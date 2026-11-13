@@ -18,6 +18,8 @@ pub struct Catalog {
     pub specs: Vec<crate::spec::Spec>,
     /// The project by levels, from the game down to its assets.
     pub tree: Option<crate::tree::Tree>,
+    /// What Blender reported for each asset built, by asset id.
+    pub builds: BTreeMap<String, crate::build::Report>,
     pub findings: Vec<Finding>,
 }
 
@@ -54,6 +56,13 @@ pub struct Piece {
     pub credit: Option<String>,
     /// What the kit's JSON manifests say of it, as written.
     pub manifest: BTreeMap<String, Value>,
+    /// Who measured it: `glb` (Kiln read the file) or `godot` (Godot read it).
+    pub measured_by: Option<String>,
+    /// A glTF of it that Blender and the page can open: its own file, or the
+    /// one Godot exported to the cache.
+    pub preview: Option<String>,
+    /// Material slot -> palette key (`[materials] bindings`).
+    pub bindings: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -64,6 +73,10 @@ pub struct Material {
     pub source: String,
     pub file: String,
     pub detail: BTreeMap<String, Value>,
+    /// Its colour, RGB 0-1, from the first `color_keys` key of its row.
+    pub color: Option<[f64; 3]>,
+    /// Its colour map, relative to the project root (texture sets).
+    pub albedo: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize)]
@@ -94,6 +107,7 @@ pub fn index(root: &Path, config: &Config) -> Catalog {
         materials: Vec::new(),
         specs: Vec::new(),
         tree: None,
+        builds: BTreeMap::new(),
         findings: Vec::new(),
     };
     for kits in &config.assets.kits {
@@ -102,7 +116,7 @@ pub fn index(root: &Path, config: &Config) -> Catalog {
         }
     }
     for t in &config.materials.tables {
-        index_table(root, t, &mut cat);
+        index_table(root, t, &config.materials.color_keys, &mut cat);
     }
     for t in &config.materials.textures {
         index_textures(root, &root.join(t), &config.materials, &mut cat);
@@ -169,6 +183,9 @@ fn index_kit(root: &Path, dir: &Path, cat: &mut Catalog) {
             },
             credit,
             manifest,
+            measured_by: None,
+            preview: None,
+            bindings: BTreeMap::new(),
         };
         if let Some(file) = models
             .get(&piece)
@@ -181,6 +198,8 @@ fn index_kit(root: &Path, dir: &Path, cat: &mut Catalog) {
                     p.tris = Some(info.tris);
                     p.material_slots = info.materials;
                     p.images = Some(info.images);
+                    p.measured_by = Some("glb".into());
+                    p.preview = p.file.clone();
                 }
                 Err(e) => cat.findings.push(Finding {
                     severity: Severity::Error,
@@ -239,7 +258,7 @@ fn read_manifests(dir: &Path) -> BTreeMap<String, BTreeMap<String, Value>> {
     out
 }
 
-fn index_table(root: &Path, file: &str, cat: &mut Catalog) {
+fn index_table(root: &Path, file: &str, color_keys: &[String], cat: &mut Catalog) {
     let path = root.join(file);
     let Ok(text) = std::fs::read_to_string(&path) else {
         cat.findings.push(Finding {
@@ -280,6 +299,8 @@ fn index_table(root: &Path, file: &str, cat: &mut Catalog) {
                 source: "table".into(),
                 file: rel(root, &path),
                 detail,
+                color: color_keys.iter().find_map(|k| rgb(row.get(k)?)),
+                albedo: None,
             });
         }
     }
@@ -326,8 +347,21 @@ fn index_textures(
             source: "texture".into(),
             file: rel(root, &entry),
             detail,
+            color: None,
+            albedo: Some(rel(root, &entry)),
         });
     }
+}
+
+/// Three numbers in 0-1, as a colour.
+fn rgb(v: &toml::Value) -> Option<[f64; 3]> {
+    let a = v.as_array()?;
+    let n: Vec<f64> = a
+        .iter()
+        .filter_map(|x| x.as_float().or_else(|| x.as_integer().map(|i| i as f64)))
+        .collect();
+    (a.len() == 3 && n.len() == 3 && n.iter().all(|x| (0.0..=1.0).contains(x)))
+        .then(|| [n[0], n[1], n[2]])
 }
 
 fn read_dir(dir: &Path) -> Vec<PathBuf> {
@@ -353,12 +387,12 @@ fn stem(p: &Path) -> String {
 fn ext(p: &Path) -> Option<String> {
     p.extension().map(|s| s.to_string_lossy().to_lowercase())
 }
-fn rel(root: &Path, p: &Path) -> String {
+pub(crate) fn rel(root: &Path, p: &Path) -> String {
     p.strip_prefix(root)
         .unwrap_or(p)
         .to_string_lossy()
         .replace('\\', "/")
 }
-fn round3(v: [f64; 3]) -> [f64; 3] {
+pub(crate) fn round3(v: [f64; 3]) -> [f64; 3] {
     v.map(|x| (x * 1000.0).round() / 1000.0)
 }

@@ -1,13 +1,15 @@
 //! A local server on 127.0.0.1 only: the graph page, its JSON and the jobs
 //! of the agent. The desktop shell (Tauri) will wrap the same page later.
 
-use crate::agent::{self, Ctx, Jobs};
+use crate::agent::{self, Ctx, Jobs, Task};
+use crate::production;
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
 use std::sync::Arc;
 
 const PAGE: &str = include_str!("../ui/index.html");
+const THREE: &str = include_str!("../ui/vendor/three.js");
 
 pub fn run(project: PathBuf, config: Option<PathBuf>, port: u16) -> Result<(), String> {
     let cfg = match &config {
@@ -22,6 +24,14 @@ pub fn run(project: PathBuf, config: Option<PathBuf>, port: u16) -> Result<(), S
             .specs
             .clone()
             .unwrap_or_else(|| "kiln/specs".into()),
+        roots: [
+            project.clone(),
+            project.join(&cfg.tools.build),
+            project.join(&cfg.tools.cache),
+        ]
+        .iter()
+        .filter_map(|p| std::fs::canonicalize(p).ok().or(Some(p.clone())))
+        .collect(),
     });
     let jobs: Jobs = Default::default();
     let listener = TcpListener::bind(("127.0.0.1", port))
@@ -91,6 +101,23 @@ fn handle(mut stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result
             .find(|(h, _)| h == k)
             .map(|(_, v)| v.as_str())
     };
+    let from_page = header("x-kiln") == Some("1")
+        && header("host")
+            .is_some_and(|h| h.starts_with("127.0.0.1:") || h.starts_with("localhost:"));
+    let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or_default();
+    let field = |k: &str| {
+        body.get(k)
+            .and_then(|t| t.as_str())
+            .map(|t| t.trim().to_string())
+            .unwrap_or_default()
+    };
+    let bad = |e: &str| {
+        (
+            "400 Bad Request",
+            "application/json",
+            serde_json::to_vec(&serde_json::json!({ "error": e })).unwrap_or_default(),
+        )
+    };
     let json = |v: serde_json::Value| {
         (
             "200 OK",
@@ -116,33 +143,68 @@ fn handle(mut stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result
                 serde_json::to_vec(&serde_json::json!({ "error": e })).unwrap_or_default(),
             ),
         },
-        // Only the page itself may start the agent: a custom header forces a CORS
-        // preflight this server never answers, so another site cannot post here.
-        ("POST", "/api/ask")
-            if header("x-kiln") == Some("1")
-                && header("host").is_some_and(|h| {
-                    h.starts_with("127.0.0.1:") || h.starts_with("localhost:")
-                }) =>
-        {
-            let text = serde_json::from_slice::<serde_json::Value>(&req.body)
-                .ok()
-                .and_then(|v| {
-                    v.get("text")
-                        .and_then(|t| t.as_str())
-                        .map(str::trim)
-                        .map(String::from)
-                })
-                .unwrap_or_default();
-            if text.is_empty() || text.len() > 500 {
-                (
-                    "400 Bad Request",
-                    "application/json",
-                    br#"{"error":"la peticion va vacia o pasa de 500 caracteres"}"#.to_vec(),
+        // Only the page itself may post here: a custom header forces a CORS
+        // preflight this server never answers, so another site cannot.
+        ("POST", _) if !from_page => (
+            "403 Forbidden",
+            "application/json",
+            br#"{"error":"solo desde la pagina de Kiln"}"#.to_vec(),
+        ),
+        ("POST", "/api/ask") => {
+            let text = field("text");
+            let layout = field("layout");
+            if !layout.is_empty() {
+                json(
+                    serde_json::json!({ "job": agent::start(jobs, ctx.clone(), Task::Layout(layout)) }),
                 )
+            } else if text.is_empty() || text.len() > 500 {
+                bad("la peticion va vacia o pasa de 500 caracteres")
             } else {
-                json(serde_json::json!({ "job": agent::start(jobs, ctx.clone(), text) }))
+                json(serde_json::json!({ "job": agent::start(jobs, ctx.clone(), Task::Ask(text)) }))
             }
         }
+        ("POST", "/api/build") => {
+            let id = field("asset");
+            if id.is_empty() {
+                bad("falta el asset")
+            } else {
+                let c = ctx.clone();
+                json(
+                    serde_json::json!({ "job": agent::job(jobs, format!("montar {id}"), move |say| {
+                    let glb = production::build_asset(&c.project, c.config.as_deref(), &id, say)?;
+                    Ok(Some(rel(&c.project, &glb)))
+                }) }),
+                )
+            }
+        }
+        ("POST", "/api/godot") => {
+            let c = ctx.clone();
+            json(
+                serde_json::json!({ "job": agent::job(jobs, "medir con Godot".into(), move |say| {
+                production::measure(&c.project, c.config.as_deref(), say).map(|_| None)
+            }) }),
+            )
+        }
+        ("POST", "/api/bind") => {
+            let (piece, slot, material) = (field("piece"), field("slot"), field("material"));
+            let r = production::config(&ctx.project, ctx.config.as_deref()).and_then(|cfg| {
+                kiln_core::bindings::set(&ctx.project, &cfg, &piece, &slot, &material)
+            });
+            match r {
+                _ if piece.is_empty() || slot.is_empty() => bad("falta la pieza o el hueco"),
+                Ok(()) => json(serde_json::json!({ "ok": true })),
+                Err(e) => bad(&e),
+            }
+        }
+        ("GET", "/vendor/three.js") => (
+            "200 OK",
+            "text/javascript; charset=utf-8",
+            THREE.as_bytes().to_vec(),
+        ),
+        ("GET", p) if p.starts_with("/files/") => match file(ctx, &p[7..]) {
+            Some((kind, body)) => ("200 OK", kind, body),
+            None => ("404 Not Found", "text/plain", b"no existe".to_vec()),
+        },
         ("GET", p) if p.starts_with("/api/jobs/") => match p[10..]
             .parse::<u64>()
             .ok()
@@ -163,4 +225,47 @@ fn handle(mut stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result
         body.len()
     )?;
     stream.write_all(&body)
+}
+
+fn rel(root: &std::path::Path, p: &std::path::Path) -> String {
+    p.strip_prefix(root)
+        .unwrap_or(p)
+        .to_string_lossy()
+        .replace('\\', "/")
+}
+
+/// A model or texture under one of the roots; the path is relative to the
+/// project, or absolute (a build or cache folder outside it).
+fn file(ctx: &Ctx, path: &str) -> Option<(&'static str, Vec<u8>)> {
+    let path = decode(path.split('?').next()?)?;
+    let kind = match path.rsplit_once('.')?.1.to_lowercase().as_str() {
+        "glb" => "model/gltf-binary",
+        "gltf" => "model/gltf+json",
+        "bin" => "application/octet-stream",
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        _ => return None,
+    };
+    let full = std::fs::canonicalize(ctx.project.join(&path)).ok()?;
+    if !ctx.roots.iter().any(|r| full.starts_with(r)) {
+        return None;
+    }
+    Some((kind, std::fs::read(full).ok()?))
+}
+
+fn decode(s: &str) -> Option<String> {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' {
+            out.push(u8::from_str_radix(s.get(i + 1..i + 3)?, 16).ok()?);
+            i += 3;
+        } else {
+            out.push(b[i]);
+            i += 1;
+        }
+    }
+    String::from_utf8(out).ok()
 }

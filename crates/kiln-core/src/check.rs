@@ -62,7 +62,7 @@ pub fn run(config: &Config, cat: &mut Catalog) {
             continue;
         }
         match (p.format.as_str(), p.size_m) {
-            ("glb" | "gltf", Some(size)) => {
+            (_, Some(size)) => {
                 let longest = size.iter().cloned().fold(0.0, f64::max);
                 if longest > rules.max_size_m || longest < rules.min_size_m {
                     push(
@@ -94,11 +94,11 @@ pub fn run(config: &Config, cat: &mut Catalog) {
                 }
             }
             ("glb" | "gltf", None) => {}
-            (f, _) => push(
+            (f, None) => push(
                 Severity::Info,
                 &p.key,
                 "not_measured",
-                format!("formato {f}: lo medirá Godot en la próxima entrega"),
+                format!("formato {f}: sin medir; mídela con Godot (`kiln godot`)"),
             ),
         }
     }

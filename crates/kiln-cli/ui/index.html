@@ -67,6 +67,14 @@ dt { color: var(--muted); } dd { margin: 0; font: 12px var(--mono); overflow-wra
 .finding { font-size: 12.5px; padding: 6px 0; border-top: 1px solid var(--line); }
 .finding code { font: 11px var(--mono); color: var(--muted); }
 .note { font-size: 12px; color: var(--muted); }
+.view3d { position: relative; height: 240px; margin: 10px 0; border: 1px solid var(--line); border-radius: 6px; overflow: hidden; background: var(--bg); }
+.view3d canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.view3d .note { position: absolute; left: 8px; bottom: 6px; }
+.slotrow { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; align-items: center; font-size: 13px; padding: 4px 0; border-top: 1px solid var(--line); }
+.slotrow span { overflow-wrap: anywhere; font: 12px var(--mono); }
+select { font: inherit; font-size: 12.5px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--fg); min-width: 0; }
+.actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+.k-build .hd i { background: #7a4fa0; }
 @media (max-width: 760px) { main { grid-template-columns: 1fr; grid-template-rows: 60vh auto; } }
 </style>
 </head>
@@ -145,8 +153,8 @@ function render() {
   if (piece) {
     let sy = Math.max(40, (nodes.find(n => n.id === sel)?.y ?? 40) - 20);
     for (const s of piece.material_slots) {
-      const bound = cat.materials.find(m => m.key === s);
-      const n = node("slot:" + piece.key + ":" + s, "slot", "Ranura", s, bound ? "coincide con la paleta" : "sin vincular a la paleta", X.slot, sy, `<span class="pill ${bound ? "ok" : "warn"}">${bound ? "vinculada" : "sin vincular"}</span>`);
+      const bound = cat.materials.find(m => m.key === (piece.bindings[s] || s));
+      const n = node("slot:" + piece.key + ":" + s, "slot", "Ranura", s, bound ? (piece.bindings[s] ? "vinculada a " + bound.key : "coincide con la paleta") : "sin vincular a la paleta", X.slot, sy, `<span class="pill ${bound ? "ok" : "warn"}">${bound ? "vinculada" : "sin vincular"}</span>`);
       nodes.push(n); edges.push([sel, n.id]); if (bound) edges.push([n.id, "mat:" + bound.key]); sy += 74;
     }
   }
@@ -274,17 +282,22 @@ function renderSpec(sp) {
   const f = cat.findings.filter(x => x.subject === "asset:" + id || x.subject.startsWith(`part:${id}/`));
   const n = s => f.filter(x => x.severity === s).length;
   nodes.push(node("check", "check", "Validación", `${n("error")} errores · ${n("warn")} avisos`, `${n("info")} notas`, C.check, 180, pill(specLevel(sp))));
-  draw(nodes, edges, [["Petición", C.ask], ["Asset", C.asset], ["Piezas", C.part], ["Modelo", C.src], ["Material", C.mat], ["Validación", C.check]]);
+  const b = cat.builds[id], placed = sp.parts.every(p => (p.at || []).length >= (p.count || 1));
+  nodes.push(node("build", "build", "Montaje", b ? `${b.tris.toLocaleString("es")} tri` : "sin montar", b ? fmt(b.size_m) : placed ? "piezas colocadas" : "faltan posiciones", C.check + 250, 180,
+    b ? `<span class="pill ${b.items.some(i => i.todo) ? "warn" : "ok"}">${b.items.filter(i => i.todo).length} por terminar a mano</span>` : `<span class="pill info">${placed ? "listo para montar" : "pide colocarlas"}</span>`));
+  edges.push(["check", "build"]);
+  draw(nodes, edges, [["Petición", C.ask], ["Asset", C.asset], ["Piezas", C.part], ["Modelo", C.src], ["Material", C.mat], ["Validación", C.check], ["Montaje", C.check + 250]]);
   world.querySelectorAll(".node").forEach(el => { el.classList.toggle("sel", el.dataset.id === sel); el.onclick = () => pickSpec(sp, el.dataset.id); });
 }
 function pickSpec(sp, id) {
   sel = id; renderSpec(sp);
   const id0 = sp.asset.id;
-  if (id === "asset" || id === "ask") { side.innerHTML = `<div class="kind">Asset</div><h2>${esc(sp.asset.name)}</h2><dl><dt>id</dt><dd>${esc(id0)}</dd><dt>petición</dt><dd>${esc(sp.asset.asked)}</dd><dt>dónde</dt><dd>${esc(sp.asset.where)}</dd><dt>estados</dt><dd>${esc(sp.asset.states.join(", "))}</dd><dt>presupuesto</dt><dd>${sp.asset.budget_tris ?? "—"} tri</dd><dt>ficha</dt><dd>${esc(sp.file)}</dd></dl>${sp.asset.notes ? `<p>${esc(sp.asset.notes)}</p>` : ""}` + findingsOf("asset:" + id0); return; }
+  if (id === "asset" || id === "ask") { side.innerHTML = `<div class="kind">Asset</div><h2>${esc(sp.asset.name)}</h2><dl><dt>id</dt><dd>${esc(id0)}</dd><dt>petición</dt><dd>${esc(sp.asset.asked)}</dd><dt>dónde</dt><dd>${esc(sp.asset.where)}</dd><dt>estados</dt><dd>${esc(sp.asset.states.join(", "))}</dd><dt>presupuesto</dt><dd>${sp.asset.budget_tris ?? "—"} tri</dd><dt>ficha</dt><dd>${esc(sp.file)}</dd></dl>${sp.asset.notes ? `<p>${esc(sp.asset.notes)}</p>` : ""}` + buildActions(sp) + findingsOf("asset:" + id0); wireBuild(sp); return; }
+  if (id === "build") return showBuild(sp);
   if (id === "check") { const f = cat.findings.filter(x => x.subject === "asset:" + id0 || x.subject.startsWith(`part:${id0}/`)); side.innerHTML = `<div class="kind">Validación</div><h2>${esc(sp.asset.name)}</h2>` + (f.map(x => `<div class="finding">${pill(x.severity)} <b>${esc(x.subject.split("/").pop())}</b>: ${esc(x.message)}</div>`).join("") || "<p>Todo en orden.</p>"); return; }
   const part = sp.parts.find(p => id === `part:${id0}/${p.id}` || id === "src:" + p.id);
   if (part) { const from = part.source.from && cat.pieces.find(c => c.key === part.source.from);
-    side.innerHTML = `<div class="kind">Pieza</div><h2>${esc(part.what)}</h2><dl><dt>id</dt><dd>${esc(part.id)}</dd><dt>medida</dt><dd>${part.size_m ? fmt(part.size_m) : "—"}</dd><dt>cuántas</dt><dd>${part.count ?? 1}</dd><dt>material</dt><dd>${esc(part.material ?? "el suyo")}</dd><dt>se mueve</dt><dd>${esc(part.moves ?? "no")}</dd><dt>fuente</dt><dd>${esc(part.source.kind)} ${esc(part.source.from ?? part.source.query ?? "")}</dd>${part.source.why ? `<dt>por qué</dt><dd>${esc(part.source.why)}</dd>` : ""}${from ? `<dt>en el catálogo</dt><dd>${fmt(from.size_m)} · ${from.tris ?? "?"} tri · ${esc(from.licenses.join(", "))}</dd>` : ""}</dl>` + findingsOf(`part:${id0}/${part.id}`); return; }
+    side.innerHTML = `<div class="kind">Pieza</div><h2>${esc(part.what)}</h2><dl><dt>id</dt><dd>${esc(part.id)}</dd><dt>medida</dt><dd>${part.size_m ? fmt(part.size_m) : "—"}</dd><dt>cuántas</dt><dd>${part.count ?? 1}</dd><dt>material</dt><dd>${esc(part.material ?? "el suyo")}</dd><dt>se mueve</dt><dd>${esc(part.moves ?? "no")}</dd><dt>fuente</dt><dd>${esc(part.source.kind)} ${esc(part.source.from ?? part.source.query ?? "")}</dd><dt>dónde</dt><dd>${(part.at || []).map(a => "(" + a.map(v => v.toFixed(2)).join(", ") + ")").join(" ") || "sin colocar"}</dd>${part.source.why ? `<dt>por qué</dt><dd>${esc(part.source.why)}</dd>` : ""}${from ? `<dt>en el catálogo</dt><dd>${fmt(from.size_m)} · ${from.tris ?? "?"} tri · ${esc(from.licenses.join(", "))}</dd>` : ""}</dl>` + (from?.preview ? `<div class="view3d" id="v3d"></div>` : "") + findingsOf(`part:${id0}/${part.id}`); if (from?.preview) view3d(from.preview); return; }
   if (id.startsWith("mat:")) { const m = cat.materials.find(x => x.key === id.slice(4)); if (m) showMat(m); else side.innerHTML = `<div class="kind">Material</div><h2>${esc(id.slice(4))}</h2><p>No está en la paleta. Hay que añadirlo antes de montar (por ejemplo, texturas CC0 de Poly Haven).</p>`; }
 }
 
@@ -296,7 +309,7 @@ function pick(id) {
   if (id.startsWith("kit:")) return showKit(cat.kits.find(k => k.name === id.slice(4)));
   if (id.startsWith("piece:")) return showPiece(cat.pieces.find(p => p.key === id.slice(6)));
   if (id.startsWith("mat:")) return showMat(cat.materials.find(m => m.key === id.slice(4)));
-  if (id.startsWith("slot:")) { side.innerHTML = `<div class="kind">Ranura de material</div><h2>${esc(id.split(":").pop())}</h2><p class="note">El vínculo de cada ranura con una clave de la paleta se escribe en la ficha del asset (tercera entrega). Hoy solo se marca vinculada cuando el nombre coincide.</p>`; }
+  if (id.startsWith("slot:")) { const key = id.slice(5, id.lastIndexOf(":")); return showPiece(cat.pieces.find(p => p.key === key)); }
 }
 function findingsOf(subject) {
   const f = cat.findings.filter(x => x.subject === subject);
@@ -306,8 +319,10 @@ function showProject() {
   const top = cat.findings.filter(f => f.severity !== "info");
   side.innerHTML = `<div class="kind">Proyecto</div><h2>${esc(cat.project)}</h2><p class="note">${esc(cat.root)}</p>
     <p>Abre un kit para ver sus piezas; toca una pieza para ver sus medidas, su licencia y sus ranuras de material.</p>
+    ${cat.findings.some(f => f.code === "not_measured" || f.code === "godot_stale") ? `<div class="actions"><button type="button" id="doGodot">Medir con Godot</button></div><p class="note">${cat.findings.filter(f => f.code === "not_measured").length} piezas solo las abre Godot: las mide y las pasa a GLB para Blender y la vista 3D.</p>` : ""}
     <div class="kind" style="margin-top:12px">Lo que hay que mirar (${top.length})</div>`
     + (top.map(x => `<div class="finding">${pill(x.severity)} <b>${esc(x.subject)}</b>: ${esc(x.message)}</div>`).join("") || `<p class="note">Nada: solo notas.</p>`);
+  document.getElementById("doGodot")?.addEventListener("click", async () => { if (job) return; const r = await post("/api/godot", {}); if (r.error) return alertSide(r.error); job = r.job; follow(); });
 }
 function showKit(k) {
   side.innerHTML = `<div class="kind">Kit</div><h2>${esc(k.name)}</h2><dl><dt>carpeta</dt><dd>${esc(k.path)}</dd><dt>piezas</dt><dd>${k.pieces}</dd>
@@ -315,10 +330,62 @@ function showKit(k) {
 }
 function showPiece(p) {
   const man = Object.entries(p.manifest).filter(([k]) => k !== "credit").map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(JSON.stringify(v))}</dd>`).join("");
-  side.innerHTML = `<div class="kind">Pieza · ${esc(p.kit)}</div><h2>${esc(p.name)}</h2>
+  side.innerHTML = `<div class="kind">Pieza · ${esc(p.kit)}</div><h2>${esc(p.name)}</h2>${p.preview ? `<div class="view3d" id="v3d"></div>` : ""}
     <dl><dt>fichero</dt><dd>${esc(p.file || "falta")}</dd><dt>medida</dt><dd>${fmt(p.size_m)}</dd><dt>base</dt><dd>${p.min ? "y = " + p.min[1].toFixed(3) + " m" : "—"}</dd>
     <dt>triángulos</dt><dd>${p.tris?.toLocaleString("es") ?? "—"}</dd><dt>texturas</dt><dd>${p.images ?? "—"}</dd><dt>ranuras</dt><dd>${esc(p.material_slots.join(", ") || "—")}</dd>
-    <dt>licencia</dt><dd>${esc(p.licenses.join(", ") || "ninguna")}</dd>${p.credit ? `<dt>crédito</dt><dd>${esc(p.credit)}</dd>` : ""}${man}</dl>` + findingsOf(p.key);
+    <dt>licencia</dt><dd>${esc(p.licenses.join(", ") || "ninguna")}</dd>${p.credit ? `<dt>crédito</dt><dd>${esc(p.credit)}</dd>` : ""}<dt>medida por</dt><dd>${esc(p.measured_by || "nadie")}</dd>${man}</dl>`
+    + (p.material_slots.length ? `<div class="kind" style="margin-top:12px">Material de cada ranura</div>` + p.material_slots.map(s => `<label class="slotrow"><span>${esc(s)}</span><select data-slot="${esc(s)}"><option value="">${cat.materials.some(m => m.key === s) ? "el de la paleta con su nombre" : "sin vincular"}</option>${cat.materials.map(m => `<option value="${esc(m.key)}"${p.bindings[s] === m.key ? " selected" : ""}>${esc(m.key)}${m.name !== m.key ? " · " + esc(m.name) : ""}</option>`).join("")}</select></label>`).join("") : "")
+    + findingsOf(p.key);
+  side.querySelectorAll("select[data-slot]").forEach(el => el.onchange = async () => {
+    const r = await post("/api/bind", { piece: p.key, slot: el.dataset.slot, material: el.value });
+    if (r.error) return alertSide(r.error);
+    await load(); showPiece(cat.pieces.find(x => x.key === p.key));
+  });
+  if (p.preview) view3d(p.preview);
+}
+
+// ---- Production: place, assemble, look at it ----
+async function post(url, body) { const r = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "X-Kiln": "1" }, body: JSON.stringify(body) }); return r.json(); }
+function alertSide(e) { side.insertAdjacentHTML("afterbegin", `<div class="finding"><span class="pill error">error</span> ${esc(e)}</div>`); }
+function buildActions(sp) {
+  return `<div class="actions"><button type="button" id="doLayout">${sp.parts.some(p => (p.at || []).length) ? "Recolocar las piezas" : "Colocar las piezas"}</button><button type="button" id="doBuild">Montar en Blender</button>${cat.builds[sp.asset.id] ? `<button type="button" id="seeBuild">Ver el montaje</button>` : ""}</div>`;
+}
+function wireBuild(sp) {
+  document.getElementById("doLayout")?.addEventListener("click", async () => { if (job) return; const r = await post("/api/ask", { layout: sp.file }); if (r.error) return alertSide(r.error); job = r.job; follow(); });
+  document.getElementById("doBuild")?.addEventListener("click", async () => { if (job) return; const r = await post("/api/build", { asset: sp.asset.id }); if (r.error) return alertSide(r.error); job = r.job; follow(); });
+  document.getElementById("seeBuild")?.addEventListener("click", () => pickSpec(sp, "build"));
+}
+function showBuild(sp) {
+  const b = cat.builds[sp.asset.id];
+  side.innerHTML = `<div class="kind">Montaje</div><h2>${esc(sp.asset.name)}</h2>` + (b
+    ? `<div class="view3d" id="v3d"></div><dl><dt>fichero</dt><dd>${esc(b.glb)}</dd><dt>medida</dt><dd>${fmt(b.size_m)}</dd><dt>triángulos</dt><dd>${b.tris.toLocaleString("es")}${sp.asset.budget_tris ? " de " + sp.asset.budget_tris.toLocaleString("es") : ""}</dd><dt>montado</dt><dd>${esc(b.built_at)}</dd></dl>`
+      + `<div class="kind">Por terminar a mano (${b.items.filter(i => i.todo).length})</div>` + (b.items.filter(i => i.todo).map(i => `<div class="finding"><b>${esc(i.name)}</b>: ${esc(i.todo)}</div>`).join("") || `<p class="note">Nada.</p>`)
+    : `<p>Aún no está montado.</p>`) + buildActions(sp);
+  wireBuild(sp);
+  if (b) view3d(b.glb);
+}
+let viewer = null;
+async function view3d(path) {
+  const box = document.getElementById("v3d"); if (!box) return;
+  viewer?.stop();
+  box.innerHTML = `<span class="note">cargando el modelo…</span>`;
+  const T = await import("/vendor/three.js");
+  const w = box.clientWidth, h = box.clientHeight;
+  const renderer = new T.WebGLRenderer({ antialias: true, alpha: true }); renderer.setPixelRatio(devicePixelRatio); renderer.setSize(w, h);
+  const scene = new T.Scene(), cam = new T.PerspectiveCamera(40, w / h, 0.01, 500);
+  scene.add(new T.HemisphereLight(0xffffff, 0x666655, 2.2)); const sun = new T.DirectionalLight(0xffffff, 1.8); sun.position.set(3, 6, 4); scene.add(sun);
+  const url = "/files/" + encodeURI(path) + "?t=" + Date.now();
+  let gltf; try { gltf = await new T.GLTFLoader().loadAsync(url); } catch (e) { box.innerHTML = `<span class="note">no se pudo abrir: ${esc(e.message || e)}</span>`; return; }
+  if (!box.isConnected) return;
+  box.innerHTML = ""; box.appendChild(renderer.domElement);
+  scene.add(gltf.scene);
+  const bb = new T.Box3().setFromObject(gltf.scene), size = bb.getSize(new T.Vector3()), mid = bb.getCenter(new T.Vector3()), r = Math.max(size.x, size.y, size.z) || 1;
+  const grid = new T.GridHelper(Math.ceil(r * 2), Math.ceil(r * 2), 0x888888, 0xcccccc); grid.position.y = bb.min.y; scene.add(grid);
+  cam.position.set(mid.x + r * 1.2, mid.y + r * 0.8, mid.z + r * 1.6); 
+  const ctl = new T.OrbitControls(cam, renderer.domElement); ctl.target.copy(mid); ctl.update();
+  box.insertAdjacentHTML("beforeend", `<span class="note">${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)} m · arrastra para girar</span>`);
+  let on = true; const tick = () => { if (!on || !box.isConnected) return renderer.dispose(); renderer.render(scene, cam); requestAnimationFrame(tick); }; tick();
+  viewer = { stop() { on = false; } };
 }
 function showMat(m) {
   const d = Object.entries(m.detail).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(JSON.stringify(v))}</dd>`).join("");
@@ -345,10 +412,11 @@ document.getElementById("askForm").addEventListener("submit", async e => {
 });
 async function follow() {
   const j = await (await fetch("/api/jobs/" + job)).json();
-  side.innerHTML = `<div class="kind">Desglosando · ${j.status === "running" ? "en marcha" : j.status === "done" ? "hecho" : "falló"}</div><h2>«${esc(j.asked)}»</h2>` + j.log.map(l => `<div class="log">${esc(l)}</div>`).join("");
+  side.innerHTML = `<div class="kind">Trabajo · ${j.status === "running" ? "en marcha" : j.status === "done" ? "hecho" : "falló"}</div><h2>«${esc(j.asked)}»</h2>` + j.log.map(l => `<div class="log">${esc(l)}</div>`).join("");
   side.scrollTop = side.scrollHeight;
   if (j.status === "running") return setTimeout(follow, 1500);
   job = null; await load();
+  if (j.spec && j.spec.endsWith(".glb")) { const id = Object.keys(cat.builds).find(k => cat.builds[k].glb === j.spec); const sp = id && cat.specs.find(x => x.asset.id === id); if (sp) { specView = id; sel = "build"; render(); showBuild(sp); side.insertAdjacentHTML("beforeend", `<div class="kind" style="margin-top:12px">Registro</div>` + j.log.map(l => `<div class="log">${esc(l)}</div>`).join("")); } return; }
   if (j.spec) { const sp = cat.specs.find(x => x.file === j.spec); if (sp) { specView = sp.asset.id; sel = "asset"; render(); pickSpec(sp, "asset"); side.insertAdjacentHTML("beforeend", `<div class="kind" style="margin-top:12px">Lo que hizo el agente</div>` + j.log.map(l => `<div class="log">${esc(l)}</div>`).join("")); } }
 }
 load();
