@@ -29,9 +29,23 @@ pub struct Ctx {
     pub project: PathBuf,
     pub config: Option<PathBuf>,
     pub specs_dir: String,
+    /// Folders the page may read files from (models, textures): the project,
+    /// its build and its cache.
+    pub roots: Vec<PathBuf>,
 }
 
-pub fn start(jobs: &Jobs, ctx: Arc<Ctx>, asked: String) -> u64 {
+/// What the agent is asked: a new asset, or to place the parts of a spec.
+#[derive(Debug, Clone)]
+pub enum Task {
+    Ask(String),
+    Layout(String),
+}
+
+pub fn start(jobs: &Jobs, ctx: Arc<Ctx>, task: Task) -> u64 {
+    let asked = match &task {
+        Task::Ask(t) => t.clone(),
+        Task::Layout(f) => format!("colocar las piezas de {f}"),
+    };
     let id = {
         let mut j = jobs.lock().unwrap();
         let id = j.len() as u64 + 1;
@@ -46,7 +60,7 @@ pub fn start(jobs: &Jobs, ctx: Arc<Ctx>, asked: String) -> u64 {
     };
     let jobs = jobs.clone();
     std::thread::spawn(move || {
-        let result = run(&jobs, id, &ctx, &asked);
+        let result = run(&jobs, id, &ctx, &task);
         let mut j = jobs.lock().unwrap();
         let job = &mut j[(id - 1) as usize];
         match result {
@@ -67,18 +81,56 @@ pub fn start(jobs: &Jobs, ctx: Arc<Ctx>, asked: String) -> u64 {
     id
 }
 
+/// A job that is not the agent (Blender, Godot): `work` says its lines and
+/// returns the file it made, relative to the project root.
+pub fn job<F>(jobs: &Jobs, asked: String, work: F) -> u64
+where
+    F: FnOnce(&dyn Fn(String)) -> Result<Option<String>, String> + Send + 'static,
+{
+    let id = {
+        let mut j = jobs.lock().unwrap();
+        let id = j.len() as u64 + 1;
+        j.push(Job {
+            id,
+            asked,
+            status: "running".into(),
+            log: Vec::new(),
+            spec: None,
+        });
+        id
+    };
+    let jobs = jobs.clone();
+    std::thread::spawn(move || {
+        let say = |l: String| log(&jobs, id, l);
+        let result = work(&say);
+        let mut j = jobs.lock().unwrap();
+        let job = &mut j[(id - 1) as usize];
+        match result {
+            Ok(file) => {
+                job.status = "done".into();
+                job.spec = file;
+            }
+            Err(e) => {
+                job.log.push(format!("Error: {e}"));
+                job.status = "failed".into();
+            }
+        }
+    });
+    id
+}
+
 fn log(jobs: &Jobs, id: u64, line: String) {
     if let Some(job) = jobs.lock().unwrap().get_mut((id - 1) as usize) {
         job.log.push(line);
     }
 }
 
-fn run(jobs: &Jobs, id: u64, ctx: &Ctx, asked: &str) -> Result<Option<String>, String> {
+fn run(jobs: &Jobs, id: u64, ctx: &Ctx, task: &Task) -> Result<Option<String>, String> {
     let cat = crate::load(&ctx.project, ctx.config.as_deref())?;
     let summary = serde_json::json!({
         "project": cat.project,
         "pieces": cat.pieces.iter().map(|p| serde_json::json!({
-            "key": p.key, "format": p.format, "size_m": p.size_m, "tris": p.tris,
+            "key": p.key, "format": p.format, "size_m": p.size_m, "min": p.min, "tris": p.tris,
             "material_slots": p.material_slots, "licenses": p.licenses,
         })).collect::<Vec<_>>(),
         "materials": cat.materials.iter().map(|m| serde_json::json!({ "key": m.key, "name": m.name, "source": m.source })).collect::<Vec<_>>(),
@@ -100,11 +152,18 @@ fn run(jobs: &Jobs, id: u64, ctx: &Ctx, asked: &str) -> Result<Option<String>, S
         ),
         None => "Configuración de Kiln del proyecto: kiln.toml en la raíz".into(),
     };
-    let prompt = format!(
-        "Petición de la persona: «{asked}»\n\n{config}\nCatálogo del proyecto: {}\nEscribe la ficha en la carpeta {} (fichero <id>.toml), siguiendo las instrucciones de la skill kiln-asset que tienes en tu prompt de sistema. No toques ningún otro fichero.",
-        cat_path.display(),
-        specs.display()
-    );
+    let prompt = match task {
+        Task::Ask(asked) => format!(
+            "Petición de la persona: «{asked}»\n\n{config}\nCatálogo del proyecto: {}\nEscribe la ficha en la carpeta {} (fichero <id>.toml), siguiendo las instrucciones de la skill kiln-asset que tienes en tu prompt de sistema. No toques ningún otro fichero.",
+            cat_path.display(),
+            specs.display()
+        ),
+        Task::Layout(file) => format!(
+            "Coloca las piezas de la ficha {} (solo el paso 4, montaje, de la skill kiln-asset que tienes en tu prompt de sistema).\n\n{config}\nCatálogo del proyecto: {}\nEdita solo esa ficha.",
+            ctx.project.join(file).display(),
+            cat_path.display()
+        ),
+    };
     log(jobs, id, "Claude Code está leyendo el proyecto".into());
     let mut child = claude()
         .args(["-p", &prompt, "--output-format", "stream-json", "--verbose", "--append-system-prompt", SKILL])

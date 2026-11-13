@@ -89,11 +89,56 @@ children = [{ key = "fixtures", field = "id", level = "asset" }]
 Un asset es una hoja: tiene modelo si el catálogo tiene una pieza con su
 nombre, ficha si hay una ficha con su id, y si no, falta.
 
+## Entrega 4: producción con Blender y Godot
+
+La IA decide y Kiln ejecuta. En la ficha, «Colocar las piezas» lanza al
+agente solo para el paso de montaje: añade a cada pieza dónde va cada copia
+(`at`, el centro de su base en metros, Y arriba) y cómo gira (`turn`).
+«Montar en Blender» convierte la ficha en un plan (`plan.json`) y lanza
+Blender sin ventana con `crates/kiln-cli/blender/assemble.py`:
+
+- importa las piezas del catálogo; «reutilizar» guarda su medida, «variante»
+  y «retocar» se estiran a `size_m`;
+- pone una caja de su medida en las que hay que buscar o no tienen glTF;
+- viste cada pieza con su material de la paleta (textura de color o color de
+  la tabla, `[materials] color_keys`) y cada ranura con su vínculo;
+- escribe `<build>/<id>/<id>.glb`, el `.blend` y `report.json` con los
+  triángulos y lo que queda por terminar a mano. Cada objeto lleva en sus
+  extras su pieza, si se mueve y en qué estados sale, para Godot.
+
+El mismo script sirve en un Blender abierto (por MCP) con `KILN_PLAN`.
+Sin ficha colocada, Kiln pone las piezas en fila para que se puedan ver.
+
+**Vista 3D.** Cada pieza con glTF, cada pieza de una ficha y el montaje se
+ven en 3D en el panel (three.js 0.187 incluido en el binario, sin red).
+
+**Ranuras y paleta.** En el panel de una pieza, cada ranura de material se
+vincula a una clave de la paleta; se guarda en `[materials] bindings`
+(`kiln/bindings.toml`) y Blender lo usa al montar.
+
+**Godot.** Las piezas `.res`, `.tres` y `.tscn` solo las abre Godot:
+`kiln godot` (o «Medir con Godot» en el panel del proyecto) lanza Godot sin
+ventana con `crates/kiln-cli/godot/measure.gd`, que mide cada una y la
+exporta a GLB en la caché; desde ahí Blender y la vista 3D las usan.
+
+```toml
+[tools]
+blender = "blender"            # o un Python con el módulo bpy
+godot = "godot"
+godot_project = "godot"        # la carpeta con project.godot
+build = "kiln/build"
+cache = "kiln/cache"
+```
+
+```bash
+kiln build --project ../rune-world --config examples/rune-world.kiln.toml --asset hoist
+kiln godot --project ../rune-world --config examples/rune-world.kiln.toml
+```
+
 ## Lo que viene
 
-- Entrega 3: producción y montaje con Blender y Godot, vista 3D en cada nodo, vínculo de ranuras con la paleta y app de escritorio (Tauri).
-- Entrega 4: el primer asset de punta a punta.
-- Entrega 5: componer escenas con módulos de piezas (un pasillo de suelo, techo, muros y luces).
+- Entrega 5: el contexto del proyecto. Una pantalla para explicar el juego, separada en capas en un grafo, con un modo de preguntas y respuestas sugeridas que lo afina; el agente lo lee al desglosar.
+- El primer asset de punta a punta y la app de escritorio (Tauri).
+- Componer escenas con módulos de piezas (un pasillo de suelo, techo, muros y luces).
+- Kiln como servidor MCP, para que cualquier Claude le pida catálogo o assets.
 - El grafo pasará a Rete.js cuando los nodos se puedan editar.
-
-Los `.res` y escenas de Godot no se miden todavía: lo hará Godot sin ventana en la entrega 3.

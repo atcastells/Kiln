@@ -67,6 +67,13 @@ pub struct Part {
     #[serde(default)]
     pub only_in: Vec<String>,
     pub source: Source,
+    /// Where each copy stands, in metres from the asset's origin (the centre
+    /// of its footprint on the ground, Y up): the centre of the copy's base.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub at: Vec<[f64; 3]>,
+    /// How each copy is turned, degrees about X, Y and Z.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub turn: Vec<[f64; 3]>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -214,6 +221,15 @@ pub fn check(s: &Spec, rules: &crate::config::Rules, cat: &mut Catalog) {
                 "pieza sin material de la paleta".into(),
             ),
             _ => {}
+        }
+        let n = p.count.unwrap_or(1) as usize;
+        if !p.at.is_empty() && p.at.len() != n {
+            push(
+                Severity::Warn,
+                subject.clone(),
+                "layout_count",
+                format!("{} posiciones para {n} copias", p.at.len()),
+            );
         }
         for st in &p.only_in {
             if !s.asset.states.contains(st) {

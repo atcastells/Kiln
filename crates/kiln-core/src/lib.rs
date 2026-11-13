@@ -2,10 +2,13 @@
 //! the catalog of what the project already has (pieces, materials) with the
 //! findings of the checks. No engine is needed to read it.
 
+pub mod bindings;
+pub mod build;
 pub mod catalog;
 pub mod check;
 pub mod config;
 pub mod glb;
+pub mod godot;
 pub mod license;
 pub mod spec;
 pub mod tree;
@@ -24,6 +27,8 @@ pub fn open(project: &Path) -> Result<Catalog, String> {
 /// Indexes the project with a config read elsewhere (`--config`).
 pub fn open_with(project: &Path, config: Config) -> Result<Catalog, String> {
     let mut catalog = catalog::index(project, &config);
+    godot::apply(project, &config, &mut catalog);
+    bindings::apply(&bindings::load(project, &config)?, &mut catalog);
     check::run(&config, &mut catalog);
     if let Some(dir) = &config.assets.specs {
         catalog.specs = spec::load_all(project, dir, &config.rules, &mut catalog);
@@ -31,6 +36,7 @@ pub fn open_with(project: &Path, config: Config) -> Result<Catalog, String> {
             .findings
             .sort_by(|a, b| b.severity.cmp(&a.severity).then(a.subject.cmp(&b.subject)));
     }
+    catalog.builds = build::reports(project, &config, &catalog.specs);
     catalog.tree = Some(tree::build(project, &config, &catalog));
     Ok(catalog)
 }
