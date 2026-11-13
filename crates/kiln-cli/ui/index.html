@@ -89,6 +89,17 @@ textarea { font: inherit; width: 100%; min-height: 180px; padding: 8px 10px; bor
 .qcard .opts { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; } .qcard .opts button { text-align: left; font-weight: 500; }
 .qcard .free { display: flex; gap: 6px; } .qcard .free input { flex: 1; }
 .qcard .skip { display: flex; gap: 6px; margin-top: 8px; } .qcard .skip button { font-weight: 500; font-size: 12px; padding: 4px 8px; }
+[hidden] { display: none !important; }
+#wizard { flex: 1; overflow: auto; }
+#wizard .wz { max-width: 640px; margin: 0 auto; padding: 8px 0 40px; display: flex; flex-direction: column; gap: 12px; }
+#wizard h2 { font-size: 22px; margin: 0; } #wizard p { margin: 0; }
+#wizard .wz input, #wizard .wz textarea { width: 100%; flex: none; } #wizard .qcard .free input { width: auto; flex: 1; }
+#wizard .opts button.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+#wizard .nav { display: flex; gap: 8px; justify-content: flex-end; } #wizard .nav .go { background: var(--accent); border-color: var(--accent); color: #fff; }
+#wizard .nav .go:disabled { opacity: .5; cursor: default; }
+#wizard .lrow { border-top: 1px solid var(--line); padding: 8px 0; } #wizard .lrow b { display: block; margin-bottom: 4px; }
+#wizard .crow { display: flex; gap: 8px; align-items: center; justify-content: space-between; font-size: 13px; padding: 3px 0; }
+#wizard .crow button { font-size: 12px; padding: 3px 8px; flex: none; }
 .proposal { border-left: 3px solid var(--warn); padding: 4px 8px; margin: 8px 0; background: var(--warnbg); font-size: 13px; }
 @media (max-width: 760px) { main { grid-template-columns: 1fr; grid-template-rows: 60vh auto; } }
 </style>
@@ -103,6 +114,7 @@ textarea { font: inherit; width: 100%; min-height: 180px; padding: 8px 10px; bor
   <button id="back" type="button" hidden>Volver</button>
   <button id="reload" type="button">Releer el proyecto</button>
 </header>
+<section id="wizard" hidden></section>
 <div id="crumbs"></div>
 <main>
   <div id="stage"><div id="world"><svg id="edges"></svg></div></div>
@@ -682,7 +694,107 @@ async function follow() {
   if (j.spec && j.spec.endsWith(".glb")) { const id = Object.keys(cat.builds).find(k => cat.builds[k].glb === j.spec || Object.values(cat.builds[k].variants || {}).includes(j.spec)); const sp = id && cat.specs.find(x => x.asset.id === id); if (sp) { specView = id; sel = "build"; render(); showBuild(sp); side.insertAdjacentHTML("beforeend", `<div class="kind" style="margin-top:12px">Registro</div>` + j.log.map(l => `<div class="log">${esc(l)}</div>`).join("")); } return; }
   if (j.spec) { const sp = cat.specs.find(x => x.file === j.spec); if (sp) { specView = sp.asset.id; sel = "asset"; render(); pickSpec(sp, "asset"); side.insertAdjacentHTML("beforeend", `<div class="kind" style="margin-top:12px">Lo que hizo el agente</div>` + j.log.map(l => `<div class="log">${esc(l)}</div>`).join("")); } }
 }
-load();
+
+// Start wizard: a folder without kiln.toml, or a project made here whose start is not settled yet.
+const WZ = ["Proyecto", "Lo básico", "Tu juego", "Preguntas", "Asentar"];
+let wz = { step: 1, name: "", basics: {}, info: null };
+const wzEl = document.getElementById("wizard");
+async function start() {
+  const n = await (await fetch("/api/new")).json();
+  if (!n.step) { wzEl.hidden = true; document.querySelector("main").hidden = false; return load(); }
+  wz.info = n; wz.step = n.step === 1 ? (wz.step === 2 ? 2 : 1) : Math.max(n.step, wz.step);
+  document.querySelector("main").hidden = true; document.querySelectorAll("header > :not(h1):not(#proj)").forEach(e => e.hidden = true);
+  document.getElementById("crumbs").hidden = true; wzEl.hidden = false;
+  if (wz.step > 2) { ctxData = await (await fetch("/api/context")).json(); wz.name ||= (await (await fetch("/api/catalog")).json()).project; }
+  document.getElementById("proj").textContent = wz.name || "juego nuevo";
+  wzRender();
+}
+function wzFrame(body, nav) {
+  wzEl.innerHTML = `<div class="wz"><div class="kind">Paso ${wz.step} de 5 · ${WZ[wz.step - 1]}</div>${body}<div class="nav">${nav}</div></div>`;
+}
+const $ = id => document.getElementById(id);
+function wzRender() {
+  const s = wz.step, C = ctxData?.context;
+  if (s === 1) {
+    wzFrame(`<h2>Un juego nuevo</h2><p class="note">En ${esc(wz.info.folder)}. Kiln escribe aquí su kiln.toml y el contexto del juego; no toca nada más.</p>
+      <label>Nombre del juego<input id="wzName" value="${esc(wz.name)}" placeholder="Puerto Niebla"></label>
+      <dl><dt>Tipo</dt><dd>Juego (de momento, el único tipo)</dd><dt>Motor</dt><dd>Godot 4</dd></dl>`, `<button type="button" class="go" id="wzNext">Seguir</button>`);
+    const go = () => { wz.name = $("wzName").value.trim(); if (wz.name) { wz.step = 2; wzRender(); } else $("wzName").focus(); };
+    $("wzNext").onclick = go; $("wzName").onkeydown = e => { if (e.key === "Enter") go(); }; $("wzName").focus();
+  } else if (s === 2) {
+    wzFrame(`<h2>Lo básico</h2><p class="note">Cinco cosas que cualquier asset necesita saber. Elige una o escribe la tuya; puedes dejar alguna en blanco.</p>`
+      + wz.info.basics.map(b => `<div class="qcard"><b>${esc(b.text)}</b><div class="opts">${b.options.map((o, i) => `<button type="button" data-b="${b.id}" data-i="${i}" class="${wz.basics[b.id] === o ? "on" : ""}">${esc(o)}</button>`).join("")}</div>
+        <div class="free"><input data-free="${b.id}" placeholder="O con tus palabras" value="${esc(b.options.includes(wz.basics[b.id]) ? "" : wz.basics[b.id] ?? "")}"></div></div>`).join(""),
+      `<button type="button" id="wzBack">Atrás</button><button type="button" class="go" id="wzMake">Crear el proyecto</button>`);
+    wzEl.querySelectorAll("[data-b]").forEach(btn => btn.onclick = () => { const b = wz.info.basics.find(x => x.id === btn.dataset.b); wz.basics[b.id] = b.options[+btn.dataset.i]; wzRender(); });
+    wzEl.querySelectorAll("[data-free]").forEach(inp => inp.oninput = () => { if (inp.value.trim()) wz.basics[inp.dataset.free] = inp.value.trim(); });
+    $("wzBack").onclick = () => { wz.step = 1; wzRender(); };
+    $("wzMake").onclick = async () => { const r = await post("/api/new", { name: wz.name, basics: wz.basics }); if (r.error) return wzError(r.error); wz.step = 3; start(); };
+  } else if (s === 3) {
+    wzFrame(`<h2>Tu juego, con tus palabras</h2><p class="note">De qué va, dónde y cuándo pasa, qué hace el jugador y cómo se ve. Si se parece a un juego que existe, dilo. El agente lo parte en afirmaciones por capa, escribe un párrafo de qué juego es y te hace preguntas.</p>
+      <textarea id="wzText" placeholder="Un juego de...">${esc(C.text)}</textarea><div id="wzLog"></div>`,
+      `<button type="button" class="go" id="wzSort">Ordenar y preguntar</button>`);
+    $("wzSort").onclick = async () => {
+      const text = $("wzText").value.trim(); if (!text) return $("wzText").focus();
+      if (!(await wzPost("text", { text }))) return;
+      $("wzSort").disabled = true; $("wzText").disabled = true;
+      if (!(await wzJob("sort")) || !(await wzJob("refine"))) { $("wzSort").disabled = false; $("wzText").disabled = false; return; }
+      start();
+    };
+  } else if (s === 4) {
+    const qs = C.questions.filter(q => q.status === "open");
+    if (!qs.length) { wz.step = 5; return wzRender(); }
+    const q = qs[0];
+    wzFrame(`<h2>Unas preguntas</h2><p class="note">Quedan ${qs.length}. Cada respuesta queda fijada en su capa: el agente no la cambia.</p>
+      <div class="kind">${esc(layerName(q.layer))}</div>` + qcard(q) + `<div id="wzLog"></div>`,
+      `<button type="button" id="wzMore">Otra ronda</button><button type="button" class="go" id="wzSkipAll">Seguir sin responder</button>`);
+    const done = ok => ok && wzRender();
+    wzEl.querySelectorAll("[data-opt]").forEach(b => b.onclick = () => wzPost("answer", { id: q.id, answer: q.options[+b.dataset.opt], status: "answered" }).then(done));
+    $("qSend").onclick = () => wzPost("answer", { id: q.id, answer: $("qFree").value, status: "answered" }).then(done);
+    $("qFree").onkeydown = e => { if (e.key === "Enter") $("qSend").click(); };
+    $("qSkip").onclick = () => wzPost("answer", { id: q.id, status: "skipped" }).then(done);
+    $("qNa").onclick = () => wzPost("answer", { id: q.id, status: "not_applicable" }).then(done);
+    $("wzMore").onclick = async () => { if (await wzJob("refine")) wzRender(); };
+    $("wzSkipAll").onclick = () => { wz.step = 5; wzRender(); };
+  } else {
+    const I = C.intent || {}, missing = wz.info.missing || [];
+    wzFrame(`<h2>Asentar el inicio</h2><p class="note">Esto es lo que todo asset leerá primero. Fija el párrafo y al menos una afirmación por capa.</p>
+      <div class="kind">Qué juego es ${I.pinned ? `<span class="pill ok">fijado</span>` : ""}</div>
+      <textarea id="wzIntent" style="min-height:110px">${esc(I.text)}</textarea>
+      <div class="actions"><button type="button" id="wzPinI">Guardar y fijar el párrafo</button></div>
+      ${I.proposed ? `<div class="proposal"><b>El agente propone:</b> ${esc(I.proposed)}<div class="actions"><button type="button" id="wzAcc">Aceptar</button><button type="button" id="wzRej">Descartar</button></div></div>` : ""}
+      <div class="kind">Por capa</div>`
+      + ctxData.layers.map(l => { const cs = C.claims.filter(c => c.layer === l.id);
+        return `<div class="lrow"><b>${esc(l.name)} ${cs.some(c => c.pinned) ? `<span class="pill ok">fijada</span>` : `<span class="pill warn">nada fijado</span>`}</b>`
+          + cs.map(c => `<div class="crow"><span>${c.conflicts ? `<span class="pill error">choca</span> ` : ""}${esc(c.text)}</span>${c.pinned ? `<span class="note">fijada</span>` : `<button type="button" data-pin="${esc(c.id)}">Fijar</button>`}${c.conflicts ? `<button type="button" data-del="${esc(c.id)}">Borrar</button>` : ""}</div>`).join("")
+          + `<div class="free"><input data-add="${esc(l.id)}" placeholder="Añadir una afirmación a ${esc(l.name)}"></div></div>`; }).join("")
+      + (missing.length ? `<div class="finding"><b>Falta:</b> ${missing.map(esc).join(" · ")}</div>` : `<p class="note">Todo listo.</p>`),
+      `<button type="button" id="wzQs">Más preguntas</button><button type="button" class="go" id="wzSettle"${missing.length ? " disabled" : ""}>Asentar y abrir el proyecto</button>`);
+    const again = ok => ok && start();
+    $("wzPinI").onclick = () => wzPost("intent", { action: "edit", text: $("wzIntent").value }).then(again);
+    $("wzAcc")?.addEventListener("click", () => wzPost("intent", { action: "accept" }).then(again));
+    $("wzRej")?.addEventListener("click", () => wzPost("intent", { action: "reject" }).then(again));
+    wzEl.querySelectorAll("[data-pin]").forEach(b => b.onclick = () => wzPost("claim", { id: b.dataset.pin, action: "pin" }).then(again));
+    wzEl.querySelectorAll("[data-del]").forEach(b => b.onclick = () => wzPost("claim", { id: b.dataset.del, action: "delete" }).then(again));
+    wzEl.querySelectorAll("[data-add]").forEach(inp => inp.onkeydown = e => { if (e.key === "Enter" && inp.value.trim()) wzPost("claim", { action: "add", layer: inp.dataset.add, text: inp.value }).then(again); });
+    $("wzQs").onclick = async () => { if (await wzJob("refine")) { wz.step = 4; start(); } };
+    $("wzSettle").onclick = async () => { const r = await post("/api/settle", {}); if (r.error) return wzError(r.error);
+      document.querySelectorAll("header > *").forEach(e => e.hidden = e.id === "back"); document.getElementById("crumbs").hidden = false; start(); };
+  }
+}
+async function wzPost(what, body) { const r = await post("/api/context/" + what, body); if (r.error) { wzError(r.error); return false; } ctxData = await (await fetch("/api/context")).json(); return true; }
+function wzError(e) { wzEl.querySelector(".nav").insertAdjacentHTML("beforebegin", `<div class="finding error">${esc(e)}</div>`); }
+async function wzJob(what) {
+  const r = await post("/api/context/" + what, {}); if (r.error) { wzError(r.error); return false; }
+  const box = $("wzLog") || wzEl.querySelector(".wz");
+  for (;;) {
+    const j = await (await fetch("/api/jobs/" + r.job)).json();
+    box.innerHTML = `<div class="kind">${j.status === "running" ? "El agente trabaja" : j.status === "done" ? "Hecho" : "Falló"} · ${esc(j.asked)}</div>` + j.log.map(l => `<div class="log">${esc(l)}</div>`).join("");
+    if (j.status !== "running") { ctxData = await (await fetch("/api/context")).json(); return j.status === "done"; }
+    await new Promise(ok => setTimeout(ok, 1500));
+  }
+}
+start();
 </script>
 </body>
 </html>

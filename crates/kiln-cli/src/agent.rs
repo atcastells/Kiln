@@ -248,6 +248,9 @@ fn run(jobs: &Jobs, id: u64, ctx: &Ctx, task: &Task) -> Result<Option<String>, S
                 format!("Propone cambiar {proposed} afirmaciones que fijaste: decide tú"),
             );
         }
+        if after.intent.proposed.is_some() && after.intent.proposed != ctx_before.intent.proposed {
+            log(jobs, id, "Propone otro párrafo de qué juego es: decide tú".into());
+        }
         let open = |c: &kiln_core::context::Context| {
             c.questions.iter().filter(|q| q.status == "open").count()
         };

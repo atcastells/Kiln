@@ -205,6 +205,15 @@ pub struct ProjectSection {
     pub name: String,
     #[serde(default)]
     pub engine: Option<String>,
+    /// What kind of project it is; only `game` exists for now.
+    #[serde(default = "default_kind")]
+    pub kind: String,
+}
+
+pub const KINDS: [&str; 1] = ["game"];
+
+fn default_kind() -> String {
+    "game".into()
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]

@@ -16,6 +16,18 @@ pub fn run(config: &Config, cat: &mut Catalog) {
         })
     };
 
+    if !crate::config::KINDS.contains(&config.project.kind.as_str()) {
+        push(
+            Severity::Warn,
+            &config.project.name,
+            "kind_unknown",
+            format!(
+                "tipo de proyecto «{}»; Kiln solo conoce: {}",
+                config.project.kind,
+                crate::config::KINDS.join(", ")
+            ),
+        );
+    }
     for kit in &cat.kits {
         if !kit.has_license_file {
             push(
@@ -116,4 +128,36 @@ pub fn run(config: &Config, cat: &mut Catalog) {
     cat.findings.extend(out);
     cat.findings
         .sort_by(|a, b| b.severity.cmp(&a.severity).then(a.subject.cmp(&b.subject)));
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn empty() -> Catalog {
+        Catalog {
+            project: "x".into(),
+            root: ".".into(),
+            kits: vec![],
+            pieces: vec![],
+            materials: vec![],
+            specs: vec![],
+            tree: None,
+            builds: Default::default(),
+            findings: vec![],
+        }
+    }
+
+    #[test]
+    fn a_project_is_a_game_unless_it_says_otherwise() {
+        let game = Config::parse("[project]\nname = \"x\"\n").unwrap();
+        assert_eq!(game.project.kind, "game");
+        let mut cat = empty();
+        run(&game, &mut cat);
+        assert!(cat.findings.is_empty());
+        let film = Config::parse("[project]\nname = \"x\"\nkind = \"film\"\n").unwrap();
+        let mut cat = empty();
+        run(&film, &mut cat);
+        assert_eq!(cat.findings[0].code, "kind_unknown");
+    }
 }
