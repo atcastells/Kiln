@@ -34,7 +34,7 @@ pub struct Claim {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub proposed: Option<String>,
     /// Other claims it bears on (ids).
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(default)]
     pub links: Vec<String>,
     /// Another claim it contradicts, when the agent sees one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -269,7 +269,10 @@ mod tests {
     fn the_agent_only_proposes_on_pinned_claims() {
         let before = Context {
             text: "un pueblo de pescadores".into(),
-            claims: vec![claim("c1", "costa fría", true), claim("c2", "sin motores", true)],
+            claims: vec![
+                claim("c1", "costa fría", true),
+                claim("c2", "sin motores", true),
+            ],
             ..Default::default()
         };
         let mut after = Context {

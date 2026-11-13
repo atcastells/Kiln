@@ -201,9 +201,9 @@ fn handle(mut stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result
         ("POST", "/api/context/sort") => {
             json(serde_json::json!({ "job": agent::start(jobs, ctx.clone(), Task::Sort) }))
         }
-        ("POST", "/api/context/refine") => {
-            json(serde_json::json!({ "job": agent::start(jobs, ctx.clone(), Task::Refine) }))
-        }
+        ("POST", "/api/context/refine") => json(
+            serde_json::json!({ "job": agent::start(jobs, ctx.clone(), Task::Refine(Some(field("layer")).filter(|l| !l.is_empty()))) }),
+        ),
         ("POST", p) if p.starts_with("/api/context/") => {
             let r = kiln_core::context::load(&ctx.context_file).and_then(|mut c| {
                 match p {

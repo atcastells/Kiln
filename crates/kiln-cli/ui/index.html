@@ -446,7 +446,7 @@ function renderContext() {
     y += 1;
   }
   const s = sel && sel.startsWith("claim:") ? C.claims.find(c => "claim:" + c.id === sel) : null;
-  if (s) for (const o of [...s.links, s.conflicts].filter(Boolean)) edges.push(["claim:" + s.id, "claim:" + o]);
+  if (s) for (const o of [...(s.links || []), s.conflicts].filter(Boolean)) edges.push(["claim:" + s.id, "claim:" + o]);
   const bands = [...layers.map(l => [["layer:" + l.id], claimsOf(l.id).map(c => "claim:" + c.id), openQs().filter(q => q.layer === l.id).map(q => "q:" + q.id)])];
   draw(nodes, edges, [["Juego", CX[0]], ["Capas", CX[1]], ["Afirmaciones", CX[2]], ["Preguntas", CX[3]]], bands);
   world.querySelectorAll(".node").forEach(el => { el.classList.toggle("sel", el.dataset.id === sel); el.onclick = () => pickContext(el.dataset.id); });
@@ -459,7 +459,7 @@ function pickContext(id) {
   if (id.startsWith("q:")) { const q = ctxData.context.questions.find(x => x.id === id.slice(2)); side.innerHTML = `<div class="kind">Pregunta · ${esc(layerName(q.layer))}</div>` + qcard(q); wireQ(q); }
 }
 async function ctxPost(what, body) { const r = await post("/api/context/" + what, body); if (r.error) { alertSide(r.error); return false; } ctxData = await (await fetch("/api/context")).json(); render(); return true; }
-async function ctxJob(what) { if (job) return; const r = await post("/api/context/" + what, {}); if (r.error) return alertSide(r.error); job = r.job; follow(); }
+async function ctxJob(what, body = {}) { if (job) return; const r = await post("/api/context/" + what, body); if (r.error) return alertSide(r.error); job = r.job; follow(); }
 function showContext() {
   const C = ctxData.context, qs = openQs();
   side.innerHTML = `<div class="kind">Contexto del proyecto</div><h2>${esc(cat.project)}</h2>
@@ -490,10 +490,18 @@ function wireQ(q, next) {
 }
 function showLayer(id) {
   const l = ctxData.layers.find(x => x.id === id) || { id, name: id, holds: "" }, cs = claimsOf(id);
-  side.innerHTML = `<div class="kind">Capa</div><h2>${esc(l.name)}</h2><p class="note">${esc(l.holds)}</p>`
-    + (cs.map(c => `<div class="finding">${c.pinned ? `<span class="pill ok">fijada</span> ` : ""}${esc(c.text)}</div>`).join("") || `<p class="note">Vacía.</p>`)
+  const qs = openQs().filter(q => q.layer === id);
+  side.innerHTML = `<div class="kind">Capa</div><h2>${esc(l.name)}</h2><p class="note">${esc(l.holds)}</p>
+    <div class="actions"><button type="button" id="layerAsk">Pedir preguntas sobre esta capa</button></div>`
+    + (qs.length ? `<div class="kind" style="margin-top:6px">Preguntas abiertas (${qs.length})</div>` + qs.map(q => `<div class="missing-row"><span>${esc(q.text)}</span><button type="button" data-q="${esc(q.id)}">Responder</button></div>`).join("") : "")
+    + `<div class="kind" style="margin-top:12px">Afirmaciones (${cs.length})</div>`
+    + (cs.map(c => `<div class="missing-row"><span>${c.pinned ? `<span class="pill ok">fijada</span> ` : ""}<a href="#" data-claim="${esc(c.id)}">${esc(c.text)}</a></span><button type="button" data-del="${esc(c.id)}">Borrar</button></div>`).join("") || `<p class="note">Vacía.</p>`)
     + `<div class="free actions"><input id="addClaim" placeholder="Añadir una afirmación a esta capa" style="flex:1"><button type="button" id="addBtn">Añadir</button></div>`;
   document.getElementById("addBtn").onclick = () => ctxPost("claim", { action: "add", layer: id, text: document.getElementById("addClaim").value }).then(ok => ok && showLayer(id));
+  document.getElementById("layerAsk").onclick = () => ctxJob("refine", { layer: id });
+  side.querySelectorAll("[data-del]").forEach(b => b.onclick = () => ctxPost("claim", { id: b.dataset.del, action: "delete" }).then(ok => ok && showLayer(id)));
+  side.querySelectorAll("[data-claim]").forEach(a => a.onclick = e => { e.preventDefault(); pickContext("claim:" + a.dataset.claim); });
+  side.querySelectorAll("[data-q]").forEach(b => b.onclick = () => pickContext("q:" + b.dataset.q));
 }
 function showClaim(c) {
   const ref = id => { const o = ctxData.context.claims.find(x => x.id === id); return o ? `<div class="finding"><span class="note">${esc(layerName(o.layer))}</span> ${esc(o.text)}</div>` : ""; };
@@ -502,7 +510,7 @@ function showClaim(c) {
     <div class="actions"><button type="button" id="cEdit">Guardar y fijar</button><button type="button" id="cPin">${c.pinned ? "Soltar" : "Fijar"}</button><button type="button" id="cDel">Borrar</button></div>
     ${c.proposed ? `<div class="proposal"><b>El agente propone:</b> ${esc(c.proposed)}<div class="actions"><button type="button" id="cAcc">Aceptar</button><button type="button" id="cRej">Descartar</button></div></div>` : ""}
     <dl><dt>origen</dt><dd>${esc(c.source)}</dd><dt>id</dt><dd>${esc(c.id)}</dd></dl>`
-    + (c.conflicts ? `<div class="kind">Choca con</div>` + ref(c.conflicts) : "") + (c.links.length ? `<div class="kind" style="margin-top:10px">Relacionadas</div>` + c.links.map(ref).join("") : "")
+    + (c.conflicts ? `<div class="kind">Choca con</div>` + ref(c.conflicts) : "") + ((c.links || []).length ? `<div class="kind" style="margin-top:10px">Relacionadas</div>` + c.links.map(ref).join("") : "")
     + `<p class="note">Lo que fijas no lo cambia el agente: como mucho, te propone otra versión.</p>`;
   const act = (action, text = "") => ctxPost("claim", { id: c.id, action, text }).then(ok => { if (!ok) return; const n = ctxData.context.claims.find(x => x.id === c.id); n ? showClaim(n) : (sel = "layer:" + c.layer, render(), showLayer(c.layer)); });
   document.getElementById("cEdit").onclick = () => act("edit", document.getElementById("claimText").value);
