@@ -26,6 +26,8 @@ pub struct Plan {
     pub report: String,
     /// The spec gave no positions for some parts and Kiln put them in a row.
     pub auto_layout: Vec<String>,
+    /// Where Blender writes which palette key each `part/zone` material wears.
+    pub materials: String,
     pub items: Vec<Item>,
 }
 
@@ -51,8 +53,14 @@ pub struct Item {
     pub moves: Option<String>,
     /// What is still to do by hand: a stand-in box, a retouch.
     pub todo: Option<String>,
+    /// Blender paints each material slot of the model with, in this order:
+    /// `zones[slot]`, else `material`, else `slots[slot]`, else the model's own.
     /// The part's palette material, on every slot.
     pub material: Option<Paint>,
+    /// Zone (slot) -> palette material, the spec's per-zone choices.
+    pub zones: BTreeMap<String, Paint>,
+    /// How to split the piece into zones (`zones::mode`), if it is split.
+    pub split: Option<String>,
     /// Slot -> palette material, from the piece's bindings.
     pub slots: BTreeMap<String, Paint>,
 }
@@ -79,6 +87,13 @@ pub struct Report {
     pub items: Vec<ReportItem>,
     #[serde(default)]
     pub built_at: String,
+    /// `part/zone` -> the palette key it wears (none: the model's own); set
+    /// by Kiln when read, from materials.json.
+    #[serde(default)]
+    pub materials: BTreeMap<String, Option<String>>,
+    /// Colour variants already painted: id -> GLB relative to the project root.
+    #[serde(default)]
+    pub variants: BTreeMap<String, String>,
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -92,6 +107,56 @@ pub struct ReportItem {
 
 pub fn out_dir(root: &Path, config: &Config, asset: &str) -> std::path::PathBuf {
     root.join(&config.tools.build).join(asset)
+}
+
+fn find_paint(root: &Path, cat: &Catalog, key: &str) -> Option<Paint> {
+    cat.materials
+        .iter()
+        .find(|m| m.key == key)
+        .map(|m| paint(root, m))
+}
+
+/// The palette material each `part/zone` name wears, without assembling
+/// again: variant > the part's zone > the part's material > the piece's
+/// binding > none (the model keeps its own). A key outside the palette counts
+/// as not chosen.
+pub fn paints(
+    root: &Path,
+    cat: &Catalog,
+    spec: &Spec,
+    names: &[String],
+    variant: Option<&str>,
+) -> BTreeMap<String, Option<Paint>> {
+    let var = variant.and_then(|v| spec.variants.iter().find(|x| x.id == v));
+    names
+        .iter()
+        .map(|name| {
+            let found = name.split_once('/').and_then(|(part, zone)| {
+                let p = spec.parts.iter().find(|p| p.id == part)?;
+                let piece = p
+                    .source
+                    .from
+                    .as_ref()
+                    .and_then(|f| cat.pieces.iter().find(|c| &c.key == f));
+                let keys = [
+                    var.and_then(|v| v.materials.get(name.as_str())),
+                    p.materials.get(zone),
+                    p.material.as_ref(),
+                    piece.and_then(|c| c.bindings.get(zone)),
+                ];
+                keys.into_iter()
+                    .flatten()
+                    .find_map(|k| find_paint(root, cat, k))
+            });
+            (name.clone(), found)
+        })
+        .collect()
+}
+
+/// The Blender file of a built asset. It sits in a hidden folder because a
+/// `.blend` in sight of Godot stops its import when the build is in the project.
+pub fn blend_file(dir: &Path, asset: &str) -> std::path::PathBuf {
+    dir.join(".kiln").join(format!("{asset}.blend"))
 }
 
 fn paint(root: &Path, m: &Material) -> Paint {
@@ -112,12 +177,8 @@ pub fn plan(root: &Path, config: &Config, cat: &Catalog, spec: &Spec) -> Plan {
             .to_string_lossy()
             .into_owned()
     };
-    let find_paint = |key: &str| {
-        cat.materials
-            .iter()
-            .find(|m| m.key == key)
-            .map(|m| paint(root, m))
-    };
+    let find_paint = |key: &str| find_paint(root, cat, key);
+    let zone_modes = crate::zones::load(root).unwrap_or_default();
     let mut items = Vec::new();
     let mut auto = Vec::new();
     for p in &spec.parts {
@@ -157,6 +218,17 @@ pub fn plan(root: &Path, config: &Config, cat: &Catalog, spec: &Spec) -> Plan {
                     .collect()
             })
             .unwrap_or_default();
+        let zones: BTreeMap<String, Paint> = p
+            .materials
+            .iter()
+            .filter_map(|(z, m)| Some((z.clone(), find_paint(m)?)))
+            .collect();
+        let split = p
+            .source
+            .from
+            .as_deref()
+            .and_then(|f| crate::zones::mode(&zone_modes, f))
+            .map(String::from);
         let n = p.count.unwrap_or(1).max(1) as usize;
         if p.at.len() < n {
             auto.push(p.id.clone());
@@ -184,6 +256,8 @@ pub fn plan(root: &Path, config: &Config, cat: &Catalog, spec: &Spec) -> Plan {
                 moves: p.moves.clone(),
                 todo: todo.clone(),
                 material: p.material.as_deref().and_then(find_paint),
+                zones: zones.clone(),
+                split: split.clone(),
                 slots: slots.clone(),
             });
         }
@@ -194,9 +268,10 @@ pub fn plan(root: &Path, config: &Config, cat: &Catalog, spec: &Spec) -> Plan {
         name: spec.asset.name.clone(),
         states: spec.asset.states.clone(),
         glb: file("glb"),
-        blend: file("blend"),
+        blend: blend_file(&dir, &spec.asset.id).to_string_lossy().into(),
         report: dir.join("report.json").to_string_lossy().into(),
         auto_layout: auto,
+        materials: dir.join("materials.json").to_string_lossy().into(),
         items,
     }
 }
@@ -239,6 +314,17 @@ pub fn reports(root: &Path, config: &Config, specs: &[Spec]) -> BTreeMap<String,
             let text = std::fs::read_to_string(dir.join("report.json")).ok()?;
             let mut r: Report = serde_json::from_str(&text).ok()?;
             r.glb = rel(root, &dir.join(format!("{}.glb", s.asset.id)));
+            r.materials = std::fs::read_to_string(dir.join("materials.json"))
+                .ok()
+                .and_then(|t| serde_json::from_str(&t).ok())
+                .unwrap_or_default();
+            r.variants = s
+                .variants
+                .iter()
+                .map(|v| (&v.id, dir.join(format!("{}--{}.glb", s.asset.id, v.id))))
+                .filter(|(_, f)| f.exists())
+                .map(|(id, f)| (id.clone(), rel(root, &f)))
+                .collect();
             Some((s.asset.id.clone(), r))
         })
         .collect()
@@ -262,8 +348,113 @@ mod tests {
             moves: None,
             todo: None,
             material: None,
+            zones: BTreeMap::new(),
+            split: None,
             slots: BTreeMap::new(),
         }
+    }
+
+    fn cat() -> Catalog {
+        let mat = |k: &str| Material {
+            key: k.into(),
+            name: k.into(),
+            source: "table".into(),
+            file: String::new(),
+            detail: Default::default(),
+            color: None,
+            albedo: None,
+        };
+        let piece = |key: &str, bindings: &[(&str, &str)]| crate::catalog::Piece {
+            key: key.into(),
+            kit: "kit".into(),
+            name: key.into(),
+            file: None,
+            format: "glb".into(),
+            size_m: None,
+            min: None,
+            tris: None,
+            material_slots: vec![],
+            split: None,
+            images: None,
+            licenses: vec![],
+            credit: None,
+            manifest: Default::default(),
+            measured_by: None,
+            preview: None,
+            bindings: bindings
+                .iter()
+                .map(|(a, b)| (a.to_string(), b.to_string()))
+                .collect(),
+        };
+        Catalog {
+            project: String::new(),
+            root: String::new(),
+            kits: vec![],
+            pieces: vec![piece("kit/beam", &[]), piece("kit/post", &[("wood", "oak")])],
+            materials: vec![mat("oak"), mat("iron"), mat("pine")],
+            specs: vec![],
+            tree: None,
+            builds: Default::default(),
+            findings: vec![],
+        }
+    }
+
+    const SPEC: &str = r#"
+[asset]
+id = "a"
+name = "A"
+[[parts]]
+id = "beam"
+what = "viga"
+material = "iron"
+materials = { wood = "oak", bad = "ghost" }
+[parts.source]
+kind = "reuse"
+from = "kit/beam"
+[[parts]]
+id = "flat"
+what = "plano"
+material = "iron"
+[parts.source]
+kind = "reuse"
+from = "kit/beam"
+[[parts]]
+id = "post"
+what = "poste"
+[parts.source]
+kind = "reuse"
+from = "kit/post"
+[[variants]]
+id = "old"
+materials = { "beam/wood" = "pine", "flat/x" = "ghost" }
+"#;
+
+    #[test]
+    fn paints_follow_the_order_variant_zone_part_binding_model() {
+        let s = crate::spec::parse(SPEC).unwrap();
+        let root = Path::new("/p");
+        let names: Vec<String> = [
+            "beam/wood", "beam/bad", "flat/x", "post/wood", "post/metal", "ghost/x", "nope",
+        ]
+        .map(String::from)
+        .to_vec();
+        let key = |m: &BTreeMap<String, Option<Paint>>, n: &str| {
+            m[n].as_ref().map(|p| p.key.clone())
+        };
+        let base = paints(root, &cat(), &s, &names, None);
+        assert_eq!(key(&base, "beam/wood").as_deref(), Some("oak"));
+        // a key outside the palette falls through to the part's material
+        assert_eq!(key(&base, "beam/bad").as_deref(), Some("iron"));
+        assert_eq!(key(&base, "flat/x").as_deref(), Some("iron"));
+        assert_eq!(key(&base, "post/wood").as_deref(), Some("oak"));
+        assert_eq!(key(&base, "post/metal"), None);
+        assert_eq!(key(&base, "ghost/x"), None);
+        assert_eq!(key(&base, "nope"), None);
+        let old = paints(root, &cat(), &s, &names, Some("old"));
+        assert_eq!(key(&old, "beam/wood").as_deref(), Some("pine"));
+        assert_eq!(key(&old, "flat/x").as_deref(), Some("iron"));
+        let none = paints(root, &cat(), &s, &names, Some("missing"));
+        assert_eq!(key(&none, "beam/wood").as_deref(), Some("oak"));
     }
 
     #[test]

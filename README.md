@@ -19,7 +19,7 @@ enseña como grafo en el navegador.
 
 ```bash
 cargo build --release
-# tu juego con su kiln.toml en la raíz (examples/kiln.toml es un ejemplo para copiar)
+# tu juego con su kiln.toml en la raíz; para probar sin juego: --project examples
 target/release/kiln serve --project ../mi-juego   # http://127.0.0.1:4330
 target/release/kiln check --project ../mi-juego   # sale con 1 si hay errores
 target/release/kiln index --project ../mi-juego --out catalog.json
@@ -234,6 +234,65 @@ review_rounds = 3       # vueltas como mucho
 
 Las hojas se sacan con Cycles por defecto, que funciona sin pantalla;
 `KILN_RENDER_ENGINE=BLENDER_EEVEE` (Blender 5) es más rápido en un Mac con pantalla.
+
+## Entrega 8: materiales por zona
+
+Una **zona** es cada ranura de material de una pieza, con el nombre que le
+da el modelo. La ficha elige un material de la paleta por zona, y las zonas
+que no nombra se quedan con el material del modelo (así una pieza traída de
+fuera conserva sus texturas):
+
+```toml
+[[parts]]
+id = "load"
+materials = { Wood = "pine" }       # la zona Iron sigue como venía
+source = { kind = "reuse", from = "harbor/crate" }
+
+[[variants]]                        # el mismo montaje con otros materiales
+id = "weathered"
+materials = { "post/Wood" = "oak", "load/Iron" = "rust" }
+```
+
+Para cada zona manda, por este orden: `materials` de la ficha, `material`
+de la pieza (todas sus zonas), el vínculo del catálogo y el propio modelo.
+
+En el GLB montado cada material se llama `pieza/zona`, y por eso cambiar un
+material no obliga a montar otra vez:
+
+- **En la vista 3D**: el panel del montaje tiene un desplegable por zona. El
+  cambio se ve al momento y se guarda en la ficha.
+- **En el GLB**: **Aplicar materiales** (`kiln paint --asset ID`) abre el
+  montaje, vuelve a vestir cada zona y exporta. No recoloca nada.
+- **En Godot**: si el montaje queda dentro del proyecto de Godot y
+  `kiln.toml` dice dónde está el material de cada clave, Kiln escribe los
+  vínculos en el `.import` del GLB. Probado con Godot 4.7.
+
+```toml
+[materials]
+godot = "res://materials/{key}.tres"
+
+[tools]
+godot_project = "godot"
+build = "godot/built"
+```
+
+**Variantes de color**: se eligen en el mismo panel. Cada una sale como
+`<id>--<variante>.glb` con `kiln paint --asset ID --variant V`.
+
+**Validar**, junto a una pieza del panel, pasa sus materiales de la ficha
+al catálogo (`kiln/bindings.toml`): quedan como valor por defecto de esa
+pieza para cualquier otro asset.
+
+**Partir en zonas** una pieza que solo trae una ranura se elige en el panel
+de la pieza y se guarda en `kiln/zones.toml`:
+
+- **por trozos sueltos**: cada parte de la malla que no toca a otra es una
+  zona (`part_1`, `part_2`…);
+- **por colores de la textura**: los triángulos se agrupan por el color que
+  tienen debajo (`color_1`, `color_2`…).
+
+Las zonas se numeran de la que más caras tiene a la que menos, y salen al
+montar.
 
 ## Lo que viene
 

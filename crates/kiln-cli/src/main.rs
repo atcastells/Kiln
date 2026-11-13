@@ -4,6 +4,7 @@
 //!   kiln check  --project DIR [--config FILE]                findings; exit 1 on errors
 //!   kiln serve  --project DIR [--config FILE] [--port 4330]  the graph at http://127.0.0.1:PORT
 //!   kiln build  --project DIR [--config FILE] --asset ID     assemble an asset in Blender
+//!   kiln paint  --project DIR [--config FILE] --asset ID [--variant ID]   wear its materials again, no assembling
 //!   kiln godot  --project DIR [--config FILE]                Godot measures its own pieces
 //!   kiln review --project DIR [--config FILE] --asset ID     build, render, review and fix, up to 3 rounds
 
@@ -24,6 +25,7 @@ struct Args {
     out: Option<PathBuf>,
     port: u16,
     asset: Option<String>,
+    variant: Option<String>,
 }
 
 fn parse() -> Result<Args, String> {
@@ -36,6 +38,7 @@ fn parse() -> Result<Args, String> {
         out: None,
         port: 4330,
         asset: None,
+        variant: None,
     };
     while let Some(flag) = it.next() {
         let mut val = || it.next().ok_or(format!("falta el valor de {flag}"));
@@ -44,6 +47,7 @@ fn parse() -> Result<Args, String> {
             "--config" => a.config = Some(PathBuf::from(val()?)),
             "--out" => a.out = Some(PathBuf::from(val()?)),
             "--asset" => a.asset = Some(val()?),
+            "--variant" => a.variant = Some(val()?),
             "--port" => a.port = val()?.parse().map_err(|_| "--port debe ser un número")?,
             other => return Err(format!("opción desconocida {other}\n{USAGE}")),
         }
@@ -53,7 +57,7 @@ fn parse() -> Result<Args, String> {
     Ok(a)
 }
 
-const USAGE: &str = "uso: kiln <index|check|serve|build|review|godot> --project DIR [--config FILE] [--out FILE] [--port N] [--asset ID]";
+const USAGE: &str = "uso: kiln <index|check|serve|build|paint|review|godot> --project DIR [--config FILE] [--out FILE] [--port N] [--asset ID] [--variant ID]";
 
 pub fn load(
     project: &std::path::Path,
@@ -130,6 +134,18 @@ fn main() -> ExitCode {
                     production::build_asset(&args.project, args.config.as_deref(), id, |l| {
                         eprintln!("{l}")
                     })?;
+                println!("{}", glb.display());
+                Ok(ExitCode::SUCCESS)
+            }
+            "paint" => {
+                let id = args.asset.as_deref().ok_or("falta --asset ID")?;
+                let glb = production::paint_asset(
+                    &args.project,
+                    args.config.as_deref(),
+                    id,
+                    args.variant.as_deref(),
+                    |l| eprintln!("{l}"),
+                )?;
                 println!("{}", glb.display());
                 Ok(ExitCode::SUCCESS)
             }

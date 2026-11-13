@@ -233,6 +233,86 @@ fn handle(mut stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result
                 Err(e) => bad(&e),
             }
         }
+        ("POST", "/api/material") => {
+            let (asset, part, zone, material, variant) = (
+                field("asset"),
+                field("part"),
+                field("zone"),
+                field("material"),
+                field("variant"),
+            );
+            let r = crate::load(&ctx.project, ctx.config.as_deref()).and_then(|cat| {
+                if !material.is_empty() && !cat.materials.iter().any(|m| m.key == material) {
+                    return Err(format!("«{material}» no está en la paleta"));
+                }
+                let file = spec_file(&ctx.project, &cat, &asset)?;
+                let text = std::fs::read_to_string(&file).map_err(|e| e.to_string())?;
+                let variant = Some(variant.as_str()).filter(|v| !v.is_empty());
+                let new = kiln_core::spec::set_material(&text, &part, &zone, &material, variant)?;
+                std::fs::write(&file, new).map_err(|e| e.to_string())
+            });
+            match r {
+                Ok(()) => json(serde_json::json!({ "ok": true })),
+                Err(e) => bad(&e),
+            }
+        }
+        ("POST", "/api/validate") => {
+            let (asset, part) = (field("asset"), field("part"));
+            let r = crate::load(&ctx.project, ctx.config.as_deref()).and_then(|cat| {
+                let cfg = production::config(&ctx.project, ctx.config.as_deref())?;
+                let file = spec_file(&ctx.project, &cat, &asset)?;
+                let p = cat
+                    .specs
+                    .iter()
+                    .find(|s| s.asset.id == asset)
+                    .and_then(|s| s.parts.iter().find(|p| p.id == part))
+                    .ok_or(format!("la ficha no tiene la pieza «{part}»"))?;
+                let piece = p
+                    .source
+                    .from
+                    .as_deref()
+                    .filter(|_| matches!(p.source.kind.as_str(), "reuse" | "variant"))
+                    .filter(|f| cat.pieces.iter().any(|c| &c.key == f))
+                    .ok_or("solo se valida una pieza que viene del catálogo")?;
+                kiln_core::bindings::set_many(&ctx.project, &cfg, piece, &p.materials)?;
+                let text = std::fs::read_to_string(&file).map_err(|e| e.to_string())?;
+                let new = kiln_core::spec::clear_materials(&text, &part)?;
+                std::fs::write(&file, new).map_err(|e| e.to_string())?;
+                Ok(piece.to_string())
+            });
+            match r {
+                Ok(piece) => json(serde_json::json!({ "ok": true, "piece": piece })),
+                Err(e) => bad(&e),
+            }
+        }
+        ("POST", "/api/split") => {
+            let (piece, mode) = (field("piece"), field("mode"));
+            let r = crate::load(&ctx.project, ctx.config.as_deref()).and_then(|cat| {
+                if !cat.pieces.iter().any(|p| p.key == piece) {
+                    return Err(format!("«{piece}» no está en el catálogo"));
+                }
+                kiln_core::zones::set(&ctx.project, &piece, &mode)
+            });
+            match r {
+                Ok(()) => json(serde_json::json!({ "ok": true })),
+                Err(e) => bad(&e),
+            }
+        }
+        ("POST", "/api/paint") => {
+            let (id, variant) = (field("asset"), field("variant"));
+            if id.is_empty() {
+                bad("falta el asset")
+            } else {
+                let c = ctx.clone();
+                json(
+                    serde_json::json!({ "job": agent::job(jobs, format!("aplicar materiales a {id}"), move |say| {
+                    let v = Some(variant.as_str()).filter(|v| !v.is_empty());
+                    let glb = production::paint_asset(&c.project, c.config.as_deref(), &id, v, say)?;
+                    Ok(Some(rel(&c.project, &glb)))
+                }) }),
+                )
+            }
+        }
         ("POST", "/api/context/sort") => {
             json(serde_json::json!({ "job": agent::start(jobs, ctx.clone(), Task::Sort) }))
         }
@@ -306,6 +386,19 @@ fn handle(mut stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result
         body.len()
     )?;
     stream.write_all(&body)
+}
+
+/// The spec file of an asset, absolute.
+fn spec_file(
+    project: &std::path::Path,
+    cat: &kiln_core::Catalog,
+    asset: &str,
+) -> Result<PathBuf, String> {
+    cat.specs
+        .iter()
+        .find(|s| s.asset.id == asset)
+        .map(|s| project.join(&s.file))
+        .ok_or(format!("no hay ficha con id «{asset}»"))
 }
 
 fn rel(root: &std::path::Path, p: &std::path::Path) -> String {

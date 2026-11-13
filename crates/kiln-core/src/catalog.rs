@@ -50,6 +50,8 @@ pub struct Piece {
     pub min: Option<[f64; 3]>,
     pub tris: Option<u64>,
     pub material_slots: Vec<String>,
+    /// How its one slot is split into zones when assembled (`kiln/zones.toml`).
+    pub split: Option<String>,
     pub images: Option<usize>,
     /// Licences of the piece: its own credit's, else the kit's.
     pub licenses: Vec<String>,
@@ -175,6 +177,7 @@ fn index_kit(root: &Path, dir: &Path, cat: &mut Catalog) {
             min: None,
             tris: None,
             material_slots: Vec::new(),
+            split: None,
             images: None,
             licenses: if own.is_empty() {
                 kit_licenses.clone()
