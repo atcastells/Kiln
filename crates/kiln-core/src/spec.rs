@@ -39,6 +39,12 @@ pub struct Asset {
     /// What the agent says to the person: its reading of the request and its doubts.
     #[serde(default)]
     pub notes: String,
+    /// The level of the tree it sits at (`asset` when left out).
+    #[serde(default)]
+    pub level: Option<String>,
+    /// For a spec above the asset level: its children, as ids or `level:id`.
+    #[serde(default)]
+    pub children: Vec<String>,
 }
 
 fn brief() -> String {

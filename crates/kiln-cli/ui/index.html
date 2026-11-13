@@ -17,6 +17,14 @@
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--fg); font: 14px var(--font); display: flex; flex-direction: column; padding: 12px 16px; gap: 10px; }
+.tabs { display: flex; } .tabs button { border-radius: 0; } .tabs button:first-child { border-radius: 6px 0 0 6px; } .tabs button:last-child { border-radius: 0 6px 6px 0; border-left: none; }
+.tabs button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+#crumbs { font-size: 13px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 4px; min-height: 18px; }
+#crumbs a { color: var(--fg); cursor: pointer; text-decoration: underline; text-underline-offset: 2px; } #crumbs a:last-child { font-weight: 600; text-decoration: none; }
+.bar { height: 5px; border-radius: 3px; background: var(--badbg); margin-top: 6px; overflow: hidden; } .bar i { display: block; height: 100%; background: var(--ok); }
+.k-game .hd i { background: var(--fg); } .k-place .hd i { background: #7a4fa0; } .k-building .hd i { background: var(--accent); } .k-room .hd i { background: var(--info); } .k-asset .hd i { background: var(--ok); }
+.missing-row { display: flex; align-items: center; gap: 8px; justify-content: space-between; border-top: 1px solid var(--line); padding: 5px 0; font-size: 13px; }
+.missing-row button { font-size: 12px; padding: 4px 8px; }
 form { display: flex; gap: 6px; flex: 1 1 320px; min-width: 0; } form input { flex: 1; }
 .k-spec .hd i, .k-asset .hd i { background: var(--accent); } .k-ask .hd i { background: var(--fg); } .k-src .hd i { background: var(--ok); } .k-check .hd i { background: var(--bad); }
 .log { font: 12px var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; border-top: 1px solid var(--line); padding: 5px 0; }
@@ -68,16 +76,20 @@ dt { color: var(--muted); } dd { margin: 0; font: 12px var(--mono); overflow-wra
   <div class="stats" id="stats"></div>
   <input id="search" placeholder="Buscar pieza o material" aria-label="Buscar pieza o material">
   <form id="askForm"><input id="ask" placeholder="Pedir un asset: crear un ascensor" aria-label="Pedir un asset"><button type="submit">Desglosar</button></form>
-  <button id="back" type="button" hidden>Volver al catálogo</button>
+  <nav class="tabs"><button type="button" data-mode="tree">Árbol</button><button type="button" data-mode="catalog">Catálogo</button></nav>
+  <button id="back" type="button" hidden>Volver</button>
   <button id="reload" type="button">Releer el proyecto</button>
 </header>
+<div id="crumbs"></div>
 <main>
   <div id="stage"><div id="world"><svg id="edges"></svg></div></div>
   <aside id="side"></aside>
 </main>
 <script>
 const W = 200, GAP = 12, X = { project: 20, kit: 270, piece: 520, slot: 770, mat: 1060 };
-let cat = null, openKit = null, sel = null, query = "", view = { x: 10, y: 10, z: 0.8 }, specView = null, job = null;
+let cat = null, openKit = null, sel = null, query = "", view = { x: 10, y: 10, z: 0.8 }, specView = null, job = null, mode = "tree", treeAt = null;
+const LEVEL = { game: "Juego", place: "Lugar", building: "Edificio", room: "Sala", module: "Módulo", scene: "Escena", asset: "Asset" };
+const lvl = l => LEVEL[l] || l;
 const world = document.getElementById("world"), svg = document.getElementById("edges"), side = document.getElementById("side");
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const fmt = v => v ? v.map(n => n.toFixed(2)).join(" × ") + " m" : "sin medir";
@@ -92,7 +104,9 @@ async function load() {
   document.getElementById("stats").innerHTML = `<span>${cat.kits.length} kits</span><span>${cat.pieces.length} piezas</span><span>${cat.materials.length} materiales</span>`
     + `<span class="error">${n("error")} errores</span><span class="warn">${n("warn")} avisos</span><span class="info">${n("info")} notas</span>`;
   if (specView && !cat.specs.find(x => x.asset.id === specView)) specView = null;
-  render(); if (!sel) showProject();
+  if (!cat.tree) mode = "catalog";
+  render();
+  if (!sel) { if (mode === "tree") { sel = cat.tree.root; render(); showTreeNode(cat.tree.nodes[sel]); } else showProject(); }
 }
 
 function node(id, k, kind, title, sub, x, y, extra = "", badge = "") {
@@ -103,7 +117,10 @@ function matches(text) { return !query || String(text).toLowerCase().includes(qu
 
 function render() {
   document.getElementById("back").hidden = !specView;
+  document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", !specView && b.dataset.mode === mode));
+  crumbs();
   if (specView) return renderSpec(cat.specs.find(x => x.asset.id === specView));
+  if (mode === "tree" && cat.tree) return renderTree();
   const nodes = [], edges = [];
   let y = 40;
   nodes.push(node("project", "project", "Proyecto", cat.project, cat.root, X.project, 40));
@@ -159,6 +176,74 @@ function draw(nodes, edges, cols) {
     const x1 = A.x + W, x2 = B.x, dx = Math.max(40, (x2 - x1) / 2), hot = sel && (a === sel || b === sel);
     return `<path class="${hot ? "hot" : ""}" d="M${x1},${A.y} C${x1 + dx},${A.y} ${x2 - dx},${B.y} ${x2},${B.y}"/>`; }).join("");
   apply();
+}
+
+// ---- The tree of the project, by levels ----
+function pathTo(key) {
+  const T = cat.tree.nodes, prev = { [cat.tree.root]: null }, q = [cat.tree.root];
+  while (q.length) { const k = q.shift(); if (k === key) break; for (const c of T[k]?.children || []) if (!(c in prev)) { prev[c] = k; q.push(c); } }
+  const out = []; for (let k = key; k; k = prev[k]) out.unshift(k); return out;
+}
+function crumbs() {
+  const el = document.getElementById("crumbs");
+  if (!cat || !cat.tree || mode !== "tree" || specView) { el.innerHTML = ""; return; }
+  el.innerHTML = pathTo(treeAt || cat.tree.root).map(k => `<a data-k="${esc(k)}">${esc(cat.tree.nodes[k].name)}</a>`).join("<span>›</span>");
+  el.querySelectorAll("a").forEach(a => a.onclick = () => { treeAt = a.dataset.k; sel = treeAt; render(); showTreeNode(cat.tree.nodes[treeAt]); });
+}
+function coverage(n) {
+  if (!n.children.length) {
+    const st = { model: ["ok", "con modelo"], spec: ["info", "con ficha"], missing: ["error", n.level === "asset" ? "falta" : "sin definir"] }[n.status] || ["info", n.status];
+    return `<span class="pill ${st[0]}">${st[1]}</span>`;
+  }
+  const pct = n.assets ? Math.round(100 * n.modelled / n.assets) : 0;
+  return `<div class="bar"><i style="width:${pct}%"></i></div><div class="s">${n.modelled} de ${n.assets} con modelo</div>`;
+}
+function renderTree() {
+  const T = cat.tree.nodes, at = T[treeAt || cat.tree.root], C = [20, 290, 560, 830], nodes = [], edges = [];
+  const mk = (n, x) => node(n.key, n.level, lvl(n.level) + (n.children.length ? ` · ${n.children.length}` : ""), n.name, n.name !== n.id ? n.id : (n.piece || n.file || ""), x, 40, coverage(n), n.children.length ? "▸" : "");
+  nodes.push(mk(at, C[0]));
+  at.children.forEach(c => { nodes.push(mk(T[c], C[1])); edges.push([at.key, c]);
+    T[c].children.forEach(g => { if (!nodes.find(n => n.id === g)) nodes.push(mk(T[g], C[2])); edges.push([c, g]); }); });
+  const label = keys => [...new Set(keys.map(k => lvl(T[k].level)))].join(" / ");
+  const grand = at.children.flatMap(c => T[c].children);
+  draw(nodes, edges, [[lvl(at.level), C[0]], [label(at.children), C[1]], [label(grand), C[2]]]);
+  world.querySelectorAll(".node").forEach(el => {
+    el.classList.toggle("sel", el.dataset.id === sel);
+    el.onclick = () => { sel = el.dataset.id; render(); showTreeNode(T[sel]); };
+    el.ondblclick = () => { if (T[el.dataset.id].children.length) { treeAt = el.dataset.id; sel = treeAt; render(); showTreeNode(T[treeAt]); } };
+    el.onkeydown = e => { if (e.key === "Enter") el.ondblclick(); };
+  });
+}
+function leavesOf(key) {
+  const T = cat.tree.nodes, seen = new Set(), out = [], st = [key];
+  while (st.length) { const k = st.pop(); if (seen.has(k)) continue; seen.add(k); const n = T[k]; if (!n.children.length && k !== key) out.push(n); st.push(...n.children); }
+  return out;
+}
+function showTreeNode(n) {
+  const T = cat.tree.nodes, parent = pathTo(n.key).slice(-2, -1)[0];
+  let html = `<div class="kind">${esc(lvl(n.level))}</div><h2>${esc(n.name)}</h2><dl><dt>id</dt><dd>${esc(n.id)}</dd><dt>declarado en</dt><dd>${esc(n.file || "solo como hijo de otro nodo")}</dd>`
+    + (n.children.length ? `<dt>hijos</dt><dd>${n.children.length}</dd><dt>assets</dt><dd>${n.modelled} de ${n.assets} con modelo</dd>` : "") + `</dl>`;
+  if (n.children.length) {
+    const missing = leavesOf(n.key).filter(l => l.status !== "model");
+    html += `<p class="note">Doble clic en un nodo para bajar; la miga de pan de arriba sube.</p><div class="kind" style="margin-top:10px">Lo que falta debajo (${missing.length})</div>`
+      + (missing.map(l => `<div class="missing-row"><span><b>${esc(l.name)}</b> <span class="note">${esc(lvl(l.level))} · ${l.status === "spec" ? "con ficha" : l.level === "asset" ? "falta" : "sin definir"}</span></span>${l.level === "asset" && l.status === "missing" ? `<button type="button" data-ask="${esc(l.id)}">Pedir ficha</button>` : ""}</div>`).join("") || `<p class="note">Nada: todo tiene modelo.</p>`);
+  } else if (n.status === "model") {
+    html += `<p>Usa la pieza <b>${esc(n.piece)}</b> del catálogo.</p><button type="button" id="goPiece">Ver en el catálogo</button>`;
+  } else if (n.status === "spec") {
+    html += `<p>Tiene ficha pero aún no modelo.</p><button type="button" id="goSpec">Ver la ficha</button>`;
+  } else if (n.level === "asset") {
+    html += `<p>Ningún modelo ni ficha. ${parent ? `Lo pide ${esc(lvl(T[parent].level).toLowerCase())} «${esc(T[parent].name)}».` : ""}</p><button type="button" data-ask="${esc(n.id)}">Pedir ficha</button>`;
+  } else html += `<p>Este nodo no está definido: nadie declara sus hijos todavía.</p>`;
+  side.innerHTML = html;
+  side.querySelectorAll("[data-ask]").forEach(b => b.onclick = () => askFor(b.dataset.ask, n));
+  document.getElementById("goPiece")?.addEventListener("click", () => { const p = cat.pieces.find(x => x.key === n.piece); mode = "catalog"; openKit = p.kit; sel = "piece:" + p.key; render(); showPiece(p); });
+  document.getElementById("goSpec")?.addEventListener("click", () => pick("spec:" + n.id));
+}
+function askFor(id, from) {
+  const T = cat.tree.nodes, holder = from.children.length ? pathTo(Object.keys(T).find(k => T[k].children.includes("asset:" + id) && pathTo(k).includes(from.key)) || from.key) : pathTo(from.key).slice(0, -1);
+  const where = holder.slice(1).map(k => T[k].name).join(" › ");
+  document.getElementById("ask").value = `crear ${id.replace(/_/g, " ")}${where ? " para " + where : ""}`;
+  document.getElementById("askForm").requestSubmit();
 }
 
 function specLevel(sp) { const subs = ["asset:" + sp.asset.id, ...sp.parts.map(p => `part:${sp.asset.id}/${p.id}`)]; const f = cat.findings.filter(x => subs.includes(x.subject)).map(x => x.severity); return f.includes("error") ? "error" : f.includes("warn") ? "warn" : f.length ? "info" : null; }
@@ -250,7 +335,8 @@ stage.addEventListener("wheel", e => { e.preventDefault(); const r = stage.getBo
   const z = Math.min(1.6, Math.max(0.3, view.z * (e.deltaY < 0 ? 1.1 : 0.9))); view.x = mx - (mx - view.x) * z / view.z; view.y = my - (my - view.y) * z / view.z; view.z = z; apply(); }, { passive: false });
 document.getElementById("search").addEventListener("input", e => { query = e.target.value.trim().toLowerCase(); if (cat) render(); });
 document.getElementById("reload").addEventListener("click", load);
-document.getElementById("back").addEventListener("click", () => { specView = null; sel = "project"; render(); showProject(); });
+document.getElementById("back").addEventListener("click", () => { specView = null; sel = mode === "tree" ? (treeAt || cat.tree?.root) : "project"; render(); mode === "tree" && cat.tree ? showTreeNode(cat.tree.nodes[sel]) : showProject(); });
+document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => { mode = b.dataset.mode; specView = null; sel = mode === "tree" ? (treeAt || cat.tree?.root) : "project"; render(); mode === "tree" && cat.tree ? showTreeNode(cat.tree.nodes[sel]) : showProject(); }));
 document.getElementById("askForm").addEventListener("submit", async e => {
   e.preventDefault(); const text = document.getElementById("ask").value.trim(); if (!text || job) return;
   const r = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json", "X-Kiln": "1" }, body: JSON.stringify({ text }) });

@@ -8,6 +8,7 @@ pub mod config;
 pub mod glb;
 pub mod license;
 pub mod spec;
+pub mod tree;
 
 pub use catalog::{Catalog, Finding, Kit, Material, Piece, Severity};
 pub use config::Config;
@@ -30,5 +31,6 @@ pub fn open_with(project: &Path, config: Config) -> Result<Catalog, String> {
             .findings
             .sort_by(|a, b| b.severity.cmp(&a.severity).then(a.subject.cmp(&b.subject)));
     }
+    catalog.tree = Some(tree::build(project, &config, &catalog));
     Ok(catalog)
 }

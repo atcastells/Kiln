@@ -62,6 +62,28 @@ una ficha tal como salió para rune-world.
 - Solo la propia página puede lanzar al agente: la petición lleva una cabecera
   propia y el servidor solo escucha en `127.0.0.1`.
 
+## Entrega 3: el árbol del proyecto
+
+Kiln se abre en el juego y se baja por niveles con doble clic (Juego ›
+Lugar › Edificio › Sala › Asset); la miga de pan sube. Cada nodo dice
+cuántos de los assets que tiene debajo ya tienen modelo y lista lo que
+falta; desde un asset que falta, «Pedir ficha» lanza al agente con la
+petición y su sitio en el árbol. Los niveles se declaran en `kiln.toml`
+(`[[levels]]`) leyendo los datos que el juego ya tiene; el ejemplo de
+rune-world lee `forts.toml`, `schemas/*.toml`, `pieces.toml` y `rooms.toml`.
+
+```toml
+[[levels]]
+level = "room"                                  # el nivel de estos nodos
+files = ["data/buildings/rooms.toml"]           # globs; cada fichero es un nodo...
+table = "rooms"                                 # ...o cada tabla de este array
+id = "use"                                      # la clave con su id
+children = [{ key = "fixtures", field = "id", level = "asset" }]
+```
+
+Un asset es una hoja: tiene modelo si el catálogo tiene una pieza con su
+nombre, ficha si hay una ficha con su id, y si no, falta.
+
 ## Lo que viene
 
 - Entrega 3: producción y montaje con Blender y Godot, vista 3D en cada nodo, vínculo de ranuras con la paleta y app de escritorio (Tauri).

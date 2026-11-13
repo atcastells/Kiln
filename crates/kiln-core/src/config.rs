@@ -14,6 +14,38 @@ pub struct Config {
     pub materials: MaterialsSection,
     #[serde(default)]
     pub rules: Rules,
+    /// The levels of the project tree between the game and its assets.
+    #[serde(default)]
+    pub levels: Vec<LevelSource>,
+}
+
+/// Where the nodes of one level are declared: each file matched by `files`
+/// (globs) is a node, or each table of its array `table`.
+#[derive(Debug, Clone, Deserialize)]
+pub struct LevelSource {
+    pub level: String,
+    pub files: Vec<String>,
+    #[serde(default)]
+    pub table: Option<String>,
+    /// The key that holds the node's id.
+    pub id: String,
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub children: Vec<ChildrenRef>,
+}
+
+/// The children of a node: under `key`, a string, or an array of strings or of tables (their `field`).
+#[derive(Debug, Clone, Deserialize)]
+pub struct ChildrenRef {
+    pub key: String,
+    #[serde(default = "default_field")]
+    pub field: String,
+    pub level: String,
+}
+
+fn default_field() -> String {
+    "id".into()
 }
 
 #[derive(Debug, Clone, Deserialize)]
