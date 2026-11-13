@@ -45,8 +45,8 @@ pub enum Task {
     Layout(String),
     /// Sort the person's explanation into claims, layer by layer.
     Sort,
-    /// Ask a round of questions with suggested answers.
-    Refine,
+    /// Ask a round of questions with suggested answers, on one layer or all.
+    Refine(Option<String>),
 }
 
 pub fn start(jobs: &Jobs, ctx: Arc<Ctx>, task: Task) -> u64 {
@@ -54,7 +54,8 @@ pub fn start(jobs: &Jobs, ctx: Arc<Ctx>, task: Task) -> u64 {
         Task::Ask(t) => t.clone(),
         Task::Layout(f) => format!("colocar las piezas de {f}"),
         Task::Sort => "ordenar el contexto del proyecto".into(),
-        Task::Refine => "preguntas para afinar el contexto".into(),
+        Task::Refine(None) => "preguntas para afinar el contexto".into(),
+        Task::Refine(Some(l)) => format!("preguntas sobre la capa {l}"),
     };
     let id = {
         let mut j = jobs.lock().unwrap();
@@ -174,9 +175,13 @@ fn run(jobs: &Jobs, id: u64, ctx: &Ctx, task: &Task) -> Result<Option<String>, S
             ctx.context_file.display(),
             cat_path.display()
         ),
-        Task::Refine => format!(
-            "Afina el contexto del proyecto del fichero {}: añade una ronda de preguntas con respuestas sugeridas. Sigue la skill kiln-context que tienes en tu prompt de sistema (modo afinar).\n\nCapas: {layers}\n{config}\nCatálogo del proyecto: {}\nEdita solo el fichero de contexto.",
+        Task::Refine(layer) => format!(
+            "Afina el contexto del proyecto del fichero {}: añade una ronda de preguntas con respuestas sugeridas{}. Sigue la skill kiln-context que tienes en tu prompt de sistema (modo afinar).\n\nCapas: {layers}\n{config}\nCatálogo del proyecto: {}\nEdita solo el fichero de contexto.",
             ctx.context_file.display(),
+            layer
+                .as_ref()
+                .map(|l| format!(", todas de la capa «{l}»"))
+                .unwrap_or_default(),
             cat_path.display()
         ),
         Task::Ask(asked) => format!(
@@ -191,7 +196,7 @@ fn run(jobs: &Jobs, id: u64, ctx: &Ctx, task: &Task) -> Result<Option<String>, S
         ),
     };
     let skill = match task {
-        Task::Sort | Task::Refine => CONTEXT_SKILL,
+        Task::Sort | Task::Refine(_) => CONTEXT_SKILL,
         _ => SKILL,
     };
     if let Some(d) = ctx.context_file.parent() {
@@ -257,7 +262,7 @@ fn run(jobs: &Jobs, id: u64, ctx: &Ctx, task: &Task) -> Result<Option<String>, S
             );
         }
     }
-    if matches!(task, Task::Sort | Task::Refine) {
+    if matches!(task, Task::Sort | Task::Refine(_)) {
         return Ok(Some(
             ctx.context_file
                 .strip_prefix(&ctx.project)
