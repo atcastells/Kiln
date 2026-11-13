@@ -16,6 +16,12 @@ cómo es este juego.
 ```toml
 text = """La explicación de la persona, tal cual. No la toques."""
 
+[intent]
+text = "Qué juego es, en un párrafo de 3 a 5 frases."
+pinned = false            # true: lo fijó la persona; no lo cambies
+# proposed = "..."        # tu versión, si `pinned = true` y crees que debe cambiar
+# settled = false         # lo pone Kiln; no lo toques
+
 [[claims]]
 id = "c1"                 # c1, c2...: no reutilices ids
 layer = "world"           # el id de una capa
@@ -49,6 +55,12 @@ asked_by = "refine"       # refine | asset:<id>
    las cambies. Si crees que una está mal, escribe tu versión en su campo
    `proposed` y deja `text` como está.
 6. Puedes rehacer las que no están fijadas: borra las que ya no valgan.
+7. Escribe `[intent] text`: qué juego es, en 3 a 5 frases y en el idioma
+   de la persona. Dónde y cuándo pasa, qué hace el jugador, cómo se ve y
+   a qué juego real se parece si la persona lo nombra. Sácalo solo de las
+   afirmaciones; si falta algo, no lo inventes. Si `pinned = true`, deja
+   `text` como está y, si crees que debe cambiar, escribe tu versión en
+   `proposed`. No toques `settled`.
 
 ## Modo afinar
 

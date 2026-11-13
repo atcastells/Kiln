@@ -294,6 +294,32 @@ de la pieza y se guarda en `kiln/zones.toml`:
 Las zonas se numeran de la que más caras tiene a la que menos, y salen al
 montar.
 
+## Entrega 9: empezar un juego desde cero
+
+`kiln serve` en una carpeta sin `kiln.toml` abre un asistente de cinco pasos
+en vez de fallar:
+
+1. **Proyecto**: el nombre. El tipo es «Juego», el único por ahora
+   (`[project] kind = "game"`; `check` avisa de cualquier otro).
+2. **Lo básico**: cámara, estilo, altura de una persona, licencias y
+   triángulos por pieza, con respuestas sugeridas. «Crear el proyecto»
+   escribe `kiln.toml` (licencias y triángulos van a `[rules]`), una paleta
+   vacía y `kiln/context.toml` con cada respuesta fijada en su capa.
+3. **Tu juego**: lo explicas con tus palabras; el agente lo ordena en capas,
+   escribe el párrafo de qué juego es (`[intent]` del contexto) y te hace
+   una ronda de preguntas.
+4. **Preguntas**: las respondes con un clic o con tus palabras.
+5. **Asentar**: fijas el párrafo y al menos una afirmación por capa, sin
+   choques abiertos. Hasta entonces el botón dice qué falta. Al asentar se
+   abre el grafo de siempre.
+
+Cada paso queda en disco: si cierras la página, el asistente sigue donde
+estaba. Los proyectos que ya tenían `kiln.toml` se abren como antes.
+
+```bash
+mkdir ../mi-juego && target/release/kiln serve --project ../mi-juego
+```
+
 ## Lo que viene
 
 - El primer asset de punta a punta y la app de escritorio (Tauri).

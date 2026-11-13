@@ -5,19 +5,23 @@ use crate::agent::{self, Ctx, Jobs, Task};
 use crate::{fetch, production, review};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
-use std::path::PathBuf;
-use std::sync::Arc;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
 
 const PAGE: &str = include_str!("../ui/index.html");
 const THREE: &str = include_str!("../ui/vendor/three.js");
 
-pub fn run(project: PathBuf, config: Option<PathBuf>, port: u16) -> Result<(), String> {
+/// The project the server works on; `None` while the folder has no
+/// `kiln.toml` and the start wizard is open.
+type Slot = Arc<RwLock<Option<Arc<Ctx>>>>;
+
+fn make_ctx(project: &Path, config: Option<PathBuf>) -> Result<Ctx, String> {
     let cfg = match &config {
         Some(c) => kiln_core::Config::load_file(c)?,
-        None => kiln_core::Config::load(&project)?,
+        None => kiln_core::Config::load(project)?,
     };
-    let ctx = Arc::new(Ctx {
-        project: project.clone(),
+    Ok(Ctx {
+        project: project.to_path_buf(),
         config,
         specs_dir: cfg
             .assets
@@ -25,7 +29,7 @@ pub fn run(project: PathBuf, config: Option<PathBuf>, port: u16) -> Result<(), S
             .clone()
             .unwrap_or_else(|| "kiln/specs".into()),
         roots: [
-            project.clone(),
+            project.to_path_buf(),
             project.join(&cfg.tools.build),
             project.join(&cfg.tools.cache),
         ]
@@ -34,23 +38,92 @@ pub fn run(project: PathBuf, config: Option<PathBuf>, port: u16) -> Result<(), S
         .collect(),
         context_file: project.join(&cfg.context.file),
         layers: cfg.context.layers(),
-    });
+    })
+}
+
+pub fn run(project: PathBuf, config: Option<PathBuf>, port: u16) -> Result<(), String> {
+    let new = config.is_none() && !project.join(kiln_core::config::FILE).exists();
+    let slot: Slot = Arc::new(RwLock::new(if new {
+        None
+    } else {
+        Some(Arc::new(make_ctx(&project, config)?))
+    }));
     let jobs: Jobs = Default::default();
     let listener = TcpListener::bind(("127.0.0.1", port))
         .map_err(|e| format!("no se puede abrir el puerto {port}: {e}"))?;
     eprintln!(
-        "Kiln en http://127.0.0.1:{port}  (proyecto {})",
+        "Kiln en http://127.0.0.1:{port}  ({} {})",
+        if new { "juego nuevo en" } else { "proyecto" },
         project.display()
     );
+    let project = Arc::new(project);
     for stream in listener.incoming().flatten() {
-        let (ctx, jobs) = (ctx.clone(), jobs.clone());
+        let (slot, jobs, project) = (slot.clone(), jobs.clone(), project.clone());
         std::thread::spawn(move || {
-            if let Err(e) = handle(stream, &ctx, &jobs) {
+            let current = slot.read().unwrap().clone();
+            let r = match current {
+                Some(ctx) => handle(stream, &ctx, &jobs),
+                None => handle_new(stream, &project, &slot),
+            };
+            if let Err(e) = r {
                 eprintln!("petición fallida: {e}");
             }
         });
     }
     Ok(())
+}
+
+fn from_page(req: &Request) -> bool {
+    let header = |k: &str| {
+        req.headers
+            .iter()
+            .find(|(h, _)| h == k)
+            .map(|(_, v)| v.as_str())
+    };
+    header("x-kiln") == Some("1")
+        && header("host")
+            .is_some_and(|h| h.starts_with("127.0.0.1:") || h.starts_with("localhost:"))
+}
+
+fn respond(mut stream: TcpStream, status: &str, kind: &str, body: &[u8]) -> std::io::Result<()> {
+    write!(
+        stream,
+        "HTTP/1.1 {status}\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+        body.len()
+    )?;
+    stream.write_all(body)
+}
+
+/// The server of a folder without `kiln.toml`: the page and the first step
+/// of the wizard, which writes the project and opens it.
+fn handle_new(stream: TcpStream, project: &Path, slot: &Slot) -> std::io::Result<()> {
+    let req = read_request(&stream)?;
+    let json = |v: serde_json::Value| serde_json::to_vec(&v).unwrap_or_default();
+    let (status, kind, body) = match (req.method.as_str(), req.path.as_str()) {
+        ("GET", "/" | "/index.html") => ("200 OK", "text/html; charset=utf-8", PAGE.as_bytes().to_vec()),
+        ("GET", "/api/new") => ("200 OK", "application/json", json(serde_json::json!({
+            "step": 1,
+            "folder": project.display().to_string(),
+            "kinds": kiln_core::config::KINDS,
+            "basics": kiln_core::new_game::BASICS,
+        }))),
+        ("POST", _) if !from_page(&req) => ("403 Forbidden", "application/json", br#"{"error":"solo desde la pagina de Kiln"}"#.to_vec()),
+        ("POST", "/api/new") => {
+            let made = serde_json::from_slice::<kiln_core::new_game::NewGame>(&req.body)
+                .map_err(|e| e.to_string())
+                .and_then(|g| kiln_core::new_game::scaffold(project, &g))
+                .and_then(|files| Ok((files, make_ctx(project, None)?)));
+            match made {
+                Ok((files, ctx)) => {
+                    *slot.write().unwrap() = Some(Arc::new(ctx));
+                    ("200 OK", "application/json", json(serde_json::json!({ "ok": true, "files": files })))
+                }
+                Err(e) => ("400 Bad Request", "application/json", json(serde_json::json!({ "error": e }))),
+            }
+        }
+        _ => ("409 Conflict", "application/json", br#"{"error":"todavia no hay proyecto: termina el primer paso"}"#.to_vec()),
+    };
+    respond(stream, status, kind, &body)
 }
 
 struct Request {
@@ -95,17 +168,9 @@ fn read_request(stream: &TcpStream) -> std::io::Result<Request> {
     })
 }
 
-fn handle(mut stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result<()> {
+fn handle(stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result<()> {
     let req = read_request(&stream)?;
-    let header = |k: &str| {
-        req.headers
-            .iter()
-            .find(|(h, _)| h == k)
-            .map(|(_, v)| v.as_str())
-    };
-    let from_page = header("x-kiln") == Some("1")
-        && header("host")
-            .is_some_and(|h| h.starts_with("127.0.0.1:") || h.starts_with("localhost:"));
+    let from_page = from_page(&req);
     let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or_default();
     let field = |k: &str| {
         body.get(k)
@@ -313,6 +378,17 @@ fn handle(mut stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result
                 )
             }
         }
+        ("POST", "/api/new") => bad("esta carpeta ya tiene kiln.toml"),
+        ("POST", "/api/settle") => {
+            let r = kiln_core::context::load(&ctx.context_file).and_then(|mut c| {
+                c.settle(&ctx.layers).map_err(|m| m.join("; "))?;
+                kiln_core::context::save(&ctx.context_file, &c)
+            });
+            match r {
+                Ok(()) => json(serde_json::json!({ "ok": true })),
+                Err(e) => bad(&e),
+            }
+        }
         ("POST", "/api/context/sort") => {
             json(serde_json::json!({ "job": agent::start(jobs, ctx.clone(), Task::Sort) }))
         }
@@ -329,6 +405,7 @@ fn handle(mut stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result
                             .unwrap_or_default()
                             .to_string()
                     }
+                    "/api/context/intent" => c.edit_intent(&field("action"), &field("text"))?,
                     "/api/context/answer" => {
                         c.answer(&field("id"), &field("answer"), &field("status"))?
                     }
@@ -349,6 +426,22 @@ fn handle(mut stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result
                 Err(e) => bad(&e),
             }
         }
+        ("GET", "/api/new") => match kiln_core::context::load(&ctx.context_file) {
+            Ok(c) => {
+                let step = match c.intent.settled {
+                    Some(false) if c.text.trim().is_empty() || c.intent.text.trim().is_empty() => 3,
+                    Some(false) if c.questions.iter().any(|q| q.status == "open") => 4,
+                    Some(false) => 5,
+                    _ => 0,
+                };
+                json(serde_json::json!({
+                    "step": step,
+                    "folder": ctx.project.display().to_string(),
+                    "missing": c.missing(&ctx.layers),
+                }))
+            }
+            Err(e) => bad(&e),
+        },
         ("GET", "/api/context") => match kiln_core::context::load(&ctx.context_file) {
             Ok(c) => json(serde_json::json!({
                 "file": rel(&ctx.project, &ctx.context_file),
@@ -380,12 +473,7 @@ fn handle(mut stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result
         },
         _ => ("404 Not Found", "text/plain", b"no existe".to_vec()),
     };
-    write!(
-        stream,
-        "HTTP/1.1 {status}\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
-        body.len()
-    )?;
-    stream.write_all(&body)
+    respond(stream, status, kind, &body)
 }
 
 /// The spec file of an asset, absolute.

@@ -12,10 +12,29 @@ pub struct Context {
     /// The project as the person explains it, as written.
     #[serde(default)]
     pub text: String,
+    /// What the game is, in one paragraph: the start every asset leans on.
+    #[serde(default)]
+    pub intent: Intent,
     #[serde(default)]
     pub claims: Vec<Claim>,
     #[serde(default)]
     pub questions: Vec<Question>,
+}
+
+/// The paragraph that says what the game is. Pinned by the person, the agent
+/// only proposes.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+pub struct Intent {
+    #[serde(default)]
+    pub text: String,
+    #[serde(default)]
+    pub pinned: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proposed: Option<String>,
+    /// Only for a project made with the start wizard: false until the
+    /// person settles its start, true after.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub settled: Option<bool>,
 }
 
 /// One short statement about the game, in one layer.
@@ -248,6 +267,73 @@ impl Context {
         }
         // The person's own words are theirs too.
         self.text = before.text.clone();
+        if before.intent.pinned {
+            let changed = (!self.intent.text.is_empty() && self.intent.text != before.intent.text)
+                .then(|| self.intent.text.clone());
+            self.intent = Intent {
+                proposed: changed.or(self.intent.proposed.take()),
+                ..before.intent.clone()
+            };
+        } else {
+            self.intent.settled = before.intent.settled;
+        }
+    }
+
+    /// A change the person makes to the intent: `edit`, `pin`, `unpin`,
+    /// `accept` or `reject` the agent's proposal.
+    pub fn edit_intent(&mut self, action: &str, text: &str) -> Result<(), String> {
+        let i = &mut self.intent;
+        match action {
+            "edit" if !text.trim().is_empty() => {
+                i.text = text.trim().into();
+                i.pinned = true;
+                i.proposed = None;
+            }
+            "pin" if !i.text.is_empty() => i.pinned = true,
+            "unpin" => i.pinned = false,
+            "accept" => {
+                if let Some(p) = i.proposed.take() {
+                    i.text = p;
+                }
+                i.pinned = !i.text.is_empty();
+            }
+            "reject" => i.proposed = None,
+            _ => return Err(format!("acción «{action}» desconocida o sin texto")),
+        }
+        Ok(())
+    }
+
+    /// Settles the start of the project, if nothing is missing.
+    pub fn settle(&mut self, layers: &[Layer]) -> Result<(), Vec<String>> {
+        let missing = self.missing(layers);
+        if !missing.is_empty() {
+            return Err(missing);
+        }
+        self.intent.settled = Some(true);
+        Ok(())
+    }
+
+    /// What is still missing for the start of the project to be settled:
+    /// a pinned intent, one pinned claim per layer and no open conflict.
+    /// Empty means settled.
+    pub fn missing(&self, layers: &[Layer]) -> Vec<String> {
+        let mut out = Vec::new();
+        if self.intent.text.trim().is_empty() {
+            out.push("falta el párrafo de qué juego es".to_string());
+        } else if !self.intent.pinned {
+            out.push("fija el párrafo de qué juego es".to_string());
+        }
+        for l in layers {
+            if !self.claims.iter().any(|c| c.pinned && c.layer == l.id) {
+                out.push(format!("«{}» no tiene nada fijado", l.name));
+            }
+        }
+        for c in &self.claims {
+            if let Some(other) = &c.conflicts {
+                out.push(format!("«{}» choca con {other}", c.text));
+            }
+        }
+        out
     }
 }
 
@@ -311,5 +397,52 @@ mod tests {
         assert_eq!(c.claims[0].layer, "materials");
         c.answer("q1", "", "skipped").unwrap();
         assert_eq!(c.questions[0].status, "skipped");
+    }
+
+    #[test]
+    fn a_context_without_intent_still_reads() {
+        let c: Context = toml::from_str("text = \"x\"\n").unwrap();
+        assert_eq!(c.intent, Intent::default());
+    }
+
+    #[test]
+    fn the_agent_only_proposes_on_a_pinned_intent() {
+        let mut before = Context::default();
+        before.edit_intent("edit", "un juego de pesca").unwrap();
+        let mut after = before.clone();
+        after.intent = Intent {
+            text: "un juego de barcos".into(),
+            ..Default::default()
+        };
+        after.guard_pinned(&before);
+        assert_eq!(after.intent.text, "un juego de pesca");
+        assert!(after.intent.pinned);
+        assert_eq!(after.intent.proposed.as_deref(), Some("un juego de barcos"));
+        after.edit_intent("accept", "").unwrap();
+        assert_eq!(after.intent.text, "un juego de barcos");
+    }
+
+    #[test]
+    fn settled_needs_a_pinned_intent_one_pinned_claim_per_layer_and_no_conflict() {
+        let layers = default_layers();
+        let mut c = Context::default();
+        assert!(c.missing(&layers).len() > layers.len());
+        c.edit_intent("edit", "un juego de pesca").unwrap();
+        for l in &layers {
+            c.edit_claim("", "add", &format!("algo de {}", l.id), &l.id)
+                .unwrap();
+        }
+        assert!(c.missing(&layers).is_empty());
+        let mut done = c.clone();
+        done.settle(&layers).unwrap();
+        assert_eq!(done.intent.settled, Some(true));
+        c.claims[0].conflicts = Some("c2".into());
+        assert_eq!(c.missing(&layers).len(), 1);
+        c.claims[0].conflicts = None;
+        c.claims.retain(|x| x.layer != "scale");
+        let m = c.missing(&layers);
+        assert_eq!(m.len(), 1);
+        assert!(m[0].contains("Escala"));
+        assert!(c.settle(&layers).is_err());
     }
 }
