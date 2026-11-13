@@ -309,6 +309,9 @@ children = [{ key = "fixtures", field = "id", level = "asset" }]
             licenses: vec![],
             credit: None,
             manifest: Default::default(),
+            measured_by: None,
+            preview: None,
+            bindings: Default::default(),
         });
         let tree = build(&dir, &config, &cat);
         let game = &tree.nodes[&tree.root];

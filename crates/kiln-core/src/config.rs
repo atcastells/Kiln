@@ -17,6 +17,52 @@ pub struct Config {
     /// The levels of the project tree between the game and its assets.
     #[serde(default)]
     pub levels: Vec<LevelSource>,
+    /// The programs Kiln calls to produce (Blender, Godot) and where it writes.
+    #[serde(default)]
+    pub tools: Tools,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Tools {
+    /// Blender, or a Python with the `bpy` module (`.../python3`).
+    #[serde(default = "default_blender")]
+    pub blender: String,
+    #[serde(default = "default_godot")]
+    pub godot: String,
+    /// The folder with `project.godot`, for pieces only Godot reads (`.res`).
+    #[serde(default)]
+    pub godot_project: Option<String>,
+    /// Where an asset is assembled (`<build>/<id>/<id>.glb`).
+    #[serde(default = "default_build")]
+    pub build: String,
+    /// What Kiln works out and keeps (Godot measures, exported GLBs).
+    #[serde(default = "default_cache")]
+    pub cache: String,
+}
+
+impl Default for Tools {
+    fn default() -> Self {
+        Tools {
+            blender: default_blender(),
+            godot: default_godot(),
+            godot_project: None,
+            build: default_build(),
+            cache: default_cache(),
+        }
+    }
+}
+
+fn default_blender() -> String {
+    "blender".into()
+}
+fn default_godot() -> String {
+    "godot".into()
+}
+fn default_build() -> String {
+    "kiln/build".into()
+}
+fn default_cache() -> String {
+    "kiln/cache".into()
 }
 
 /// Where the nodes of one level are declared: each file matched by `files`
@@ -79,6 +125,12 @@ pub struct MaterialsSection {
     /// The ends of the other maps Kiln looks for beside it.
     #[serde(default = "default_maps")]
     pub map_suffixes: Vec<String>,
+    /// Keys of a table row that hold its colour as RGB 0-1, first found wins.
+    #[serde(default = "default_color_keys")]
+    pub color_keys: Vec<String>,
+    /// The file where each slot of a piece is bound to a palette material.
+    #[serde(default = "default_bindings")]
+    pub bindings: String,
 }
 
 impl Default for MaterialsSection {
@@ -88,6 +140,8 @@ impl Default for MaterialsSection {
             textures: Vec::new(),
             albedo_suffix: default_albedo(),
             map_suffixes: default_maps(),
+            color_keys: default_color_keys(),
+            bindings: default_bindings(),
         }
     }
 }
@@ -97,6 +151,14 @@ fn default_albedo() -> String {
 }
 fn default_maps() -> Vec<String> {
     vec!["_normal".into(), "_roughness".into()]
+}
+fn default_color_keys() -> Vec<String> {
+    ["color", "colour", "albedo", "base_color"]
+        .map(String::from)
+        .to_vec()
+}
+fn default_bindings() -> String {
+    "kiln/bindings.toml".into()
 }
 
 #[derive(Debug, Clone, Deserialize)]

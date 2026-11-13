@@ -3,8 +3,11 @@
 //!   kiln index  --project DIR [--config FILE] [--out FILE]   catalog as JSON
 //!   kiln check  --project DIR [--config FILE]                findings; exit 1 on errors
 //!   kiln serve  --project DIR [--config FILE] [--port 4330]  the graph at http://127.0.0.1:PORT
+//!   kiln build  --project DIR [--config FILE] --asset ID     assemble an asset in Blender
+//!   kiln godot  --project DIR [--config FILE]                Godot measures its own pieces
 
 mod agent;
+mod production;
 mod serve;
 
 use kiln_core::{Catalog, Config, Severity};
@@ -17,6 +20,7 @@ struct Args {
     config: Option<PathBuf>,
     out: Option<PathBuf>,
     port: u16,
+    asset: Option<String>,
 }
 
 fn parse() -> Result<Args, String> {
@@ -28,6 +32,7 @@ fn parse() -> Result<Args, String> {
         config: None,
         out: None,
         port: 4330,
+        asset: None,
     };
     while let Some(flag) = it.next() {
         let mut val = || it.next().ok_or(format!("falta el valor de {flag}"));
@@ -35,15 +40,17 @@ fn parse() -> Result<Args, String> {
             "--project" => a.project = PathBuf::from(val()?),
             "--config" => a.config = Some(PathBuf::from(val()?)),
             "--out" => a.out = Some(PathBuf::from(val()?)),
+            "--asset" => a.asset = Some(val()?),
             "--port" => a.port = val()?.parse().map_err(|_| "--port debe ser un número")?,
             other => return Err(format!("opción desconocida {other}\n{USAGE}")),
         }
     }
+    a.project =
+        std::fs::canonicalize(&a.project).map_err(|e| format!("{}: {e}", a.project.display()))?;
     Ok(a)
 }
 
-const USAGE: &str =
-    "uso: kiln <index|check|serve> --project DIR [--config FILE] [--out FILE] [--port N]";
+const USAGE: &str = "uso: kiln <index|check|serve|build|godot> --project DIR [--config FILE] [--out FILE] [--port N] [--asset ID]";
 
 pub fn load(
     project: &std::path::Path,
@@ -114,6 +121,19 @@ fn main() -> ExitCode {
             }
             "serve" => serve::run(args.project.clone(), args.config.clone(), args.port)
                 .map(|_| ExitCode::SUCCESS),
+            "build" => {
+                let id = args.asset.as_deref().ok_or("falta --asset ID")?;
+                let glb =
+                    production::build_asset(&args.project, args.config.as_deref(), id, |l| {
+                        eprintln!("{l}")
+                    })?;
+                println!("{}", glb.display());
+                Ok(ExitCode::SUCCESS)
+            }
+            "godot" => {
+                production::measure(&args.project, args.config.as_deref(), |l| eprintln!("{l}"))
+                    .map(|_| ExitCode::SUCCESS)
+            }
             _ => Err(USAGE.into()),
         }
     };
