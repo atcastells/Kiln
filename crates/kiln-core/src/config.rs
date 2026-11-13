@@ -26,6 +26,36 @@ pub struct Config {
     /// Asset sites to search for `search` parts, and where pieces brought in go.
     #[serde(default)]
     pub sources: SourcesSection,
+    /// Which model each agent runs on, and how far the review loop goes.
+    #[serde(default)]
+    pub agents: AgentsSection,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AgentsSection {
+    /// The reviewer looks at images: the strongest model (`opus` is the
+    /// latest Opus for Claude Code).
+    #[serde(default = "default_review_model")]
+    pub review_model: String,
+    /// Rounds of review, fix and build at most; the best one is kept.
+    #[serde(default = "default_review_rounds")]
+    pub review_rounds: u32,
+}
+
+impl Default for AgentsSection {
+    fn default() -> Self {
+        AgentsSection {
+            review_model: default_review_model(),
+            review_rounds: default_review_rounds(),
+        }
+    }
+}
+
+fn default_review_model() -> String {
+    "opus".into()
+}
+fn default_review_rounds() -> u32 {
+    3
 }
 
 #[derive(Debug, Clone, Deserialize)]

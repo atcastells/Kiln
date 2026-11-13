@@ -2,7 +2,7 @@
 //! of the agent. The desktop shell (Tauri) will wrap the same page later.
 
 use crate::agent::{self, Ctx, Jobs, Task};
-use crate::{fetch, production};
+use crate::{fetch, production, review};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
@@ -179,6 +179,20 @@ fn handle(mut stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result
                 )
             }
         }
+        ("POST", "/api/review") => {
+            let id = field("asset");
+            if id.is_empty() {
+                bad("falta el asset")
+            } else {
+                let c = ctx.clone();
+                json(
+                    serde_json::json!({ "job": agent::job(jobs, format!("revisar {id}"), move |say| {
+                    let file = review::run(&c.project, c.config.as_deref(), &id, say)?;
+                    Ok(Some(rel(&c.project, &file)))
+                }) }),
+                )
+            }
+        }
         ("POST", "/api/godot") => {
             let c = ctx.clone();
             json(
@@ -312,6 +326,8 @@ fn file(ctx: &Ctx, path: &str) -> Option<(&'static str, Vec<u8>)> {
         "png" => "image/png",
         "jpg" | "jpeg" => "image/jpeg",
         "webp" => "image/webp",
+        // what a visual review left (review.json, measures.json)
+        "json" if path.contains("/review/") => "application/json",
         _ => return None,
     };
     let full = std::fs::canonicalize(ctx.project.join(&path)).ok()?;
