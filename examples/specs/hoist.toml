@@ -1,0 +1,79 @@
+# Spec written by Claude Code through Kiln for «crear un ascensor» in Rune World
+# (2026-11-13), kept as it came out.
+[asset]
+id = "hoist"
+name = "Montacargas de torno"
+asked = "crear un ascensor"
+used_by = ["fort_works", "house_loft"]
+where = "al pie del andamio de las obras de la casa fuerte (sube piedra y madera) y en el hastial de la casa con sobrado (sube los sacos)"
+states = ["down", "up", "loaded"]
+budget_tris = 4000
+status = "inventory"
+notes = "En el mundo de Rune un ascensor es un montacargas de torno: dos postes, travesaño con polea, rodillo con manivela y una plataforma de tablas colgada de la soga. Lo usarían las obras de la casa fuerte (godot/buildings/fort_works.gd, el andamio de fort_plot.gd) y el sobrado (house_loft.gd, forts.toml sack_layers), pero hoy ninguna regla de rune-core mueve carga con él: hay que decidir su uso en la simulación antes de dibujarlo (regla «lo dibujado tiene uso»). No hay kiln.toml en el proyecto ni material de soga en la paleta: propongo la clave nueva hemp_rope. El rodillo serviría también para sustituir el torno del pozo, hoy hecho con código en stone_mass.gd (regla 098). Las piezas medievalkit no traen medida en el catálogo; las medidas de plataforma y sacos son las deseadas."
+
+[[parts]]
+id = "post"
+what = "poste vertical del bastidor, hincado en el suelo"
+count = 2
+size_m = [0.18, 4.5, 0.29]
+material = "log"
+source = { kind = "variant", from = "village/beam", why = "viga del kit puesta de pie y alargada de 2 m a 4,5 m" }
+
+[[parts]]
+id = "crossbeam"
+what = "travesaño que une los postes arriba y sostiene la polea"
+count = 1
+size_m = [2.0, 0.18, 0.29]
+source = { kind = "reuse", from = "village/beam" }
+
+[[parts]]
+id = "brace"
+what = "tornapunta entre cada poste y el travesaño"
+count = 2
+size_m = [0.39, 0.39, 0.12]
+source = { kind = "reuse", from = "jetty/brace" }
+
+[[parts]]
+id = "windlass"
+what = "rodillo del torno con su manivela, entre los postes a la altura del pecho"
+count = 1
+size_m = [2.1, 0.5, 0.5]
+moves = "rotate_x"
+material = "log"
+source = { kind = "search", query = "wooden windlass crank" }
+
+[[parts]]
+id = "pulley"
+what = "polea de madera colgada del centro del travesaño"
+count = 1
+size_m = [0.12, 0.35, 0.3]
+moves = "rotate_x"
+material = "oldwood"
+source = { kind = "search", query = "wooden pulley block" }
+
+[[parts]]
+id = "rope"
+what = "soga tensa del rodillo a la polea y de la polea a la plataforma; se acorta al subir"
+count = 1
+size_m = [0.04, 4.0, 0.04]
+moves = "scale_y"
+material = "hemp_rope"
+source = { kind = "retouch", from = "medievalkit/Rope_Coil", why = "la soga del kit está enrollada; se estira en un tramo recto y se dejan unas vueltas en el rodillo" }
+
+[[parts]]
+id = "platform"
+what = "plataforma de tablas colgada de la soga por cuatro ramales"
+count = 1
+size_m = [1.2, 0.08, 1.2]
+moves = "translate_y"
+material = "planks"
+source = { kind = "variant", from = "medievalkit/Door_Plank", why = "hoja de tablas del kit tumbada y recortada a 1,2 m de lado" }
+
+[[parts]]
+id = "load"
+what = "sacos sobre la plataforma; suben y bajan con ella"
+count = 3
+size_m = [0.5, 0.3, 0.8]
+moves = "translate_y"
+only_in = ["loaded"]
+source = { kind = "reuse", from = "medievalkit/Sack" }

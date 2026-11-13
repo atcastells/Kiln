@@ -16,3 +16,36 @@ textures = ["godot/textures"]
 # Rune admits CC0 and CC-BY (docs/principios.md); NC, ND and SA do not enter, GPL not without a decision.
 licenses = ["CC0", "CC-BY"]
 max_tris = 20000
+# Rune draws nothing without a use in its simulation.
+require_use = true
+
+# The tree of the project, from the game down to its assets. Rune's world is
+# generated, so its nodes are kinds (the fortified house), not places.
+[[levels]]
+level = "place"
+files = ["data/buildings/forts.toml"]
+table = "forts"
+id = "id"
+name = "name"
+children = [{ key = "house_piece", level = "building" }, { key = "house_chamber", level = "building" }]
+
+[[levels]]
+level = "building"
+files = ["data/buildings/schemas/*.toml"]
+id = "id"
+children = [{ key = "needs", field = "use", level = "room" }]
+
+[[levels]]
+level = "building"
+files = ["data/buildings/pieces.toml"]
+table = "pieces"
+id = "id"
+name = "name"
+children = [{ key = "rooms", field = "id", level = "room" }]
+
+[[levels]]
+level = "room"
+files = ["data/buildings/rooms.toml"]
+table = "rooms"
+id = "use"
+children = [{ key = "fixtures", field = "id", level = "asset" }]
