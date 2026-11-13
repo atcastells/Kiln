@@ -10,6 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::time::SystemTime;
 
 const SKILL: &str = include_str!("../../../skills/asset/SKILL.md");
+const CONTEXT_SKILL: &str = include_str!("../../../skills/context/SKILL.md");
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Job {
@@ -32,6 +33,9 @@ pub struct Ctx {
     /// Folders the page may read files from (models, textures): the project,
     /// its build and its cache.
     pub roots: Vec<PathBuf>,
+    /// The context of the project (`[context] file`), absolute.
+    pub context_file: PathBuf,
+    pub layers: Vec<kiln_core::context::Layer>,
 }
 
 /// What the agent is asked: a new asset, or to place the parts of a spec.
@@ -39,12 +43,18 @@ pub struct Ctx {
 pub enum Task {
     Ask(String),
     Layout(String),
+    /// Sort the person's explanation into claims, layer by layer.
+    Sort,
+    /// Ask a round of questions with suggested answers.
+    Refine,
 }
 
 pub fn start(jobs: &Jobs, ctx: Arc<Ctx>, task: Task) -> u64 {
     let asked = match &task {
         Task::Ask(t) => t.clone(),
         Task::Layout(f) => format!("colocar las piezas de {f}"),
+        Task::Sort => "ordenar el contexto del proyecto".into(),
+        Task::Refine => "preguntas para afinar el contexto".into(),
     };
     let id = {
         let mut j = jobs.lock().unwrap();
@@ -66,8 +76,8 @@ pub fn start(jobs: &Jobs, ctx: Arc<Ctx>, task: Task) -> u64 {
         match result {
             Ok(spec) => {
                 job.log.push(match &spec {
-                    Some(s) => format!("Ficha escrita: {s}"),
-                    None => "El agente terminó sin escribir ficha".into(),
+                    Some(s) => format!("Escrito: {s}"),
+                    None => "El agente terminó sin escribir nada".into(),
                 });
                 job.status = if spec.is_some() { "done" } else { "failed" }.into();
                 job.spec = spec;
@@ -152,26 +162,49 @@ fn run(jobs: &Jobs, id: u64, ctx: &Ctx, task: &Task) -> Result<Option<String>, S
         ),
         None => "Configuración de Kiln del proyecto: kiln.toml en la raíz".into(),
     };
+    let context = format!(
+        "Contexto del proyecto: {} (léelo antes que nada; si no existe, aún no hay contexto)",
+        ctx.context_file.display()
+    );
+    let layers = serde_json::to_string(&ctx.layers).unwrap_or_default();
+    let ctx_before = kiln_core::context::load(&ctx.context_file)?;
     let prompt = match task {
+        Task::Sort => format!(
+            "Ordena el contexto del proyecto: la explicación de la persona está en el campo `text` del fichero {}. Sigue la skill kiln-context que tienes en tu prompt de sistema (modo ordenar).\n\nCapas: {layers}\n{config}\nCatálogo del proyecto: {}\nEdita solo el fichero de contexto.",
+            ctx.context_file.display(),
+            cat_path.display()
+        ),
+        Task::Refine => format!(
+            "Afina el contexto del proyecto del fichero {}: añade una ronda de preguntas con respuestas sugeridas. Sigue la skill kiln-context que tienes en tu prompt de sistema (modo afinar).\n\nCapas: {layers}\n{config}\nCatálogo del proyecto: {}\nEdita solo el fichero de contexto.",
+            ctx.context_file.display(),
+            cat_path.display()
+        ),
         Task::Ask(asked) => format!(
-            "Petición de la persona: «{asked}»\n\n{config}\nCatálogo del proyecto: {}\nEscribe la ficha en la carpeta {} (fichero <id>.toml), siguiendo las instrucciones de la skill kiln-asset que tienes en tu prompt de sistema. No toques ningún otro fichero.",
+            "Petición de la persona: «{asked}»\n\n{config}\n{context}\nCatálogo del proyecto: {}\nEscribe la ficha en la carpeta {} (fichero <id>.toml), siguiendo las instrucciones de la skill kiln-asset que tienes en tu prompt de sistema. No toques ningún otro fichero salvo para añadir preguntas al contexto.",
             cat_path.display(),
             specs.display()
         ),
         Task::Layout(file) => format!(
-            "Coloca las piezas de la ficha {} (solo el paso 4, montaje, de la skill kiln-asset que tienes en tu prompt de sistema).\n\n{config}\nCatálogo del proyecto: {}\nEdita solo esa ficha.",
+            "Coloca las piezas de la ficha {} (solo el paso 4, montaje, de la skill kiln-asset que tienes en tu prompt de sistema).\n\n{config}\nCatálogo del proyecto: {}\nEdita solo esa ficha.\n{context}",
             ctx.project.join(file).display(),
             cat_path.display()
         ),
     };
+    let skill = match task {
+        Task::Sort | Task::Refine => CONTEXT_SKILL,
+        _ => SKILL,
+    };
+    if let Some(d) = ctx.context_file.parent() {
+        std::fs::create_dir_all(d).map_err(|e| e.to_string())?;
+    }
     log(jobs, id, "Claude Code está leyendo el proyecto".into());
     let mut child = claude()
-        .args(["-p", &prompt, "--output-format", "stream-json", "--verbose", "--append-system-prompt", SKILL])
+        .args(["-p", &prompt, "--output-format", "stream-json", "--verbose", "--append-system-prompt", skill])
         .args(["--allowedTools", "Read", "Glob", "Grep", "Write", "Edit", "--permission-mode", "acceptEdits"])
         .args(["--disallowedTools", "Bash"])
         .arg("--add-dir")
         .arg(&tmp)
-        .args(ctx.config.iter().filter_map(|c| c.parent()).flat_map(|d| [std::ffi::OsStr::new("--add-dir"), d.as_os_str()]))
+        .args(ctx.config.iter().filter_map(|c| c.parent()).chain(ctx.context_file.parent()).flat_map(|d| [std::ffi::OsStr::new("--add-dir"), d.as_os_str()]))
         .current_dir(&ctx.project)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -193,6 +226,45 @@ fn run(jobs: &Jobs, id: u64, ctx: &Ctx, task: &Task) -> Result<Option<String>, S
             let _ = e.read_to_string(&mut err);
         }
         return Err(format!("Claude Code salió con {status}: {}", err.trim()));
+    }
+    if let Ok(mut after) = kiln_core::context::load(&ctx.context_file)
+        && after != ctx_before
+    {
+        after.guard_pinned(&ctx_before);
+        kiln_core::context::save(&ctx.context_file, &after)?;
+        let props = |c: &kiln_core::context::Context| {
+            c.claims.iter().filter(|c| c.proposed.is_some()).count()
+        };
+        let proposed = props(&after).saturating_sub(props(&ctx_before));
+        if proposed > 0 {
+            log(
+                jobs,
+                id,
+                format!("Propone cambiar {proposed} afirmaciones que fijaste: decide tú"),
+            );
+        }
+        let open = |c: &kiln_core::context::Context| {
+            c.questions.iter().filter(|q| q.status == "open").count()
+        };
+        if open(&after) > open(&ctx_before) {
+            log(
+                jobs,
+                id,
+                format!(
+                    "Deja {} preguntas nuevas en el contexto",
+                    open(&after) - open(&ctx_before)
+                ),
+            );
+        }
+    }
+    if matches!(task, Task::Sort | Task::Refine) {
+        return Ok(Some(
+            ctx.context_file
+                .strip_prefix(&ctx.project)
+                .unwrap_or(&ctx.context_file)
+                .to_string_lossy()
+                .replace('\\', "/"),
+        ));
     }
     Ok(newest(&specs)
         .filter(|n| Some(n) != before.as_ref())

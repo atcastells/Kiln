@@ -1,0 +1,56 @@
+# Context of Puerto Niebla, the invented game of examples/kiln.toml: the shape
+# Kiln keeps in `[context] file`.
+text = """Un pueblo de pescadores en una costa fría y con niebla. El jugador lleva el almacén del muelle: compra pescado, lo sala y lo vende. Estilo de dibujo sencillo, colores apagados. Godot 4, assets CC0."""
+
+[[claims]]
+id = "c1"
+layer = "world"
+text = "Pueblo de pescadores en una costa fría; no hay electricidad ni motores"
+source = "text"
+pinned = false
+links = ["c3"]
+
+[[claims]]
+id = "c2"
+layer = "look"
+text = "Dibujo sencillo, de pocas caras, con colores apagados por la niebla"
+source = "text"
+pinned = false
+
+[[claims]]
+id = "c3"
+layer = "materials"
+text = "Casas y muelle de madera de pino gris por la sal; tejados de pizarra"
+source = "text"
+pinned = true
+
+[[claims]]
+id = "c4"
+layer = "play"
+text = "El jugador compra, sala y vende pescado desde el almacén del muelle"
+source = "text"
+pinned = false
+
+[[claims]]
+id = "c5"
+layer = "tech"
+text = "Godot 4; solo assets CC0"
+source = "text"
+pinned = false
+
+[[questions]]
+id = "q1"
+layer = "scale"
+text = "¿Cuánto mide de alto una persona adulta, que es la medida de puertas y muebles?"
+options = ["1,75 m", "1,80 m", "1,65 m"]
+status = "open"
+asked_by = "refine"
+
+[[questions]]
+id = "q2"
+layer = "materials"
+text = "¿Con qué se cierran las ventanas de las casas?"
+options = ["contraventanas de tabla", "vidrio pequeño con marco de plomo", "contraventanas y tela encerada"]
+status = "answered"
+answer = "contraventanas de tabla"
+asked_by = "refine"
