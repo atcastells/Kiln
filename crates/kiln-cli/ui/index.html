@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kiln</title>
+<style>
+/* Barra arriba, lienzo del grafo a la izquierda, ficha del nodo a la derecha. */
+:root {
+  --bg: #eef0ec; --grid: #d9ddd4; --panel: #ffffff; --fg: #1d221c; --muted: #5d6658; --line: #c5cbbf; --accent: #b4561f;
+  --ok: #3d7a3a; --okbg: #e3efdf; --warn: #a06a00; --warnbg: #f7ecd2; --bad: #b13a2e; --badbg: #f6e0dc; --info: #2f5f8a; --infobg: #dde8f2;
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif; --mono: ui-monospace, "Cascadia Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #161a15; --grid: #232822; --panel: #1f241e; --fg: #e6eae2; --muted: #9aa393; --line: #3a4237; --accent: #e08a4e;
+  --ok: #8cc887; --okbg: #22331f; --warn: #e2b04f; --warnbg: #3a2f17; --bad: #ec8476; --badbg: #3d221e; --info: #8ab8e2; --infobg: #1d2b38; color-scheme: dark } }
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 14px var(--font); display: flex; flex-direction: column; padding: 12px 16px; gap: 10px; }
+header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
+h1 { font-size: 18px; margin: 0; }
+.tag { font: 500 11px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 2px 6px; }
+.stats { display: flex; gap: 6px; flex-wrap: wrap; font: 500 11.5px var(--mono); }
+.stats span { padding: 3px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+input { font: inherit; padding: 7px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--fg); min-width: 0; flex: 0 1 260px; }
+input:disabled { opacity: .6; }
+button { font: 600 13px var(--font); padding: 7px 12px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel); color: var(--fg); cursor: pointer; }
+button:focus-visible, input:focus-visible, .node:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main { flex: 1; display: grid; grid-template-columns: 1fr 340px; gap: 10px; min-height: 0; }
+#stage { position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; cursor: grab; touch-action: none;
+  background-color: var(--bg); background-image: radial-gradient(var(--grid) 1.2px, transparent 1.2px); background-size: 22px 22px; }
+#world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+svg#edges { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; }
+svg#edges path { fill: none; stroke: var(--line); stroke-width: 2; }
+svg#edges path.hot { stroke: var(--accent); stroke-width: 2.5; }
+.col { position: absolute; font: 500 11px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+.node { position: absolute; width: 200px; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; cursor: pointer; user-select: none; }
+.node.sel { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.node.dim { opacity: .35; }
+.node .hd { display: flex; align-items: center; gap: 6px; padding: 5px 9px; border-bottom: 1px solid var(--line); font: 500 10px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.node .hd i { width: 8px; height: 8px; border-radius: 2px; background: var(--muted); }
+.node .hd b { margin-left: auto; font-weight: 500; }
+.node .bd { padding: 6px 9px 8px; }
+.node .t { font-weight: 600; font-size: 13px; overflow-wrap: anywhere; }
+.node .s { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.k-project .hd i { background: var(--fg); } .k-kit .hd i { background: var(--accent); } .k-piece .hd i { background: var(--info); }
+.k-slot .hd i { background: var(--warn); } .k-mat .hd i { background: var(--ok); }
+.pill { display: inline-block; margin: 5px 4px 0 0; font: 500 10.5px var(--mono); padding: 1px 6px; border-radius: 4px; }
+.ok { background: var(--okbg); color: var(--ok); } .warn { background: var(--warnbg); color: var(--warn); }
+.error { background: var(--badbg); color: var(--bad); } .info { background: var(--infobg); color: var(--info); }
+aside { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 14px; overflow: auto; min-width: 0; }
+aside h2 { font-size: 16px; margin: 2px 0 4px; overflow-wrap: anywhere; }
+.kind { font: 500 11px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .08em; }
+dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 10px; font-size: 13px; margin: 12px 0; }
+dt { color: var(--muted); } dd { margin: 0; font: 12px var(--mono); overflow-wrap: anywhere; }
+.finding { font-size: 12.5px; padding: 6px 0; border-top: 1px solid var(--line); }
+.finding code { font: 11px var(--mono); color: var(--muted); }
+.note { font-size: 12px; color: var(--muted); }
+@media (max-width: 760px) { main { grid-template-columns: 1fr; grid-template-rows: 60vh auto; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Kiln</h1><span class="tag" id="proj">cargando…</span>
+  <div class="stats" id="stats"></div>
+  <input id="search" placeholder="Buscar pieza o material" aria-label="Buscar pieza o material">
+  <input id="ask" placeholder="Pedir un asset (próxima entrega)" disabled aria-label="Pedir un asset">
+  <button id="reload" type="button">Releer el proyecto</button>
+</header>
+<main>
+  <div id="stage"><div id="world"><svg id="edges"></svg></div></div>
+  <aside id="side"></aside>
+</main>
+<script>
+const W = 200, GAP = 12, X = { project: 20, kit: 270, piece: 520, slot: 770, mat: 1060 };
+let cat = null, openKit = null, sel = null, query = "", view = { x: 10, y: 10, z: 0.8 };
+const world = document.getElementById("world"), svg = document.getElementById("edges"), side = document.getElementById("side");
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const fmt = v => v ? v.map(n => n.toFixed(2)).join(" × ") + " m" : "sin medir";
+const worst = subject => { const f = cat.findings.filter(f => f.subject === subject); return f.find(x => x.severity === "error") ? "error" : f.find(x => x.severity === "warn") ? "warn" : f.length ? "info" : null; };
+const PILL = { error: "error", warn: "aviso", info: "nota" };
+
+async function load() {
+  const r = await fetch("/api/catalog"); const j = await r.json();
+  if (j.error) { side.innerHTML = `<div class="kind">Error</div><p>${esc(j.error)}</p>`; return; }
+  cat = j; document.getElementById("proj").textContent = cat.project;
+  const n = s => cat.findings.filter(f => f.severity === s).length;
+  document.getElementById("stats").innerHTML = `<span>${cat.kits.length} kits</span><span>${cat.pieces.length} piezas</span><span>${cat.materials.length} materiales</span>`
+    + `<span class="error">${n("error")} errores</span><span class="warn">${n("warn")} avisos</span><span class="info">${n("info")} notas</span>`;
+  render(); if (!sel) showProject();
+}
+
+function node(id, k, kind, title, sub, x, y, extra = "", badge = "") {
+  return { id, k, html: `<div class="node k-${k}" data-id="${esc(id)}" tabindex="0" style="left:${x}px;top:${y}px"><div class="hd"><i></i>${esc(kind)}<b>${esc(badge)}</b></div><div class="bd"><div class="t">${esc(title)}</div><div class="s">${esc(sub)}</div>${extra}</div></div>`, x, y };
+}
+function pill(level) { return level ? `<span class="pill ${level}">${PILL[level]}</span>` : ""; }
+function matches(text) { return !query || String(text).toLowerCase().includes(query); }
+
+function render() {
+  const nodes = [], edges = [];
+  let y = 40;
+  nodes.push(node("project", "project", "Proyecto", cat.project, cat.root, X.project, 40));
+  for (const k of cat.kits) {
+    const pcs = cat.pieces.filter(p => p.kit === k.name);
+    const hit = pcs.some(p => matches(p.key)) || matches(k.name);
+    const lv = worst(k.path) || (pcs.map(p => worst(p.key)).includes("error") ? "error" : pcs.map(p => worst(p.key)).includes("warn") ? "warn" : null);
+    const n = node("kit:" + k.name, "kit", "Kit", k.name, `${k.pieces} piezas · ${k.licenses.join(", ") || "sin licencia"}`, X.kit, y, pill(lv), openKit === k.name ? "▾" : "▸");
+    if (!hit) n.html = n.html.replace('class="node', 'class="node dim');
+    nodes.push(n); edges.push(["project", n.id]); y += 74;
+  }
+  if (openKit) {
+    let py = 40;
+    for (const p of cat.pieces.filter(p => p.kit === openKit)) {
+      const n = node("piece:" + p.key, "piece", "Pieza · " + p.format, p.name, `${fmt(p.size_m)}${p.tris != null ? " · " + p.tris.toLocaleString("es") + " tri" : ""}`, X.piece, py, pill(worst(p.key)));
+      if (!matches(p.key)) n.html = n.html.replace('class="node', 'class="node dim');
+      nodes.push(n); edges.push(["kit:" + openKit, n.id]); py += 74;
+    }
+  }
+  const piece = sel && sel.startsWith("piece:") ? cat.pieces.find(p => "piece:" + p.key === sel) : null;
+  if (piece) {
+    let sy = Math.max(40, (nodes.find(n => n.id === sel)?.y ?? 40) - 20);
+    for (const s of piece.material_slots) {
+      const bound = cat.materials.find(m => m.key === s);
+      const n = node("slot:" + piece.key + ":" + s, "slot", "Ranura", s, bound ? "coincide con la paleta" : "sin vincular a la paleta", X.slot, sy, `<span class="pill ${bound ? "ok" : "warn"}">${bound ? "vinculada" : "sin vincular"}</span>`);
+      nodes.push(n); edges.push([sel, n.id]); if (bound) edges.push([n.id, "mat:" + bound.key]); sy += 74;
+    }
+  }
+  let my = 40;
+  for (const m of cat.materials.filter(m => matches(m.key) || matches(m.name)).slice(0, 80)) {
+    nodes.push(node("mat:" + m.key, "mat", m.source === "table" ? "Material · tabla" : "Material · textura", m.key, m.name !== m.key ? m.name : m.file, X.mat, my)); my += 66;
+  }
+  world.querySelectorAll(".node, .col").forEach(e => e.remove());
+  world.insertAdjacentHTML("beforeend", [["Proyecto", X.project], ["Kits", X.kit], ["Piezas", X.piece], ["Ranuras", X.slot], ["Paleta", X.mat]]
+    .map(([l, x]) => `<div class="col" style="left:${x}px;top:10px">${l}</div>`).join("") + nodes.map(n => n.html).join(""));
+  world.querySelectorAll(".node").forEach(el => {
+    el.classList.toggle("sel", el.dataset.id === sel);
+    el.addEventListener("click", () => pick(el.dataset.id));
+    el.addEventListener("keydown", e => { if (e.key === "Enter") pick(el.dataset.id); });
+  });
+  // Stack each column by the real height of its nodes, so none overlaps.
+  const cols = {};
+  world.querySelectorAll(".node").forEach(el => (cols[el.offsetLeft] ??= []).push(el));
+  for (const list of Object.values(cols)) {
+    list.sort((a, b) => a.offsetTop - b.offsetTop);
+    let y = 0;
+    for (const el of list) { y = Math.max(y, el.offsetTop); el.style.top = y + "px"; y += el.offsetHeight + GAP; }
+  }
+  const at = id => { const el = world.querySelector(`.node[data-id="${CSS.escape(id)}"]`); return el ? { x: el.offsetLeft, y: el.offsetTop + el.offsetHeight / 2 } : null; };
+  svg.innerHTML = edges.map(([a, b]) => { const A = at(a), B = at(b); if (!A || !B) return "";
+    const x1 = A.x + W, x2 = B.x, dx = Math.max(40, (x2 - x1) / 2), hot = sel && (a === sel || b === sel);
+    return `<path class="${hot ? "hot" : ""}" d="M${x1},${A.y} C${x1 + dx},${A.y} ${x2 - dx},${B.y} ${x2},${B.y}"/>`; }).join("");
+  apply();
+}
+
+function pick(id) {
+  if (id.startsWith("kit:")) { const k = id.slice(4); openKit = openKit === k && sel === id ? null : k; }
+  sel = id; render();
+  if (id === "project") return showProject();
+  if (id.startsWith("kit:")) return showKit(cat.kits.find(k => k.name === id.slice(4)));
+  if (id.startsWith("piece:")) return showPiece(cat.pieces.find(p => p.key === id.slice(6)));
+  if (id.startsWith("mat:")) return showMat(cat.materials.find(m => m.key === id.slice(4)));
+  if (id.startsWith("slot:")) { side.innerHTML = `<div class="kind">Ranura de material</div><h2>${esc(id.split(":").pop())}</h2><p class="note">El vínculo de cada ranura con una clave de la paleta se escribe en la ficha del asset (tercera entrega). Hoy solo se marca vinculada cuando el nombre coincide.</p>`; }
+}
+function findingsOf(subject) {
+  const f = cat.findings.filter(x => x.subject === subject);
+  return f.length ? `<div class="kind" style="margin-top:12px">Comprobaciones</div>` + f.map(x => `<div class="finding">${pill(x.severity)} ${esc(x.message)} <code>${esc(x.code)}</code></div>`).join("") : `<p class="note">Sin avisos.</p>`;
+}
+function showProject() {
+  const top = cat.findings.filter(f => f.severity !== "info");
+  side.innerHTML = `<div class="kind">Proyecto</div><h2>${esc(cat.project)}</h2><p class="note">${esc(cat.root)}</p>
+    <p>Abre un kit para ver sus piezas; toca una pieza para ver sus medidas, su licencia y sus ranuras de material.</p>
+    <div class="kind" style="margin-top:12px">Lo que hay que mirar (${top.length})</div>`
+    + (top.map(x => `<div class="finding">${pill(x.severity)} <b>${esc(x.subject)}</b>: ${esc(x.message)}</div>`).join("") || `<p class="note">Nada: solo notas.</p>`);
+}
+function showKit(k) {
+  side.innerHTML = `<div class="kind">Kit</div><h2>${esc(k.name)}</h2><dl><dt>carpeta</dt><dd>${esc(k.path)}</dd><dt>piezas</dt><dd>${k.pieces}</dd>
+    <dt>licencias</dt><dd>${esc(k.licenses.join(", ") || "ninguna")}</dd><dt>LICENSE.md</dt><dd>${k.has_license_file ? "sí" : "no"}${k.has_credit ? ", con crédito" : ""}</dd></dl>` + findingsOf(k.path);
+}
+function showPiece(p) {
+  const man = Object.entries(p.manifest).filter(([k]) => k !== "credit").map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(JSON.stringify(v))}</dd>`).join("");
+  side.innerHTML = `<div class="kind">Pieza · ${esc(p.kit)}</div><h2>${esc(p.name)}</h2>
+    <dl><dt>fichero</dt><dd>${esc(p.file || "falta")}</dd><dt>medida</dt><dd>${fmt(p.size_m)}</dd><dt>base</dt><dd>${p.min ? "y = " + p.min[1].toFixed(3) + " m" : "—"}</dd>
+    <dt>triángulos</dt><dd>${p.tris?.toLocaleString("es") ?? "—"}</dd><dt>texturas</dt><dd>${p.images ?? "—"}</dd><dt>ranuras</dt><dd>${esc(p.material_slots.join(", ") || "—")}</dd>
+    <dt>licencia</dt><dd>${esc(p.licenses.join(", ") || "ninguna")}</dd>${p.credit ? `<dt>crédito</dt><dd>${esc(p.credit)}</dd>` : ""}${man}</dl>` + findingsOf(p.key);
+}
+function showMat(m) {
+  const d = Object.entries(m.detail).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(JSON.stringify(v))}</dd>`).join("");
+  side.innerHTML = `<div class="kind">Material · ${m.source === "table" ? "tabla" : "textura"}</div><h2>${esc(m.key)}</h2><dl><dt>nombre</dt><dd>${esc(m.name)}</dd><dt>fichero</dt><dd>${esc(m.file)}</dd>${d}</dl>` + findingsOf(m.key);
+}
+
+function apply() { world.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.z})`; }
+const stage = document.getElementById("stage");
+stage.addEventListener("pointerdown", e => { if (e.target.closest(".node")) return; const sx = e.clientX - view.x, sy = e.clientY - view.y; stage.setPointerCapture(e.pointerId);
+  const mv = ev => { view.x = ev.clientX - sx; view.y = ev.clientY - sy; apply(); };
+  const up = () => { stage.removeEventListener("pointermove", mv); stage.removeEventListener("pointerup", up); };
+  stage.addEventListener("pointermove", mv); stage.addEventListener("pointerup", up); });
+stage.addEventListener("wheel", e => { e.preventDefault(); const r = stage.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
+  const z = Math.min(1.6, Math.max(0.3, view.z * (e.deltaY < 0 ? 1.1 : 0.9))); view.x = mx - (mx - view.x) * z / view.z; view.y = my - (my - view.y) * z / view.z; view.z = z; apply(); }, { passive: false });
+document.getElementById("search").addEventListener("input", e => { query = e.target.value.trim().toLowerCase(); if (cat) render(); });
+document.getElementById("reload").addEventListener("click", load);
+load();
+</script>
+</body>
+</html>
