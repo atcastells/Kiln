@@ -7,9 +7,11 @@ pub mod check;
 pub mod config;
 pub mod glb;
 pub mod license;
+pub mod spec;
 
 pub use catalog::{Catalog, Finding, Kit, Material, Piece, Severity};
 pub use config::Config;
+pub use spec::Spec;
 
 use std::path::Path;
 
@@ -22,5 +24,11 @@ pub fn open(project: &Path) -> Result<Catalog, String> {
 pub fn open_with(project: &Path, config: Config) -> Result<Catalog, String> {
     let mut catalog = catalog::index(project, &config);
     check::run(&config, &mut catalog);
+    if let Some(dir) = &config.assets.specs {
+        catalog.specs = spec::load_all(project, dir, &mut catalog);
+        catalog
+            .findings
+            .sort_by(|a, b| b.severity.cmp(&a.severity).then(a.subject.cmp(&b.subject)));
+    }
     Ok(catalog)
 }

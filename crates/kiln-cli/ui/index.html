@@ -17,6 +17,9 @@
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
 body { background: var(--bg); color: var(--fg); font: 14px var(--font); display: flex; flex-direction: column; padding: 12px 16px; gap: 10px; }
+form { display: flex; gap: 6px; flex: 1 1 320px; min-width: 0; } form input { flex: 1; }
+.k-spec .hd i, .k-asset .hd i { background: var(--accent); } .k-ask .hd i { background: var(--fg); } .k-src .hd i { background: var(--ok); } .k-check .hd i { background: var(--bad); }
+.log { font: 12px var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; border-top: 1px solid var(--line); padding: 5px 0; }
 header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
 h1 { font-size: 18px; margin: 0; }
 .tag { font: 500 11px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 2px 6px; }
@@ -64,7 +67,8 @@ dt { color: var(--muted); } dd { margin: 0; font: 12px var(--mono); overflow-wra
   <h1>Kiln</h1><span class="tag" id="proj">cargando…</span>
   <div class="stats" id="stats"></div>
   <input id="search" placeholder="Buscar pieza o material" aria-label="Buscar pieza o material">
-  <input id="ask" placeholder="Pedir un asset (próxima entrega)" disabled aria-label="Pedir un asset">
+  <form id="askForm"><input id="ask" placeholder="Pedir un asset: crear un ascensor" aria-label="Pedir un asset"><button type="submit">Desglosar</button></form>
+  <button id="back" type="button" hidden>Volver al catálogo</button>
   <button id="reload" type="button">Releer el proyecto</button>
 </header>
 <main>
@@ -73,7 +77,7 @@ dt { color: var(--muted); } dd { margin: 0; font: 12px var(--mono); overflow-wra
 </main>
 <script>
 const W = 200, GAP = 12, X = { project: 20, kit: 270, piece: 520, slot: 770, mat: 1060 };
-let cat = null, openKit = null, sel = null, query = "", view = { x: 10, y: 10, z: 0.8 };
+let cat = null, openKit = null, sel = null, query = "", view = { x: 10, y: 10, z: 0.8 }, specView = null, job = null;
 const world = document.getElementById("world"), svg = document.getElementById("edges"), side = document.getElementById("side");
 const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const fmt = v => v ? v.map(n => n.toFixed(2)).join(" × ") + " m" : "sin medir";
@@ -87,6 +91,7 @@ async function load() {
   const n = s => cat.findings.filter(f => f.severity === s).length;
   document.getElementById("stats").innerHTML = `<span>${cat.kits.length} kits</span><span>${cat.pieces.length} piezas</span><span>${cat.materials.length} materiales</span>`
     + `<span class="error">${n("error")} errores</span><span class="warn">${n("warn")} avisos</span><span class="info">${n("info")} notas</span>`;
+  if (specView && !cat.specs.find(x => x.asset.id === specView)) specView = null;
   render(); if (!sel) showProject();
 }
 
@@ -97,9 +102,12 @@ function pill(level) { return level ? `<span class="pill ${level}">${PILL[level]
 function matches(text) { return !query || String(text).toLowerCase().includes(query); }
 
 function render() {
+  document.getElementById("back").hidden = !specView;
+  if (specView) return renderSpec(cat.specs.find(x => x.asset.id === specView));
   const nodes = [], edges = [];
   let y = 40;
   nodes.push(node("project", "project", "Proyecto", cat.project, cat.root, X.project, 40));
+  cat.specs.forEach((sp, i) => { nodes.push(node("spec:" + sp.asset.id, "spec", "Ficha · " + sp.asset.status, sp.asset.name, `${sp.parts.length} piezas · «${sp.asset.asked}»`, X.project, 140 + i * 80, pill(specLevel(sp)))); });
   for (const k of cat.kits) {
     const pcs = cat.pieces.filter(p => p.kit === k.name);
     const hit = pcs.some(p => matches(p.key)) || matches(k.name);
@@ -129,18 +137,19 @@ function render() {
   for (const m of cat.materials.filter(m => matches(m.key) || matches(m.name)).slice(0, 80)) {
     nodes.push(node("mat:" + m.key, "mat", m.source === "table" ? "Material · tabla" : "Material · textura", m.key, m.name !== m.key ? m.name : m.file, X.mat, my)); my += 66;
   }
-  world.querySelectorAll(".node, .col").forEach(e => e.remove());
-  world.insertAdjacentHTML("beforeend", [["Proyecto", X.project], ["Kits", X.kit], ["Piezas", X.piece], ["Ranuras", X.slot], ["Paleta", X.mat]]
-    .map(([l, x]) => `<div class="col" style="left:${x}px;top:10px">${l}</div>`).join("") + nodes.map(n => n.html).join(""));
+  draw(nodes, edges, [["Proyecto y fichas", X.project], ["Kits", X.kit], ["Piezas", X.piece], ["Ranuras", X.slot], ["Paleta", X.mat]]);
   world.querySelectorAll(".node").forEach(el => {
     el.classList.toggle("sel", el.dataset.id === sel);
     el.addEventListener("click", () => pick(el.dataset.id));
     el.addEventListener("keydown", e => { if (e.key === "Enter") pick(el.dataset.id); });
   });
-  // Stack each column by the real height of its nodes, so none overlaps.
-  const cols = {};
-  world.querySelectorAll(".node").forEach(el => (cols[el.offsetLeft] ??= []).push(el));
-  for (const list of Object.values(cols)) {
+}
+function draw(nodes, edges, cols) {
+  world.querySelectorAll(".node, .col").forEach(e => e.remove());
+  world.insertAdjacentHTML("beforeend", cols.map(([l, x]) => `<div class="col" style="left:${x}px;top:10px">${l}</div>`).join("") + nodes.map(n => n.html).join(""));
+  const byCol = {};
+  world.querySelectorAll(".node").forEach(el => (byCol[el.offsetLeft] ??= []).push(el));
+  for (const list of Object.values(byCol)) {
     list.sort((a, b) => a.offsetTop - b.offsetTop);
     let y = 0;
     for (const el of list) { y = Math.max(y, el.offsetTop); el.style.top = y + "px"; y += el.offsetHeight + GAP; }
@@ -152,7 +161,50 @@ function render() {
   apply();
 }
 
+function specLevel(sp) { const subs = ["asset:" + sp.asset.id, ...sp.parts.map(p => `part:${sp.asset.id}/${p.id}`)]; const f = cat.findings.filter(x => subs.includes(x.subject)).map(x => x.severity); return f.includes("error") ? "error" : f.includes("warn") ? "warn" : f.length ? "info" : null; }
+
+const SRC = { reuse: ["Reutilizar", "ok"], variant: ["Variante", "info"], search: ["Buscar", "warn"], retouch: ["Retocar", "info"] };
+function renderSpec(sp) {
+  const C = { ask: 20, asset: 260, part: 500, src: 750, mat: 1000, check: 1250 };
+  const nodes = [], edges = [], id = sp.asset.id;
+  nodes.push(node("ask", "ask", "Petición", `«${sp.asset.asked || sp.asset.name}»`, sp.file, C.ask, 200));
+  nodes.push(node("asset", "asset", "Asset · " + sp.asset.status, sp.asset.name, `${sp.asset.states.join(", ") || "sin estados"}`, C.asset, 180,
+    `<span class="pill ${sp.asset.used_by.length ? "ok" : "warn"}">${sp.asset.used_by.length ? "lo usan: " + esc(sp.asset.used_by.join(", ")) : "nadie lo usa"}</span>`));
+  edges.push(["ask", "asset"]);
+  const mats = new Set();
+  sp.parts.forEach((p, i) => {
+    const y = 40 + i * 90, pid = `part:${id}/${p.id}`;
+    nodes.push(node(pid, "piece", "Pieza" + (p.count > 1 ? " ×" + p.count : ""), p.what, `${p.size_m ? fmt(p.size_m) : "medida libre"}${p.moves ? " · " + p.moves : ""}`, C.part, y, pill(worst(pid))));
+    edges.push(["asset", pid]);
+    const [label, lv] = SRC[p.source.kind] || [p.source.kind, "error"];
+    const sid = "src:" + p.id;
+    nodes.push(node(sid, "src", label, p.source.from || (p.source.query ? `buscar «${p.source.query}»` : "—"), p.source.why || "", C.src, y, `<span class="pill ${lv}">${p.source.kind === "search" ? "espera tu permiso" : label.toLowerCase()}</span>`));
+    edges.push([pid, sid]);
+    if (p.material) {
+      const known = cat.materials.find(m => m.key === p.material);
+      if (!mats.has(p.material)) nodes.push(node("mat:" + p.material, "mat", "Material", p.material, known ? known.name : "no está en la paleta", C.mat, y, `<span class="pill ${known ? "ok" : "error"}">${known ? "en la paleta" : "falta"}</span>`));
+      mats.add(p.material); edges.push([sid, "mat:" + p.material]); edges.push(["mat:" + p.material, "check"]);
+    } else edges.push([sid, "check"]);
+  });
+  const f = cat.findings.filter(x => x.subject === "asset:" + id || x.subject.startsWith(`part:${id}/`));
+  const n = s => f.filter(x => x.severity === s).length;
+  nodes.push(node("check", "check", "Validación", `${n("error")} errores · ${n("warn")} avisos`, `${n("info")} notas`, C.check, 180, pill(specLevel(sp))));
+  draw(nodes, edges, [["Petición", C.ask], ["Asset", C.asset], ["Piezas", C.part], ["Modelo", C.src], ["Material", C.mat], ["Validación", C.check]]);
+  world.querySelectorAll(".node").forEach(el => { el.classList.toggle("sel", el.dataset.id === sel); el.onclick = () => pickSpec(sp, el.dataset.id); });
+}
+function pickSpec(sp, id) {
+  sel = id; renderSpec(sp);
+  const id0 = sp.asset.id;
+  if (id === "asset" || id === "ask") { side.innerHTML = `<div class="kind">Asset</div><h2>${esc(sp.asset.name)}</h2><dl><dt>id</dt><dd>${esc(id0)}</dd><dt>petición</dt><dd>${esc(sp.asset.asked)}</dd><dt>dónde</dt><dd>${esc(sp.asset.where)}</dd><dt>estados</dt><dd>${esc(sp.asset.states.join(", "))}</dd><dt>presupuesto</dt><dd>${sp.asset.budget_tris ?? "—"} tri</dd><dt>ficha</dt><dd>${esc(sp.file)}</dd></dl>${sp.asset.notes ? `<p>${esc(sp.asset.notes)}</p>` : ""}` + findingsOf("asset:" + id0); return; }
+  if (id === "check") { const f = cat.findings.filter(x => x.subject === "asset:" + id0 || x.subject.startsWith(`part:${id0}/`)); side.innerHTML = `<div class="kind">Validación</div><h2>${esc(sp.asset.name)}</h2>` + (f.map(x => `<div class="finding">${pill(x.severity)} <b>${esc(x.subject.split("/").pop())}</b>: ${esc(x.message)}</div>`).join("") || "<p>Todo en orden.</p>"); return; }
+  const part = sp.parts.find(p => id === `part:${id0}/${p.id}` || id === "src:" + p.id);
+  if (part) { const from = part.source.from && cat.pieces.find(c => c.key === part.source.from);
+    side.innerHTML = `<div class="kind">Pieza</div><h2>${esc(part.what)}</h2><dl><dt>id</dt><dd>${esc(part.id)}</dd><dt>medida</dt><dd>${part.size_m ? fmt(part.size_m) : "—"}</dd><dt>cuántas</dt><dd>${part.count ?? 1}</dd><dt>material</dt><dd>${esc(part.material ?? "el suyo")}</dd><dt>se mueve</dt><dd>${esc(part.moves ?? "no")}</dd><dt>fuente</dt><dd>${esc(part.source.kind)} ${esc(part.source.from ?? part.source.query ?? "")}</dd>${part.source.why ? `<dt>por qué</dt><dd>${esc(part.source.why)}</dd>` : ""}${from ? `<dt>en el catálogo</dt><dd>${fmt(from.size_m)} · ${from.tris ?? "?"} tri · ${esc(from.licenses.join(", "))}</dd>` : ""}</dl>` + findingsOf(`part:${id0}/${part.id}`); return; }
+  if (id.startsWith("mat:")) { const m = cat.materials.find(x => x.key === id.slice(4)); if (m) showMat(m); else side.innerHTML = `<div class="kind">Material</div><h2>${esc(id.slice(4))}</h2><p>No está en la paleta. Hay que añadirlo antes de montar (por ejemplo, texturas CC0 de Poly Haven).</p>`; }
+}
+
 function pick(id) {
+  if (id.startsWith("spec:")) { specView = id.slice(5); sel = "asset"; render(); return pickSpec(cat.specs.find(x => x.asset.id === specView), "asset"); }
   if (id.startsWith("kit:")) { const k = id.slice(4); openKit = openKit === k && sel === id ? null : k; }
   sel = id; render();
   if (id === "project") return showProject();
@@ -198,6 +250,21 @@ stage.addEventListener("wheel", e => { e.preventDefault(); const r = stage.getBo
   const z = Math.min(1.6, Math.max(0.3, view.z * (e.deltaY < 0 ? 1.1 : 0.9))); view.x = mx - (mx - view.x) * z / view.z; view.y = my - (my - view.y) * z / view.z; view.z = z; apply(); }, { passive: false });
 document.getElementById("search").addEventListener("input", e => { query = e.target.value.trim().toLowerCase(); if (cat) render(); });
 document.getElementById("reload").addEventListener("click", load);
+document.getElementById("back").addEventListener("click", () => { specView = null; sel = "project"; render(); showProject(); });
+document.getElementById("askForm").addEventListener("submit", async e => {
+  e.preventDefault(); const text = document.getElementById("ask").value.trim(); if (!text || job) return;
+  const r = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json", "X-Kiln": "1" }, body: JSON.stringify({ text }) });
+  const j = await r.json(); if (j.error) { side.innerHTML = `<div class="kind">Error</div><p>${esc(j.error)}</p>`; return; }
+  job = j.job; follow();
+});
+async function follow() {
+  const j = await (await fetch("/api/jobs/" + job)).json();
+  side.innerHTML = `<div class="kind">Desglosando · ${j.status === "running" ? "en marcha" : j.status === "done" ? "hecho" : "falló"}</div><h2>«${esc(j.asked)}»</h2>` + j.log.map(l => `<div class="log">${esc(l)}</div>`).join("");
+  side.scrollTop = side.scrollHeight;
+  if (j.status === "running") return setTimeout(follow, 1500);
+  job = null; await load();
+  if (j.spec) { const sp = cat.specs.find(x => x.file === j.spec); if (sp) { specView = sp.asset.id; sel = "asset"; render(); pickSpec(sp, "asset"); side.insertAdjacentHTML("beforeend", `<div class="kind" style="margin-top:12px">Lo que hizo el agente</div>` + j.log.map(l => `<div class="log">${esc(l)}</div>`).join("")); } }
+}
 load();
 </script>
 </body>
