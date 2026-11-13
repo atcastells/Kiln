@@ -5,10 +5,12 @@
 //!   kiln serve  --project DIR [--config FILE] [--port 4330]  the graph at http://127.0.0.1:PORT
 //!   kiln build  --project DIR [--config FILE] --asset ID     assemble an asset in Blender
 //!   kiln godot  --project DIR [--config FILE]                Godot measures its own pieces
+//!   kiln review --project DIR [--config FILE] --asset ID     build, render, review and fix, up to 3 rounds
 
 mod agent;
 mod fetch;
 mod production;
+mod review;
 mod serve;
 
 use kiln_core::{Catalog, Config, Severity};
@@ -51,7 +53,7 @@ fn parse() -> Result<Args, String> {
     Ok(a)
 }
 
-const USAGE: &str = "uso: kiln <index|check|serve|build|godot> --project DIR [--config FILE] [--out FILE] [--port N] [--asset ID]";
+const USAGE: &str = "uso: kiln <index|check|serve|build|review|godot> --project DIR [--config FILE] [--out FILE] [--port N] [--asset ID]";
 
 pub fn load(
     project: &std::path::Path,
@@ -129,6 +131,14 @@ fn main() -> ExitCode {
                         eprintln!("{l}")
                     })?;
                 println!("{}", glb.display());
+                Ok(ExitCode::SUCCESS)
+            }
+            "review" => {
+                let id = args.asset.as_deref().ok_or("falta --asset ID")?;
+                let file = review::run(&args.project, args.config.as_deref(), id, &|l| {
+                    eprintln!("{l}")
+                })?;
+                println!("{}", file.display());
                 Ok(ExitCode::SUCCESS)
             }
             "godot" => {

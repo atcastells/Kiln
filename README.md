@@ -199,6 +199,42 @@ resolution = "1k"          # texturas de Poly Haven
 credits = "kiln/CREDITS.md"
 ```
 
+## Entrega 7: el revisor visual
+
+El agente que coloca las piezas nunca ve el resultado; el revisor sí.
+**Montar y revisar**, en el panel de un asset (o `kiln review --asset ID`),
+hace hasta tres vueltas:
+
+1. Monta en Blender y saca cuatro hojas, siempre con las mismas cámaras, la
+   misma luz y el mismo fondo: **giro** (seis vistas a 30° de altura, cada
+   60°), **alzados** (frente y lado en ortográfica, rejilla de 1 m, figura
+   de 1,80 m y cotas), **piezas** (cada una de un color con su `id`) y
+   **silueta** (en negro, y el asset al tamaño al que se verá en el juego).
+2. Blender mide lo que un modelo de visión no ve bien: la caja de cada
+   copia, las piezas que se atraviesan y las que no se apoyan en nada
+   (`measures.json`).
+3. Un revisor aparte (`claude -p` con la skill `skills/review/SKILL.md`,
+   Opus fijado y sin poder editar la ficha) describe lo que ve, puntúa seis
+   criterios y devuelve hallazgos con su corrección en términos de la
+   ficha (`at`, `turn`, `size_m`, `count`, `material`).
+4. Kiln aplica esas correcciones y vuelve a montar. Desde la segunda vuelta
+   el revisor compara la nueva con la mejor hasta entonces, en orden
+   aleatorio, y se queda con la que gana: el resultado nunca empeora.
+
+Al terminar quedan en su sitio la ficha y el montaje de la mejor vuelta. El
+panel enseña las hojas de cada vuelta, sus puntuaciones, lo que se aplicó y
+lo que queda para ti (añadir piezas, cambiar de modelo). Todo se guarda en
+`<build>/<id>/review/`.
+
+```toml
+[agents]
+review_model = "opus"   # el modelo del revisor
+review_rounds = 3       # vueltas como mucho
+```
+
+Las hojas se sacan con Cycles por defecto, que funciona sin pantalla;
+`KILN_RENDER_ENGINE=BLENDER_EEVEE` (Blender 5) es más rápido en un Mac con pantalla.
+
 ## Lo que viene
 
 - El primer asset de punta a punta y la app de escritorio (Tauri).

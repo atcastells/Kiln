@@ -281,7 +281,7 @@ fn run(jobs: &Jobs, id: u64, ctx: &Ctx, task: &Task) -> Result<Option<String>, S
         }))
 }
 
-fn claude() -> Command {
+pub fn claude() -> Command {
     if let Ok(path) = std::env::var("KILN_CLAUDE") {
         return Command::new(path);
     }
@@ -304,7 +304,7 @@ fn newest(dir: &Path) -> Option<(PathBuf, SystemTime)> {
 }
 
 /// A line for the page from one event of the stream, or none.
-fn describe(line: &str, project: &Path) -> Option<String> {
+pub fn describe(line: &str, project: &Path) -> Option<String> {
     let v: Value = serde_json::from_str(line).ok()?;
     let short = |p: &str| {
         p.strip_prefix(&*project.to_string_lossy())
