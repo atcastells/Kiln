@@ -7,6 +7,7 @@
 //!   kiln godot  --project DIR [--config FILE]                Godot measures its own pieces
 
 mod agent;
+mod fetch;
 mod production;
 mod serve;
 

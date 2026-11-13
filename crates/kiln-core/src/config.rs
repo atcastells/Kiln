@@ -23,6 +23,47 @@ pub struct Config {
     /// What the agent must know of the game (`kiln/context.toml`).
     #[serde(default)]
     pub context: ContextSection,
+    /// Asset sites to search for `search` parts, and where pieces brought in go.
+    #[serde(default)]
+    pub sources: SourcesSection,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SourcesSection {
+    /// polyhaven | polypizza | sketchfab
+    #[serde(default = "default_sites")]
+    pub sites: Vec<String>,
+    /// The folder of kits where each site gets its own (`<kits>/<site>/`);
+    /// the first of `[assets] kits` when left out.
+    #[serde(default)]
+    pub kits: Option<String>,
+    /// Texture size of Poly Haven models: 1k, 2k, 4k.
+    #[serde(default = "default_resolution")]
+    pub resolution: String,
+    /// The credits file of the game.
+    #[serde(default = "default_credits")]
+    pub credits: String,
+}
+
+impl Default for SourcesSection {
+    fn default() -> Self {
+        SourcesSection {
+            sites: default_sites(),
+            kits: None,
+            resolution: default_resolution(),
+            credits: default_credits(),
+        }
+    }
+}
+
+fn default_sites() -> Vec<String> {
+    crate::sources::SITES.map(String::from).to_vec()
+}
+fn default_resolution() -> String {
+    "1k".into()
+}
+fn default_credits() -> String {
+    "kiln/CREDITS.md".into()
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -241,6 +282,26 @@ fn default_min_size() -> f64 {
 }
 
 impl Config {
+    /// Where pieces brought in from sites go: `[sources] kits`, else the
+    /// first of `[assets] kits`, else `kiln/kits`.
+    pub fn sources_root(&self) -> String {
+        self.sources
+            .kits
+            .clone()
+            .or(self.assets.kits.first().cloned())
+            .unwrap_or("kiln/kits".into())
+    }
+
+    /// Every folder of kits the catalog reads, the sources one included.
+    pub fn kit_roots(&self) -> Vec<String> {
+        let mut out = self.assets.kits.clone();
+        let s = self.sources_root();
+        if !out.contains(&s) {
+            out.push(s);
+        }
+        out
+    }
+
     pub fn load(project: &Path) -> Result<Config, String> {
         let path = project.join(FILE);
         let text = std::fs::read_to_string(&path)

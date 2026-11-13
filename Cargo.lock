@@ -43,6 +43,7 @@ dependencies = [
  "kiln-core",
  "serde",
  "serde_json",
+ "toml",
 ]
 
 [[package]]

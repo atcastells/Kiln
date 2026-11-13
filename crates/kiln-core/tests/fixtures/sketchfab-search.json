@@ -1,0 +1,298 @@
+{
+ "results": [
+  {
+   "uri": "https://api.sketchfab.com/v3/models/1ed7131ab9494516a47c15983f30454f",
+   "uid": "1ed7131ab9494516a47c15983f30454f",
+   "name": "Well",
+   "staffpickedAt": null,
+   "viewCount": 755,
+   "likeCount": 21,
+   "animationCount": 0,
+   "viewerUrl": "https://sketchfab.com/3d-models/none-1ed7131ab9494516a47c15983f30454f",
+   "embedUrl": "https://sketchfab.com/models/1ed7131ab9494516a47c15983f30454f/embed",
+   "commentCount": 0,
+   "isDownloadable": true,
+   "publishedAt": "2020-11-01T20:48:38.404507",
+   "tags": [
+    {
+     "name": "3dtexturing",
+     "slug": "3dtexturing",
+     "uri": "https://api.sketchfab.com/v3/tags/3dtexturing"
+    },
+    {
+     "name": "substancepainter",
+     "slug": "substancepainter",
+     "uri": "https://api.sketchfab.com/v3/tags/substancepainter"
+    }
+   ],
+   "categories": [
+    {
+     "name": "architecture"
+    },
+    {
+     "name": "cultural-heritage-history"
+    }
+   ],
+   "thumbnails": {
+    "images": [
+     {
+      "uid": "7da0fd94c9c248a5a0c56abb2e45aaaf",
+      "size": 145230,
+      "width": 1920,
+      "url": "https://media.sketchfab.com/models/1ed7131ab9494516a47c15983f30454f/thumbnails/af687c891dcb4a4285ffa2706b3db97f/b2fcdd6da72242328864be142fe7f834.jpeg",
+      "height": 1080
+     },
+     {
+      "uid": "06dae1ee422b459bb209913d81bf2f74",
+      "size": 43948,
+      "width": 1024,
+      "url": "https://media.sketchfab.com/models/1ed7131ab9494516a47c15983f30454f/thumbnails/af687c891dcb4a4285ffa2706b3db97f/2bf9ece7250a47b4a9e604a9d1ca30b9.jpeg",
+      "height": 576
+     }
+    ]
+   },
+   "user": {
+    "username": "chiragbhoir",
+    "displayName": "chiragbhoir",
+    "profileUrl": "https://sketchfab.com/chiragbhoir"
+   },
+   "description": "Its a stone wall well with a wooden roof n wooden pulley. It is almost 50-60 yrs",
+   "faceCount": 5568,
+   "createdAt": "2020-11-01T20:46:47.748470",
+   "vertexCount": 2900,
+   "isAgeRestricted": false,
+   "archives": {
+    "glb": {
+     "textureCount": 15,
+     "size": 16286132,
+     "type": "glb",
+     "textureMaxResolution": 1024,
+     "faceCount": 5563,
+     "vertexCount": 4087
+    },
+    "gltf": {
+     "textureCount": 15,
+     "size": 16114602,
+     "type": "gltf",
+     "textureMaxResolution": 1024,
+     "faceCount": 5563,
+     "vertexCount": 4087
+    },
+    "source": {
+     "textureCount": null,
+     "size": 24645494,
+     "type": "source",
+     "textureMaxResolution": null,
+     "faceCount": null,
+     "vertexCount": null
+    },
+    "usdz": {
+     "textureCount": null,
+     "size": 9510138,
+     "type": "usdz",
+     "textureMaxResolution": null,
+     "faceCount": null,
+     "vertexCount": null
+    }
+   },
+   "license": {
+    "uid": "322a749bcfa841b29dff1e8a1bb74b0b",
+    "label": "CC Attribution"
+   }
+  },
+  {
+   "uri": "https://api.sketchfab.com/v3/models/3ec54e6329cc4588a0f46f667e39ecc8",
+   "uid": "3ec54e6329cc4588a0f46f667e39ecc8",
+   "name": "Wooden Pulley Wheel: EOA:2022.91.2",
+   "staffpickedAt": null,
+   "viewCount": 101,
+   "likeCount": 4,
+   "animationCount": 0,
+   "viewerUrl": "https://sketchfab.com/3d-models/none-3ec54e6329cc4588a0f46f667e39ecc8",
+   "embedUrl": "https://sketchfab.com/models/3ec54e6329cc4588a0f46f667e39ecc8/embed",
+   "commentCount": 0,
+   "isDownloadable": true,
+   "publishedAt": "2022-08-19T14:28:25.725856",
+   "tags": [
+    {
+     "name": "museum",
+     "slug": "museum",
+     "uri": "https://api.sketchfab.com/v3/tags/museum"
+    },
+    {
+     "name": "shipwreck-archaeology",
+     "slug": "shipwreck-archaeology",
+     "uri": "https://api.sketchfab.com/v3/tags/shipwreck-archaeology"
+    }
+   ],
+   "categories": [
+    {
+     "name": "cultural-heritage-history"
+    }
+   ],
+   "thumbnails": {
+    "images": [
+     {
+      "uid": "1aa5c69df72d4930b66aa2596383e9e1",
+      "size": 173459,
+      "width": 1920,
+      "url": "https://media.sketchfab.com/models/3ec54e6329cc4588a0f46f667e39ecc8/thumbnails/9a949e922bef4f4b8d1232402a99e99d/ce56ba2ea322483b9bc4d73063255b01.jpeg",
+      "height": 1080
+     },
+     {
+      "uid": "4af05b6965a4413e8357ec7627b37f49",
+      "size": 56975,
+      "width": 1024,
+      "url": "https://media.sketchfab.com/models/3ec54e6329cc4588a0f46f667e39ecc8/thumbnails/9a949e922bef4f4b8d1232402a99e99d/06cc90b4cade4cfc9d85046e518f30d5.jpeg",
+      "height": 576
+     }
+    ]
+   },
+   "user": {
+    "username": "portlandmuseum",
+    "displayName": "Portland Museum",
+    "profileUrl": "https://sketchfab.com/portlandmuseum"
+   },
+   "description": "Wooden pulley wheel from the wreck of the Earl Of Abergavenny.\n\nID:EOA:2022.91.2",
+   "faceCount": 24999,
+   "createdAt": "2022-08-19T14:27:58.236354",
+   "vertexCount": 12502,
+   "isAgeRestricted": false,
+   "archives": {
+    "glb": {
+     "textureCount": 1,
+     "size": 2752704,
+     "type": "glb",
+     "textureMaxResolution": 2048,
+     "faceCount": 24999,
+     "vertexCount": 13985
+    },
+    "gltf": {
+     "textureCount": 1,
+     "size": 2516473,
+     "type": "gltf",
+     "textureMaxResolution": 2048,
+     "faceCount": 24999,
+     "vertexCount": 13985
+    },
+    "source": {
+     "textureCount": null,
+     "size": 7484170,
+     "type": "source",
+     "textureMaxResolution": null,
+     "faceCount": null,
+     "vertexCount": null
+    },
+    "usdz": {
+     "textureCount": null,
+     "size": 2367268,
+     "type": "usdz",
+     "textureMaxResolution": null,
+     "faceCount": null,
+     "vertexCount": null
+    }
+   },
+   "license": {
+    "uid": "322a749bcfa841b29dff1e8a1bb74b0b",
+    "label": "CC Attribution"
+   }
+  },
+  {
+   "uri": "https://api.sketchfab.com/v3/models/2025bb0d907941e7bfccc2ea99bd0e63",
+   "uid": "2025bb0d907941e7bfccc2ea99bd0e63",
+   "name": "Wooden Ship's Pulley",
+   "staffpickedAt": null,
+   "viewCount": 1087,
+   "likeCount": 11,
+   "animationCount": 0,
+   "viewerUrl": "https://sketchfab.com/3d-models/none-2025bb0d907941e7bfccc2ea99bd0e63",
+   "embedUrl": "https://sketchfab.com/models/2025bb0d907941e7bfccc2ea99bd0e63/embed",
+   "commentCount": 0,
+   "isDownloadable": true,
+   "publishedAt": "2022-06-17T22:36:08.203384",
+   "tags": [
+    {
+     "name": "lidar",
+     "slug": "lidar",
+     "uri": "https://api.sketchfab.com/v3/tags/lidar"
+    },
+    {
+     "name": "hook",
+     "slug": "hook",
+     "uri": "https://api.sketchfab.com/v3/tags/hook"
+    }
+   ],
+   "categories": [
+    {
+     "name": "cultural-heritage-history"
+    }
+   ],
+   "thumbnails": {
+    "images": [
+     {
+      "uid": "50bee9e93d954ae1952df21921ba10c8",
+      "size": 493539,
+      "width": 1920,
+      "url": "https://media.sketchfab.com/models/2025bb0d907941e7bfccc2ea99bd0e63/thumbnails/6251b659753e4a03a700ee426c47851e/8f43d62f7d67400eb97d32391a42c858.jpeg",
+      "height": 1080
+     },
+     {
+      "uid": "049639eafadc4b969683de0e1a663924",
+      "size": 124441,
+      "width": 1024,
+      "url": "https://media.sketchfab.com/models/2025bb0d907941e7bfccc2ea99bd0e63/thumbnails/6251b659753e4a03a700ee426c47851e/411dc2dc745649d6ab30770398351777.jpeg",
+      "height": 576
+     }
+    ]
+   },
+   "user": {
+    "username": "keithito",
+    "displayName": "Keith Ito",
+    "profileUrl": "https://sketchfab.com/keithito"
+   },
+   "description": "📍 [San Francisco, CA](https://scaniver.se/L37.79766,-122.39377)\n\nMade with [Scan",
+   "faceCount": 129283,
+   "createdAt": "2022-06-17T20:59:50.165626",
+   "vertexCount": 65330,
+   "isAgeRestricted": false,
+   "archives": {
+    "glb": {
+     "textureCount": 1,
+     "size": 17102764,
+     "type": "glb",
+     "textureMaxResolution": 8192,
+     "faceCount": 129281,
+     "vertexCount": 70779
+    },
+    "gltf": {
+     "textureCount": 1,
+     "size": 15214656,
+     "type": "gltf",
+     "textureMaxResolution": 8192,
+     "faceCount": 129281,
+     "vertexCount": 70779
+    },
+    "source": {
+     "textureCount": null,
+     "size": 20386261,
+     "type": "source",
+     "textureMaxResolution": null,
+     "faceCount": null,
+     "vertexCount": null
+    },
+    "usdz": {
+     "textureCount": null,
+     "size": 4574324,
+     "type": "usdz",
+     "textureMaxResolution": null,
+     "faceCount": null,
+     "vertexCount": null
+    }
+   },
+   "license": {
+    "uid": "322a749bcfa841b29dff1e8a1bb74b0b",
+    "label": "CC Attribution"
+   }
+  }
+ ]
+}

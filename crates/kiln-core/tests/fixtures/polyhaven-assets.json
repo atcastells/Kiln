@@ -1,0 +1,174 @@
+{
+ "wooden_crate_01": {
+  "date_published": 1645747200,
+  "name": "Wooden Crate 01",
+  "type": 2,
+  "authors": {
+   "James Ray Cock": "All"
+  },
+  "categories": [
+   "containers",
+   "collection: smugglers_cove"
+  ],
+  "tags": [
+   "vintage",
+   "wood",
+   "old",
+   "wooden",
+   "fancy",
+   "colonial",
+   "chest",
+   "box",
+   "prop",
+   "antique",
+   "farmhouse",
+   "crate",
+   "maritime",
+   "commercial",
+   "container"
+  ],
+  "max_resolution": [
+   8192,
+   8192
+  ],
+  "polycount": 6576,
+  "texel_density": 4578.689151712849,
+  "dimensions": [
+   825.2729177474976,
+   408.9537411928177,
+   349.6182831004262
+  ],
+  "files_hash": "1ac5d053ce4c72e3fbb4c3065e7979522bf1908e",
+  "description": "Free 8K model of a vintage wooden crate - weathered colonial chest with rope handles, metal rivets and latch; ideal as maritime, farmhouse or prop container.",
+  "category_id": "7db08e6b-4676-50ac-8387-ecec2d7ffeb2",
+  "category": "Containers & Storage/Boxes & Crates/Wooden Crates",
+  "sponsors": [
+   "7934315"
+  ],
+  "collections": [
+   "smugglers_cove"
+  ],
+  "attributes": {
+   "condition": [
+    "worn"
+   ],
+   "material": [
+    "wood",
+    "metal"
+   ]
+  },
+  "img_version": "3b8df674",
+  "download_count": 26809,
+  "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wooden_crate_01.png?width=256&height=256&format=webp&v=3b8df674"
+ },
+ "ArmChair_01": {
+  "date_published": 1585605600,
+  "name": "Arm Chair 01",
+  "categories": [
+   "furniture",
+   "seating"
+  ],
+  "type": 2,
+  "tags": [
+   "gothic",
+   "vintage",
+   "chair",
+   "furniture",
+   "victorian",
+   "couch",
+   "wood",
+   "varnished",
+   "classic"
+  ],
+  "authors": {
+   "Kirill Sannikov": "All"
+  },
+  "sponsors": [
+   "66627515",
+   "4047949"
+  ],
+  "max_resolution": [
+   4096,
+   4096
+  ],
+  "polycount": 5626,
+  "texel_density": 1972.3631956341671,
+  "dimensions": [
+   848.4309017658234,
+   765.7602727413177,
+   1065.087635157397
+  ],
+  "files_hash": "8a04a102d4a1e1a480bc4288384d4a2dfd649608",
+  "description": "Free (CC0) vintage Victorian armchair 3D model - varnished carved wood frame, upholstered seat; gothic/classic styling ideal for interiors, period scenes, and renders.",
+  "category_id": "11261ec6-df2b-5150-9904-684d2558070d",
+  "category": "Furniture/Seating/Chairs",
+  "attributes": {
+   "condition": [
+    "worn"
+   ],
+   "material": [
+    "wood",
+    "fabric"
+   ]
+  },
+  "img_version": "abbc4732",
+  "download_count": 32935,
+  "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/ArmChair_01.png?width=256&height=256&format=webp&v=abbc4732"
+ },
+ "wooden_bucket_01": {
+  "type": 2,
+  "name": "Wooden Bucket 01",
+  "authors": {
+   "James Ray Cock": "All"
+  },
+  "date_published": 1648598400,
+  "categories": [
+   "props",
+   "containers",
+   "collection: smugglers_cove"
+  ],
+  "tags": [
+   "wooden",
+   "bucket",
+   "old",
+   "worn",
+   "wood",
+   "prop",
+   "container"
+  ],
+  "max_resolution": [
+   8192,
+   8192
+  ],
+  "polycount": 5116,
+  "texel_density": 7673.335509768572,
+  "dimensions": [
+   366.97085201740265,
+   342.2211855649948,
+   549.862340092659
+  ],
+  "files_hash": "8d260ae5188bca1ef50676560a2c7a4160c82100",
+  "description": "Free 8K model of a worn wooden bucket with metal bands and an iron handle - rustic, weathered prop container. Vintage farmhouse/colonial maritime prop from the Smugglers Cove collection.",
+  "sponsors": [
+   "9910225",
+   "26820710"
+  ],
+  "category_id": "1d2ebe30-8c69-5f58-bc61-fcf2e6a03cba",
+  "category": "Containers & Storage/Baskets & Buckets/Buckets",
+  "collections": [
+   "smugglers_cove"
+  ],
+  "attributes": {
+   "condition": [
+    "worn"
+   ],
+   "material": [
+    "wood",
+    "metal"
+   ]
+  },
+  "img_version": "e3a59ddb",
+  "download_count": 14121,
+  "thumbnail_url": "https://cdn.polyhaven.com/asset_img/thumbs/wooden_bucket_01.png?width=256&height=256&format=webp&v=e3a59ddb"
+ }
+}

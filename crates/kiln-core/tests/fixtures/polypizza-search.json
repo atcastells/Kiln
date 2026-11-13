@@ -1,0 +1,31 @@
+{
+ "total": 2,
+ "results": [
+  {
+   "ID": "8ciDd9k8wha",
+   "Title": "Pulley",
+   "Description": "",
+   "Creator": {"Username": "Quaternius", "PURL": "https://poly.pizza/u/Quaternius"},
+   "Category": "Objects",
+   "Tags": ["pulley", "rope", "wood"],
+   "Licence": "CC0 1.0",
+   "Thumbnail": "https://static.poly.pizza/8ciDd9k8wha.webp",
+   "Download": "https://static.poly.pizza/8ciDd9k8wha.glb",
+   "TriangleCount": 412,
+   "Animated": false
+  },
+  {
+   "ID": "dK2nSa0bWqx",
+   "Title": "Crane hook",
+   "Description": "",
+   "Creator": {"Username": "Poly by Google", "PURL": "https://poly.pizza/u/Poly%20by%20Google"},
+   "Category": "Objects",
+   "Tags": ["hook"],
+   "Licence": "CC-BY 3.0",
+   "Thumbnail": "https://static.poly.pizza/dK2nSa0bWqx.webp",
+   "Download": "https://static.poly.pizza/dK2nSa0bWqx.glb",
+   "TriangleCount": 980,
+   "Animated": false
+  }
+ ]
+}
