@@ -19,10 +19,11 @@ enseña como grafo en el navegador.
 
 ```bash
 cargo build --release
-# tu juego con el kiln.toml de ejemplo (o copia examples/kiln.toml a la raíz del juego)
-target/release/kiln serve --project ../mi-juego --config examples/kiln.toml   # http://127.0.0.1:4330
-target/release/kiln check --project ../mi-juego --config examples/kiln.toml   # sale con 1 si hay errores
-target/release/kiln index --project ../mi-juego --config examples/kiln.toml --out catalog.json
+# tu juego con su kiln.toml en la raíz (examples/kiln.toml es un ejemplo para copiar)
+target/release/kiln serve --project ../mi-juego   # http://127.0.0.1:4330
+target/release/kiln check --project ../mi-juego   # sale con 1 si hay errores
+target/release/kiln index --project ../mi-juego --out catalog.json
+# --config FICHERO usa otro kiln.toml sin tocar el juego
 ```
 
 Sin dependencias fuera de Rust; el servidor solo escucha en `127.0.0.1`.
@@ -48,7 +49,8 @@ require_use = false            # true: cada asset debe nombrar el sistema del ju
 
 Kiln no supone nada de un proyecto concreto: sus reglas, sus carpetas, sus
 niveles y sus convenciones de nombres (`albedo_suffix`, `map_suffixes`) van
-en su `kiln.toml`. `examples/kiln.toml` es un ejemplo de un juego inventado.
+en su `kiln.toml`. `examples/kiln.toml` es un ejemplo completo de un juego
+inventado, Puerto Niebla.
 
 ## Entrega 2: pedir un asset
 
@@ -59,7 +61,7 @@ catálogo y escribe la ficha en la carpeta `[assets] specs` de `kiln.toml`.
 El grafo sigue lo que hace y, al terminar, despliega la ficha: petición,
 asset, piezas, de dónde sale cada modelo (reutilizar, variante, buscar,
 retocar), material de la paleta y validación. `examples/specs/hoist.toml` es
-una ficha de ejemplo.
+una ficha de ejemplo para Puerto Niebla.
 
 - Necesita `claude` en el PATH (o su ruta en `KILN_CLAUDE`) con sesión iniciada.
 - El agente solo puede leer y escribir ficheros (sin terminal) y no baja nada:
@@ -131,8 +133,8 @@ cache = "kiln/cache"
 ```
 
 ```bash
-kiln build --project ../mi-juego --config examples/kiln.toml --asset hoist
-kiln godot --project ../mi-juego --config examples/kiln.toml
+kiln build --project ../mi-juego --asset hoist
+kiln godot --project ../mi-juego
 ```
 
 ## Entrega 5: el contexto del proyecto
@@ -164,7 +166,7 @@ file = "kiln/context.toml"
 layers = [{ id = "sound", name = "Sonido", holds = "ambiente, efectos, música" }]   # sustituye a las seis
 ```
 
-`examples/context.toml` es un contexto de ejemplo.
+`examples/context.toml` es el contexto de Puerto Niebla.
 
 ## Lo que viene
 
