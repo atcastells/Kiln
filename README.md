@@ -43,12 +43,57 @@ textures = ["godot/textures"]                # texturas `<clave>_albedo.<ext>`
 [rules]
 licenses = ["CC0", "CC-BY"]
 max_tris = 20000
+require_use = false            # true: cada asset debe nombrar el sistema del juego que lo usa
 ```
+
+Kiln no supone nada de un proyecto concreto: sus reglas, sus carpetas, sus
+niveles y sus convenciones de nombres (`albedo_suffix`, `map_suffixes`) van
+en su `kiln.toml`. `examples/kiln.toml` es un ejemplo de un juego inventado.
+
+## Entrega 2: pedir un asset
+
+En el grafo, escribe la petición («crear un ascensor») y pulsa Desglosar.
+Kiln lanza Claude Code sin ventana (`claude -p`, con la skill
+`skills/asset/SKILL.md`) en el proyecto; el agente lee el proyecto y el
+catálogo y escribe la ficha en la carpeta `[assets] specs` de `kiln.toml`.
+El grafo sigue lo que hace y, al terminar, despliega la ficha: petición,
+asset, piezas, de dónde sale cada modelo (reutilizar, variante, buscar,
+retocar), material de la paleta y validación. `examples/specs/hoist.toml` es
+una ficha de ejemplo.
+
+- Necesita `claude` en el PATH (o su ruta en `KILN_CLAUDE`) con sesión iniciada.
+- El agente solo puede leer y escribir ficheros (sin terminal) y no baja nada:
+  las piezas «buscar» esperan tu permiso.
+- Solo la propia página puede lanzar al agente: la petición lleva una cabecera
+  propia y el servidor solo escucha en `127.0.0.1`.
+
+## Entrega 3: el árbol del proyecto
+
+Kiln se abre en el juego y se baja por niveles con doble clic (Juego ›
+Lugar › Edificio › Sala › Asset); la miga de pan sube. Cada nodo dice
+cuántos de los assets que tiene debajo ya tienen modelo y lista lo que
+falta; desde un asset que falta, «Pedir ficha» lanza al agente con la
+petición y su sitio en el árbol. Los niveles se declaran en `kiln.toml`
+(`[[levels]]`) leyendo los datos que el juego ya tiene; el ejemplo lee
+barrios, edificios y salas de tres ficheros de datos.
+
+```toml
+[[levels]]
+level = "room"                                  # el nivel de estos nodos
+files = ["data/buildings/rooms.toml"]           # globs; cada fichero es un nodo...
+table = "rooms"                                 # ...o cada tabla de este array
+id = "use"                                      # la clave con su id
+children = [{ key = "fixtures", field = "id", level = "asset" }]
+```
+
+Un asset es una hoja: tiene modelo si el catálogo tiene una pieza con su
+nombre, ficha si hay una ficha con su id, y si no, falta.
 
 ## Lo que viene
 
-- Entrega 2: pedir un asset desde el grafo; Claude Code (`claude -p`) escribe la ficha y los nodos aparecen. El grafo pasa a Rete.js.
 - Entrega 3: producción y montaje con Blender y Godot, vista 3D en cada nodo, vínculo de ranuras con la paleta y app de escritorio (Tauri).
 - Entrega 4: el primer asset de punta a punta.
+- Entrega 5: componer escenas con módulos de piezas (un pasillo de suelo, techo, muros y luces).
+- El grafo pasará a Rete.js cuando los nodos se puedan editar.
 
 Los `.res` y escenas de Godot no se miden todavía: lo hará Godot sin ventana en la entrega 3.

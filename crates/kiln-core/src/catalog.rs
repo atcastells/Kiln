@@ -14,6 +14,10 @@ pub struct Catalog {
     pub kits: Vec<Kit>,
     pub pieces: Vec<Piece>,
     pub materials: Vec<Material>,
+    /// The asset specs of the project (`[assets] specs`).
+    pub specs: Vec<crate::spec::Spec>,
+    /// The project by levels, from the game down to its assets.
+    pub tree: Option<crate::tree::Tree>,
     pub findings: Vec<Finding>,
 }
 
@@ -88,6 +92,8 @@ pub fn index(root: &Path, config: &Config) -> Catalog {
         kits: Vec::new(),
         pieces: Vec::new(),
         materials: Vec::new(),
+        specs: Vec::new(),
+        tree: None,
         findings: Vec::new(),
     };
     for kits in &config.assets.kits {
@@ -99,7 +105,7 @@ pub fn index(root: &Path, config: &Config) -> Catalog {
         index_table(root, t, &mut cat);
     }
     for t in &config.materials.textures {
-        index_textures(root, &root.join(t), &mut cat);
+        index_textures(root, &root.join(t), &config.materials, &mut cat);
     }
     cat
 }
@@ -279,16 +285,21 @@ fn index_table(root: &Path, file: &str, cat: &mut Catalog) {
     }
 }
 
-fn index_textures(root: &Path, dir: &Path, cat: &mut Catalog) {
+fn index_textures(
+    root: &Path,
+    dir: &Path,
+    mats: &crate::config::MaterialsSection,
+    cat: &mut Catalog,
+) {
     for entry in read_dir(dir) {
         if entry.is_dir() {
-            index_textures(root, &entry, cat);
+            index_textures(root, &entry, mats, cat);
             continue;
         }
         let n = file_name(&entry);
         let Some(key) = n
             .rsplit_once('.')
-            .and_then(|(s, _)| s.strip_suffix("_albedo"))
+            .and_then(|(s, _)| s.strip_suffix(mats.albedo_suffix.as_str()))
         else {
             continue;
         };
@@ -303,11 +314,11 @@ fn index_textures(root: &Path, dir: &Path, cat: &mut Catalog) {
             .map(|t| license::find(&t))
             .unwrap_or_default();
         detail.insert("licenses".into(), serde_json::json!(lic));
-        for map in ["normal", "roughness"] {
+        for map in &mats.map_suffixes {
             let has = read_dir(dir)
                 .iter()
-                .any(|p| file_name(p).starts_with(&format!("{key}_{map}.")));
-            detail.insert(map.into(), Value::Bool(has));
+                .any(|p| file_name(p).starts_with(&format!("{key}{map}.")));
+            detail.insert(map.trim_start_matches(['_', '-']).into(), Value::Bool(has));
         }
         cat.materials.push(Material {
             key: key.into(),
