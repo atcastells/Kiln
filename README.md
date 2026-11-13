@@ -135,9 +135,39 @@ kiln build --project ../rune-world --config examples/rune-world.kiln.toml --asse
 kiln godot --project ../rune-world --config examples/rune-world.kiln.toml
 ```
 
+## Entrega 5: el contexto del proyecto
+
+Lo que el agente sabe del juego antes de desglosar un asset. En la pestaña
+**Contexto** explicas el juego con tus palabras; «Guardar y ordenar» lanza
+al agente (skill `skills/context/SKILL.md`), que lo parte en afirmaciones
+cortas, cada una en su capa (Mundo, Estética, Escala, Materiales, Juego,
+Técnica), con su origen (tu texto o un fichero del proyecto), enlaces entre
+capas y choques marcados. El grafo va del juego a las capas, de cada capa a
+sus afirmaciones y a sus preguntas abiertas.
+
+- **Afinar**: el agente deja una ronda de preguntas con tres respuestas
+  sugeridas; respondes con un clic, con tus palabras, «Saltar» o «No
+  aplica». Cada respuesta es una afirmación nueva de su capa.
+- **Fijar**: lo que escribes, editas o respondes queda fijado. El agente no
+  lo cambia: como mucho deja su versión como propuesta, que aceptas o
+  descartas (Kiln lo garantiza al terminar cada trabajo del agente).
+- **Al pedir un asset**, el agente lee el contexto primero; si le falta un
+  dato, decide lo más probable, lo dice en la ficha y deja la pregunta en
+  el contexto con el asset que la pidió.
+
+Todo vive en `kiln/context.toml` (texto plano, se versiona con el juego).
+Las capas se cambian en `kiln.toml`:
+
+```toml
+[context]
+file = "kiln/context.toml"
+layers = [{ id = "sound", name = "Sonido", holds = "ambiente, efectos, música" }]   # sustituye a las seis
+```
+
+`examples/rune-world.context.toml` es el contexto de prueba de rune-world.
+
 ## Lo que viene
 
-- Entrega 5: el contexto del proyecto. Una pantalla para explicar el juego, separada en capas en un grafo, con un modo de preguntas y respuestas sugeridas que lo afina; el agente lo lee al desglosar.
 - El primer asset de punta a punta y la app de escritorio (Tauri).
 - Componer escenas con módulos de piezas (un pasillo de suelo, techo, muros y luces).
 - Kiln como servidor MCP, para que cualquier Claude le pida catálogo o assets.

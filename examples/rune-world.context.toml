@@ -1,0 +1,445 @@
+# Example context for Rune World made through Kiln on 2026-11-13: the text and the
+# answers to q1 and q2 were written by Claude to test it, not by the project owner;
+# the claims and questions are what the agent wrote from them and the project files.
+text = "Rune es un mundo de fantasía medieval baja que se genera entero por semilla: un continente con sus islas, reinos de humanos, enanos, orcos y drows, y gente que vive su día (oficios, rutinas, rumores). La magia es rara, antigua y tiene precio. El jugador es una persona más del mundo, con muerte definitiva. Visualmente queremos algo sobrio y creíble, como Kingdom Come: casas de troncos y piedra, nada brillante. Todo lo que se dibuja tiene que tener un uso en la simulación. El motor es Godot 4 y los assets son CC0 o CC-BY, con un máximo de 20 000 triángulos."
+
+[[claims]]
+id = "c1"
+layer = "world"
+text = "Fantasía medieval baja: un mundo creíble con poca magia, sin pólvora ni maquinaria"
+source = "text"
+pinned = false
+
+[[claims]]
+id = "c2"
+layer = "world"
+text = "El mundo se genera entero por semilla: un solo continente de 270 km con las islas de su costa"
+source = "file:CLAUDE.md"
+pinned = false
+links = ["c17"]
+
+[[claims]]
+id = "c3"
+layer = "world"
+text = "Hay reinos de humanos, enanos, orcos y drows"
+source = "text"
+pinned = false
+
+[[claims]]
+id = "c4"
+layer = "world"
+text = "La magia es rara y antigua, y cobra su precio en años de vida, recuerdos o cordura"
+source = "file:lore/00-lore-base.md"
+pinned = false
+links = ["c13"]
+
+[[claims]]
+id = "c5"
+layer = "world"
+text = "De los Eldarán desaparecidos quedan torres negras sin puertas y runas grabadas en piedras, espadas y huesos"
+source = "file:lore/00-lore-base.md"
+pinned = false
+
+[[claims]]
+id = "c6"
+layer = "world"
+text = "Casi toda la gente vive en granjas y aldeas; las ciudades son pocas y destacan"
+source = "file:lore/19-escala.md"
+pinned = false
+links = ["c24"]
+
+[[claims]]
+id = "c7"
+layer = "world"
+text = "Alta Edad Media con poco hierro: casi todos pelean en tela y cuero, y la malla es del señor y de unos pocos"
+source = "file:lore/26-armaduras.md"
+pinned = false
+links = ["c30"]
+conflicts = "c8"
+
+[[claims]]
+id = "c8"
+layer = "world"
+text = "Las casas siguen la Bohemia del siglo XIV de Kingdom Come, con ladrillo en las casas de pueblo grande"
+source = "file:data/buildings/materials.toml"
+pinned = false
+links = [
+    "c10",
+    "c25",
+]
+conflicts = "c7"
+
+[[claims]]
+id = "c9"
+layer = "world"
+text = "Los molinos son de agua o de viento; se viaja a pie, a caballo, en carro o en barco"
+source = "file:lore/19-escala.md"
+pinned = false
+
+[[claims]]
+id = "c10"
+layer = "look"
+text = "Sobrio y creíble, con Kingdom Come: Deliverance como referencia principal"
+source = "text"
+pinned = false
+links = ["c8"]
+
+[[claims]]
+id = "c11"
+layer = "look"
+text = "Nada brillante: ni superficies pulidas, ni colores saturados, ni efectos que luzcan"
+source = "text"
+pinned = false
+links = ["c29"]
+
+[[claims]]
+id = "c12"
+layer = "look"
+text = "La paleta es de tierras apagadas: gris pardo de madera vieja, gris de piedra de campo, ocre de barro y de paja"
+source = "file:data/buildings/materials.toml"
+pinned = false
+links = [
+    "c25",
+    "c26",
+    "c27",
+]
+
+[[claims]]
+id = "c13"
+layer = "look"
+text = "La magia apenas se ve: es sutil, al estilo de El Señor de los Anillos"
+source = "file:lore/11-jugador.md"
+pinned = false
+links = ["c4"]
+
+[[claims]]
+id = "c14"
+layer = "look"
+text = "La ropa y las armas miran a Bannerlord (Battania y Sturgia), Hellblade y Vikingos: tela, cuero y poca malla"
+source = "file:lore/26-armaduras.md"
+pinned = false
+links = ["c30"]
+
+[[claims]]
+id = "c15"
+layer = "look"
+text = "Las superficies llevan texturas PBR descargadas; el detalle no es procedural, solo se orienta, se tinta y se desgasta"
+source = "file:docs/capas.md"
+pinned = false
+links = ["c39"]
+
+[[claims]]
+id = "c16"
+layer = "scale"
+text = "Todo se mide en metros"
+source = "file:CLAUDE.md"
+pinned = false
+
+[[claims]]
+id = "c17"
+layer = "scale"
+text = "El mundo se recorre a escala real, sin comprimir: una jornada a pie son 25 a 30 km"
+source = "file:lore/19-escala.md"
+pinned = false
+links = ["c2"]
+
+[[claims]]
+id = "c18"
+layer = "scale"
+text = "Las aldeas vecinas están a 3-5 km y el pueblo de mercado a 10-15 km de sus aldeas"
+source = "file:lore/19-escala.md"
+pinned = false
+
+[[claims]]
+id = "c19"
+layer = "scale"
+text = "El jugador va a pie y cambia entre primera y tercera persona, así que los assets se ven de cerca"
+source = "file:docs/estructura.md"
+pinned = false
+links = ["c32"]
+
+[[claims]]
+id = "c20"
+layer = "scale"
+text = "El paño de pared del kit de aldea mide 2 m de ancho por 2,4 m de alto"
+source = "file:catalog.json"
+pinned = false
+
+[[claims]]
+id = "c21"
+layer = "scale"
+text = "Las camas del kit están ajustadas a 2 m de largo y la mesa a 2 m por 0,9 m y 0,76 m de alto"
+source = "file:catalog.json"
+pinned = false
+
+[[claims]]
+id = "c22"
+layer = "scale"
+text = "El tronco escuadrado de una pared mide 4 m de largo y 16 por 22 cm de sección"
+source = "file:data/buildings/materials.toml"
+pinned = false
+links = ["c25"]
+
+[[claims]]
+id = "c23"
+layer = "scale"
+text = "El ladrillo de casa mide 25 × 12 × 6,5 cm"
+source = "file:data/buildings/materials.toml"
+pinned = false
+links = ["c28"]
+
+[[claims]]
+id = "c24"
+layer = "materials"
+text = "Cada material es de un solo uso: casa de aldea, casa de pueblo, muralla, castillo u otro"
+source = "file:data/buildings/materials.toml"
+pinned = false
+links = ["c6"]
+
+[[claims]]
+id = "c25"
+layer = "materials"
+text = "La casa de aldea es de troncos escuadrados a azuela, gris pardo por los años, sobre un zócalo de piedra de campo sin labrar"
+source = "file:data/buildings/materials.toml"
+pinned = false
+links = [
+    "c8",
+    "c12",
+    "c22",
+]
+
+[[claims]]
+id = "c26"
+layer = "materials"
+text = "Las juntas entre troncos y el revoco son de barro con paja picada; también hay paredes de entramado de varas de avellano con barro"
+source = "file:data/buildings/materials.toml"
+pinned = false
+links = ["c12"]
+
+[[claims]]
+id = "c27"
+layer = "materials"
+text = "Los tejados de aldea son de haces de paja de centeno o de tablilla partida a mano, gris por la edad"
+source = "file:data/buildings/materials.toml"
+pinned = false
+links = ["c12"]
+
+[[claims]]
+id = "c28"
+layer = "materials"
+text = "El ladrillo es de casa de pueblo: hecho a mano, poco cocido, irregular y poco gastado"
+source = "file:data/buildings/materials.toml"
+pinned = false
+links = ["c23"]
+
+[[claims]]
+id = "c29"
+layer = "materials"
+text = "Todo está usado: la piedra muy gastada, la madera y la tablilla a medio gastar, nada recién hecho"
+source = "file:data/buildings/materials.toml"
+pinned = false
+links = ["c11"]
+
+[[claims]]
+id = "c30"
+layer = "materials"
+text = "El hierro escasea: herrajes, armas y herramientas llevan el mínimo, y lo demás es madera, cuero y tela"
+source = "file:lore/26-armaduras.md"
+pinned = false
+links = [
+    "c7",
+    "c14",
+]
+
+[[claims]]
+id = "c31"
+layer = "materials"
+text = "Los caminos y los suelos de fuera son de tierra pisada con grava, más oscura en las rodadas; los muros de bancal, de piedra seca"
+source = "file:data/buildings/materials.toml"
+pinned = false
+
+[[claims]]
+id = "c32"
+layer = "play"
+text = "El jugador es una persona más, un forastero que llega con lo puesto; no hay historia principal ni misiones escritas a mano"
+source = "file:lore/11-jugador.md"
+pinned = false
+links = ["c19"]
+
+[[claims]]
+id = "c33"
+layer = "play"
+text = "La muerte del personaje es definitiva"
+source = "text"
+pinned = false
+
+[[claims]]
+id = "c34"
+layer = "play"
+text = "Todo lo que se dibuja tiene un uso en la simulación: no hay atrezo"
+source = "text"
+pinned = false
+links = ["c40"]
+
+[[claims]]
+id = "c35"
+layer = "play"
+text = "La gente vive su día con oficio, rutina y rumores, y usa los muebles y las salas: cama, hogar, mesa, banco, arcón"
+source = "text"
+pinned = false
+
+[[claims]]
+id = "c36"
+layer = "play"
+text = "El jugador camina, monta, navega, habla, comercia, pelea, ejerce un oficio y construye; no labra ni cuida ganado"
+source = "file:lore/11-jugador.md"
+pinned = false
+
+[[claims]]
+id = "c37"
+layer = "play"
+text = "Los edificios se componen de piezas y salas reutilizables, y cada sala pide sus muebles por uso"
+source = "file:CLAUDE.md"
+pinned = false
+links = ["c41"]
+
+[[claims]]
+id = "c38"
+layer = "tech"
+text = "El motor es Godot 4.7; el mundo lo calcula un núcleo en Rust y Godot solo pinta"
+source = "file:CLAUDE.md"
+pinned = false
+
+[[claims]]
+id = "c39"
+layer = "tech"
+text = "Los assets son CC0 o CC-BY; no entran NC, ND ni SA, ni GPL sin una decisión; cada uno lleva su LICENSE.md"
+source = "file:docs/principios.md"
+pinned = false
+links = ["c15"]
+
+[[claims]]
+id = "c40"
+layer = "tech"
+text = "Un asset tiene como máximo 20 000 triángulos"
+source = "text"
+pinned = false
+links = ["c34"]
+
+[[claims]]
+id = "c41"
+layer = "tech"
+text = "Nada visible se genera solo con código: las piezas salen de modelos descargados, que un script puede ajustar pero no inventar"
+source = "file:docs/principios.md"
+pinned = false
+links = ["c37"]
+
+[[claims]]
+id = "c42"
+layer = "tech"
+text = "Las piezas del kit están en godot/kit como glb o gltf, con el origen en el suelo (y mínima 0)"
+source = "file:catalog.json"
+pinned = false
+
+[[claims]]
+id = "c43"
+layer = "tech"
+text = "El arcón rico del kit (furniture/chest_rich) tiene 103 330 triángulos y se pasa del máximo"
+source = "file:catalog.json"
+pinned = false
+conflicts = "c40"
+
+[[claims]]
+id = "c44"
+layer = "tech"
+text = "Toda pieza pasa por el laboratorio, que la deja con los mismos materiales y con sus niveles de detalle"
+source = "file:docs/principios.md"
+pinned = false
+
+[[claims]]
+id = "c45"
+layer = "world"
+text = "cada cosa la suya: casas del siglo XIV, ropa y armas de la Alta Edad Media"
+source = "answer:q1"
+pinned = true
+
+[[claims]]
+id = "c46"
+layer = "tech"
+text = "se reduce en el laboratorio hasta caber en el máximo"
+source = "answer:q2"
+pinned = true
+
+[[questions]]
+id = "q1"
+layer = "world"
+text = "Las casas siguen la Bohemia del siglo XIV y las armas la Alta Edad Media con poco hierro: ¿qué época manda cuando un asset tiene que elegir?"
+options = [
+    "cada cosa la suya: casas del siglo XIV, ropa y armas de la Alta Edad Media",
+    "manda la Alta Edad Media: casas de troncos y barro, y el ladrillo casi no se ve",
+    "manda el siglo XIV: el ladrillo se queda y el poco hierro es solo pobreza del lugar",
+]
+status = "answered"
+answer = "cada cosa la suya: casas del siglo XIV, ropa y armas de la Alta Edad Media"
+asked_by = "refine"
+
+[[questions]]
+id = "q2"
+layer = "tech"
+text = "¿Qué se hace con una pieza que pasa de 20 000 triángulos, como el arcón rico (103 330)?"
+options = [
+    "se reduce en el laboratorio hasta caber en el máximo",
+    "se cambia por otro modelo que ya quepa",
+    "se admite como excepción si es una pieza pequeña y única",
+]
+status = "answered"
+answer = "se reduce en el laboratorio hasta caber en el máximo"
+asked_by = "refine"
+
+[[questions]]
+id = "q3"
+layer = "look"
+text = "¿Cómo se distingue a primera vista una casa de enanos, orcos o drows de una de humanos?"
+options = [
+    "de momento solo se hacen casas de humanos",
+    "cada pueblo construye con otros materiales y otra forma",
+    "la misma construcción, con otra talla y otros adornos",
+]
+status = "open"
+asked_by = "refine"
+
+[[questions]]
+id = "q4"
+layer = "play"
+text = "¿Qué puede hacer el jugador con un mueble de guardar, como el arcón o el barril?"
+options = [
+    "abrirlo y guardar o sacar cosas",
+    "abrirlo y además cargarlo y cambiarlo de sitio",
+    "nada: lo usan los vecinos y el jugador solo lo ve",
+]
+status = "open"
+asked_by = "refine"
+
+[[questions]]
+id = "q5"
+layer = "scale"
+text = "¿Cuánto mide de alto un humano adulto, que es la medida de puertas y muebles?"
+options = [
+    "1,70 m",
+    "1,80 m",
+    "1,60 m, y se agacha al pasar por las puertas de aldea",
+]
+status = "open"
+asked_by = "refine"
+
+[[questions]]
+id = "q6"
+layer = "materials"
+text = "¿Con qué se cierran las ventanas de una casa de aldea?"
+options = [
+    "contraventanas de tabla, sin vidrio",
+    "reja de madera y contraventana por dentro",
+    "piel o tela encerada, con contraventana para la noche",
+]
+status = "open"
+asked_by = "refine"

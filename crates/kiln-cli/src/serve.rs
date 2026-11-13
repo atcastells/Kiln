@@ -32,6 +32,8 @@ pub fn run(project: PathBuf, config: Option<PathBuf>, port: u16) -> Result<(), S
         .iter()
         .filter_map(|p| std::fs::canonicalize(p).ok().or(Some(p.clone())))
         .collect(),
+        context_file: project.join(&cfg.context.file),
+        layers: cfg.context.layers(),
     });
     let jobs: Jobs = Default::default();
     let listener = TcpListener::bind(("127.0.0.1", port))
@@ -196,6 +198,50 @@ fn handle(mut stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result
                 Err(e) => bad(&e),
             }
         }
+        ("POST", "/api/context/sort") => {
+            json(serde_json::json!({ "job": agent::start(jobs, ctx.clone(), Task::Sort) }))
+        }
+        ("POST", "/api/context/refine") => {
+            json(serde_json::json!({ "job": agent::start(jobs, ctx.clone(), Task::Refine) }))
+        }
+        ("POST", p) if p.starts_with("/api/context/") => {
+            let r = kiln_core::context::load(&ctx.context_file).and_then(|mut c| {
+                match p {
+                    "/api/context/text" => {
+                        c.text = body
+                            .get("text")
+                            .and_then(|t| t.as_str())
+                            .unwrap_or_default()
+                            .to_string()
+                    }
+                    "/api/context/answer" => {
+                        c.answer(&field("id"), &field("answer"), &field("status"))?
+                    }
+                    "/api/context/claim" => c
+                        .edit_claim(
+                            &field("id"),
+                            &field("action"),
+                            &field("text"),
+                            &field("layer"),
+                        )
+                        .map(|_| ())?,
+                    _ => return Err("no existe".into()),
+                }
+                kiln_core::context::save(&ctx.context_file, &c)
+            });
+            match r {
+                Ok(()) => json(serde_json::json!({ "ok": true })),
+                Err(e) => bad(&e),
+            }
+        }
+        ("GET", "/api/context") => match kiln_core::context::load(&ctx.context_file) {
+            Ok(c) => json(serde_json::json!({
+                "file": rel(&ctx.project, &ctx.context_file),
+                "layers": ctx.layers,
+                "context": c,
+            })),
+            Err(e) => bad(&e),
+        },
         ("GET", "/vendor/three.js") => (
             "200 OK",
             "text/javascript; charset=utf-8",
