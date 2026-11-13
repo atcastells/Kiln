@@ -16,6 +16,8 @@ pub struct Catalog {
     pub materials: Vec<Material>,
     /// The asset specs of the project (`[assets] specs`).
     pub specs: Vec<crate::spec::Spec>,
+    /// The project by levels, from the game down to its assets.
+    pub tree: Option<crate::tree::Tree>,
     pub findings: Vec<Finding>,
 }
 
@@ -91,6 +93,7 @@ pub fn index(root: &Path, config: &Config) -> Catalog {
         pieces: Vec::new(),
         materials: Vec::new(),
         specs: Vec::new(),
+        tree: None,
         findings: Vec::new(),
     };
     for kits in &config.assets.kits {
