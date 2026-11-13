@@ -7,8 +7,13 @@ description: Desgrana la petición de un asset («crear un ascensor») en una fi
 
 Kiln te lanza con una petición, la ruta del catálogo del proyecto (JSON con
 sus kits, piezas y materiales) y la ruta donde escribir la ficha. Tu trabajo
-son los pasos 1 a 3 del flujo: encargo, desglose e inventario. No bajes nada,
-no modeles nada y no toques ningún fichero aparte de la ficha.
+son los pasos 1 a 4 del flujo: encargo, desglose, inventario y montaje. No
+bajes nada, no modeles nada y no toques ningún fichero aparte de la ficha.
+Kiln monta luego el asset en Blender con lo que diga la ficha.
+
+Si Kiln te pide solo colocar las piezas de una ficha que ya existe, haz
+solo el paso 4 sobre esa ficha: añade `at` (y `turn` si hace falta) a cada
+pieza, pon `status = "layout"` y no cambies nada más.
 
 ## 1. Encargo: qué es en este juego
 
@@ -53,6 +58,24 @@ inventarlas. Cada pieza que no sea `reuse` lleva `material` con una clave de
 la paleta (`materials[].key` del catálogo); si no hay ninguna adecuada, pon
 la clave que propones y explícalo en `notes`.
 
+## 4. Montaje: dónde va cada pieza
+
+Para cada pieza, una posición por copia (`at`, tantas como `count`), en
+metros, con Y hacia arriba. El origen del asset es el centro de su planta a
+ras de suelo. Cada `at` es el centro de la **base** de la copia tal como
+queda montada: una pieza que apoya en el suelo lleva `y = 0`; una que
+cuelga con su parte baja a 3 m lleva `y = 3`. `turn` gira cada copia en
+grados sobre X, Y y Z; `size_m` se mide en los ejes de la pieza antes de
+girarla (una viga de pie de 4,5 m tumbada como travesaño lleva
+`turn = [[0, 0, 90]]`, y su base pasa a ser su costado). Kiln coloca cada
+copia ya girada con el centro de su base en `at`, así que basta con los
+tamaños para casar las piezas: un travesaño encima de dos postes de 4,5 m va
+en `y = 4.5`.
+
+Coloca el asset en su estado de reposo (el primero de `states`). Las
+piezas que solo salen en otro estado (`only_in`) van donde estarían en él.
+Pon `status = "layout"` al terminar.
+
 ## La ficha
 
 TOML, en la ruta que te da Kiln, con este formato:
@@ -66,7 +89,7 @@ used_by = ["works", "granary"]
 where = "granero y obras"
 states = ["down", "up", "loaded"]
 budget_tris = 6000
-status = "inventory"
+status = "layout"
 notes = "Tu lectura de la petición y tus dudas, en dos o tres frases."
 
 [[parts]]
@@ -75,6 +98,8 @@ what = "bastidor de dos postes y travesaño"
 size_m = [2.2, 3.5, 0.3]          # x, y (alto), z
 material = "log"
 source = { kind = "variant", from = "village/beam", why = "viga del kit, más larga" }
+at = [[0, 0, 0]]                  # centro de la base de cada copia (una por `count`)
+turn = [[0, 0, 0]]                # opcional: grados sobre X, Y, Z
 ```
 
 Escribe la ficha una sola vez, completa. Termina con una línea que resuma

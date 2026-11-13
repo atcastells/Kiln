@@ -49,3 +49,6 @@ files = ["data/buildings/rooms.toml"]
 table = "rooms"
 id = "use"
 children = [{ key = "fixtures", field = "id", level = "asset" }]
+
+[tools]
+godot_project = "godot"
