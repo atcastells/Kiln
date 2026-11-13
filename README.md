@@ -168,6 +168,37 @@ layers = [{ id = "sound", name = "Sonido", holds = "ambiente, efectos, música" 
 
 `examples/context.toml` es el contexto de Puerto Niebla.
 
+## Entrega 6: buscar assets fuera
+
+Una pieza que la ficha marca como «buscar» se busca en Poly Haven, Poly
+Pizza y Sketchfab desde su panel. **Buscar** pregunta a los tres a la vez y
+enseña una rejilla con miniatura, autor, licencia, triángulos (en aviso si
+pasan del presupuesto) y enlace a la página. Solo salen las licencias de
+`[rules] licenses`. **Traer** vuelve a leer la licencia en el sitio (nunca
+se fía de la página), baja el modelo a `<kits>/<sitio>/<pieza>/`, apunta su
+origen en `sources.json` del kit, reescribe su `LICENSE.md` y
+`kiln/CREDITS.md` (lo que el juego tiene que acreditar), y la pieza de la
+ficha pasa a «reutilizar» (si ya tiene la medida) o a «variante» (se escala
+al montar).
+
+| Sitio | Licencias | Clave |
+| --- | --- | --- |
+| Poly Haven | CC0 | ninguna |
+| Poly Pizza | CC0, CC-BY | gratuita, `KILN_POLYPIZZA_KEY` |
+| Sketchfab | las de `[rules]` | buscar sin clave; bajar con tu token, `KILN_SKETCHFAB_TOKEN` |
+
+Las claves van en variables de entorno o en `~/.config/kiln/keys.toml`
+(`polypizza = "…"`, `sketchfab = "…"`), nunca en `kiln.toml`; ni la página
+ni el agente las ven. La red pasa por `curl`.
+
+```toml
+[sources]
+sites = ["polyhaven", "polypizza", "sketchfab"]
+kits = "godot/kits"        # por defecto, el primero de [assets] kits
+resolution = "1k"          # texturas de Poly Haven
+credits = "kiln/CREDITS.md"
+```
+
 ## Lo que viene
 
 - El primer asset de punta a punta y la app de escritorio (Tauri).

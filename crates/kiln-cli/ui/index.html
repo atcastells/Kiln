@@ -76,6 +76,12 @@ select { font: inherit; font-size: 12.5px; padding: 4px 6px; border: 1px solid v
 .actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
 .k-build .hd i { background: #7a4fa0; }
 .k-layer .hd i { background: var(--accent); } .k-claim .hd i { background: var(--info); } .k-claim.pinned .hd i { background: var(--ok); } .k-question .hd i { background: var(--warn); }
+.cands { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; margin: 8px 0; }
+.cand { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; display: flex; flex-direction: column; font-size: 12px; }
+.cand img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; background: var(--bg); display: block; }
+.cand .cb { padding: 6px 8px; display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.cand .cb b { font-size: 12.5px; overflow-wrap: anywhere; } .cand .cb span { color: var(--muted); overflow-wrap: anywhere; }
+.cand .ca { display: flex; gap: 6px; align-items: center; padding: 0 8px 8px; } .cand .ca a { color: var(--muted); font-size: 12px; } .cand .ca button { margin-left: auto; font-size: 12px; padding: 4px 8px; }
 textarea { font: inherit; width: 100%; min-height: 180px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--fg); resize: vertical; }
 .qcard { border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin: 8px 0; }
 .qcard .opts { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; } .qcard .opts button { text-align: left; font-weight: 500; }
@@ -325,7 +331,7 @@ function pickSpec(sp, id) {
   if (id === "check") { const f = cat.findings.filter(x => x.subject === "asset:" + id0 || x.subject.startsWith(`part:${id0}/`)); side.innerHTML = `<div class="kind">Validación</div><h2>${esc(sp.asset.name)}</h2>` + (f.map(x => `<div class="finding">${pill(x.severity)} <b>${esc(x.subject.split("/").pop())}</b>: ${esc(x.message)}</div>`).join("") || "<p>Todo en orden.</p>"); return; }
   const part = sp.parts.find(p => id === `part:${id0}/${p.id}` || id === "src:" + p.id);
   if (part) { const from = part.source.from && cat.pieces.find(c => c.key === part.source.from);
-    side.innerHTML = `<div class="kind">Pieza</div><h2>${esc(part.what)}</h2><dl><dt>id</dt><dd>${esc(part.id)}</dd><dt>medida</dt><dd>${part.size_m ? fmt(part.size_m) : "—"}</dd><dt>cuántas</dt><dd>${part.count ?? 1}</dd><dt>material</dt><dd>${esc(part.material ?? "el suyo")}</dd><dt>se mueve</dt><dd>${esc(part.moves ?? "no")}</dd><dt>fuente</dt><dd>${esc(part.source.kind)} ${esc(part.source.from ?? part.source.query ?? "")}</dd><dt>dónde</dt><dd>${(part.at || []).map(a => "(" + a.map(v => v.toFixed(2)).join(", ") + ")").join(" ") || "sin colocar"}</dd>${part.source.why ? `<dt>por qué</dt><dd>${esc(part.source.why)}</dd>` : ""}${from ? `<dt>en el catálogo</dt><dd>${fmt(from.size_m)} · ${from.tris ?? "?"} tri · ${esc(from.licenses.join(", "))}</dd>` : ""}</dl>` + (from?.preview ? `<div class="view3d" id="v3d"></div>` : "") + findingsOf(`part:${id0}/${part.id}`); if (from?.preview) view3d(from.preview); return; }
+    side.innerHTML = `<div class="kind">Pieza</div><h2>${esc(part.what)}</h2><dl><dt>id</dt><dd>${esc(part.id)}</dd><dt>medida</dt><dd>${part.size_m ? fmt(part.size_m) : "—"}</dd><dt>cuántas</dt><dd>${part.count ?? 1}</dd><dt>material</dt><dd>${esc(part.material ?? "el suyo")}</dd><dt>se mueve</dt><dd>${esc(part.moves ?? "no")}</dd><dt>fuente</dt><dd>${esc(part.source.kind)} ${esc(part.source.from ?? part.source.query ?? "")}</dd><dt>dónde</dt><dd>${(part.at || []).map(a => "(" + a.map(v => v.toFixed(2)).join(", ") + ")").join(" ") || "sin colocar"}</dd>${part.source.why ? `<dt>por qué</dt><dd>${esc(part.source.why)}</dd>` : ""}${from ? `<dt>en el catálogo</dt><dd>${fmt(from.size_m)} · ${from.tris ?? "?"} tri · ${esc(from.licenses.join(", "))}</dd>` : ""}</dl>` + (from?.preview ? `<div class="view3d" id="v3d"></div>` : "") + siteSearch(part) + findingsOf(`part:${id0}/${part.id}`); if (from?.preview) view3d(from.preview); wireSearch(sp, part); return; }
   if (id.startsWith("mat:")) { const m = cat.materials.find(x => x.key === id.slice(4)); if (m) showMat(m); else side.innerHTML = `<div class="kind">Material</div><h2>${esc(id.slice(4))}</h2><p>No está en la paleta. Hay que añadirlo antes de montar (por ejemplo, texturas CC0 de Poly Haven).</p>`; }
 }
 
@@ -370,6 +376,34 @@ function showPiece(p) {
     await load(); showPiece(cat.pieces.find(x => x.key === p.key));
   });
   if (p.preview) view3d(p.preview);
+}
+
+// ---- Asset sites: search a part, bring the picked model in ----
+const SITES = { polyhaven: "Poly Haven", polypizza: "Poly Pizza", sketchfab: "Sketchfab" };
+function siteSearch(part) {
+  const fromSite = part.source.from && SITES[part.source.from.split("/")[0]];
+  if (part.source.kind !== "search" && !fromSite) return "";
+  return `<div class="kind" style="margin-top:12px">En sitios de assets</div>
+    <p class="note">${part.source.kind === "search" ? `Busca «${esc(part.source.query || part.what)}» en ${Object.values(SITES).join(", ")}. Solo salen las licencias que admite el proyecto; nada se baja hasta que pulses Traer.` : `Traída de ${fromSite}. Puedes buscar otra.`}</p>
+    <div class="actions"><button type="button" id="doSearch">${part.source.kind === "search" ? "Buscar" : "Buscar otra"}</button></div><div id="cands"></div>`;
+}
+function wireSearch(sp, part) {
+  const btn = document.getElementById("doSearch"); if (!btn) return;
+  btn.onclick = async () => {
+    const box = document.getElementById("cands"); btn.disabled = true; box.innerHTML = `<p class="note">Preguntando a los sitios…</p>`;
+    const r = await post("/api/search", { asset: sp.asset.id, part: part.id }); btn.disabled = false;
+    if (r.error) { box.innerHTML = ""; return alertSide(r.error); }
+    const over = c => sp.asset.budget_tris && c.tris > sp.asset.budget_tris;
+    box.innerHTML = `<p class="note">${r.candidates.length} candidatos para «${esc(r.query)}»${r.size_m ? " · la pieza mide " + fmt(r.size_m) : ""}${sp.asset.budget_tris ? " · presupuesto del asset " + sp.asset.budget_tris.toLocaleString("es") + " tri" : ""}</p>`
+      + r.notes.map(n => `<div class="finding"><span class="pill warn">aviso</span> ${esc(n)}</div>`).join("")
+      + `<div class="cands">` + r.candidates.map((c, i) => `<div class="cand">${c.thumb ? `<img src="${esc(c.thumb)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ""}<div class="cb"><b>${esc(c.name)}</b><span>${SITES[c.site]} · ${esc(c.author)}</span>
+        <span><span class="pill ${c.license === "CC0" ? "ok" : "info"}">${esc(c.license)}</span>${c.tris != null ? `<span class="pill ${over(c) ? "warn" : "ok"}">${c.tris.toLocaleString("es")} tri</span>` : ""}</span>${c.size_m ? `<span>${fmt(c.size_m)}</span>` : ""}</div>
+        <div class="ca"><a href="${esc(c.page_url)}" target="_blank" rel="noopener noreferrer">ver</a><button type="button" data-i="${i}">Traer</button></div></div>`).join("") + `</div>`;
+    box.querySelectorAll("button[data-i]").forEach(b => b.onclick = async () => {
+      if (job) return; const c = r.candidates[+b.dataset.i];
+      const j = await post("/api/import", { asset: sp.asset.id, part: part.id, site: c.site, id: c.id }); if (j.error) return alertSide(j.error); job = j.job; follow();
+    });
+  };
 }
 
 // ---- Production: place, assemble, look at it ----

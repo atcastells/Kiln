@@ -110,7 +110,7 @@ pub fn index(root: &Path, config: &Config) -> Catalog {
         builds: BTreeMap::new(),
         findings: Vec::new(),
     };
-    for kits in &config.assets.kits {
+    for kits in config.kit_roots() {
         for dir in sorted_dirs(&root.join(kits)) {
             index_kit(root, &dir, &mut cat);
         }

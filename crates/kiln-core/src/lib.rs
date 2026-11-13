@@ -11,6 +11,7 @@ pub mod context;
 pub mod glb;
 pub mod godot;
 pub mod license;
+pub mod sources;
 pub mod spec;
 pub mod tree;
 

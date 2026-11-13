@@ -2,7 +2,7 @@
 //! of the agent. The desktop shell (Tauri) will wrap the same page later.
 
 use crate::agent::{self, Ctx, Jobs, Task};
-use crate::production;
+use crate::{fetch, production};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::PathBuf;
@@ -186,6 +186,27 @@ fn handle(mut stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result
                 production::measure(&c.project, c.config.as_deref(), say).map(|_| None)
             }) }),
             )
+        }
+        ("POST", "/api/search") => {
+            let (asset, part) = (field("asset"), field("part"));
+            match fetch::search(&ctx.project, ctx.config.as_deref(), &asset, &part) {
+                Ok(found) => json(serde_json::to_value(found).unwrap_or_default()),
+                Err(e) => bad(&e),
+            }
+        }
+        ("POST", "/api/import") => {
+            let (asset, part, site, id) =
+                (field("asset"), field("part"), field("site"), field("id"));
+            if asset.is_empty() || part.is_empty() || site.is_empty() || id.is_empty() {
+                bad("falta el asset, la pieza, el sitio o el modelo")
+            } else {
+                let c = ctx.clone();
+                json(
+                    serde_json::json!({ "job": agent::job(jobs, format!("traer {site}/{id} para {part}"), move |say| {
+                    fetch::import(&c.project, c.config.as_deref(), &asset, &part, &site, &id, say).map(Some)
+                }) }),
+                )
+            }
         }
         ("POST", "/api/bind") => {
             let (piece, slot, material) = (field("piece"), field("slot"), field("material"));

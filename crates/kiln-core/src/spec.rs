@@ -274,3 +274,49 @@ mod tests {
         assert!(s.parts.iter().any(|p| p.source.kind == "reuse"));
     }
 }
+
+/// The spec's TOML with one part's source changed (a piece brought in from a
+/// site turns a `search` into a `reuse` or a `variant`). The rest of the file
+/// keeps its values; comments are lost.
+pub fn set_source(
+    text: &str,
+    part: &str,
+    kind: &str,
+    from: &str,
+    why: &str,
+) -> Result<String, String> {
+    let mut doc: toml::Table = toml::from_str(text).map_err(|e| e.to_string())?;
+    let p = doc
+        .get_mut("parts")
+        .and_then(|v| v.as_array_mut())
+        .and_then(|a| {
+            a.iter_mut()
+                .find(|p| p.get("id").and_then(|i| i.as_str()) == Some(part))
+        })
+        .and_then(|p| p.as_table_mut())
+        .ok_or(format!("la ficha no tiene la pieza «{part}»"))?;
+    let src = p
+        .entry("source")
+        .or_insert_with(|| toml::Value::Table(Default::default()))
+        .as_table_mut()
+        .ok_or("source no es una tabla")?;
+    src.insert("kind".into(), kind.into());
+    src.insert("from".into(), from.into());
+    src.insert("why".into(), why.into());
+    toml::to_string(&doc).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod source_tests {
+    #[test]
+    fn a_search_becomes_a_reuse() {
+        let text = "[asset]\nid = \"a\"\nname = \"A\"\n\n[[parts]]\nid = \"block\"\nwhat = \"polea\"\nsize_m = [0.2, 0.3, 0.1]\n[parts.source]\nkind = \"search\"\nquery = \"wooden pulley\"\n";
+        let out =
+            super::set_source(text, "block", "variant", "sketchfab/pulley", "traída").unwrap();
+        let s = super::parse(&out).unwrap();
+        assert_eq!(s.parts[0].source.kind, "variant");
+        assert_eq!(s.parts[0].source.from.as_deref(), Some("sketchfab/pulley"));
+        assert_eq!(s.parts[0].source.query.as_deref(), Some("wooden pulley"));
+        assert!(super::set_source(text, "nope", "reuse", "x", "").is_err());
+    }
+}
