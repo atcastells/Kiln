@@ -75,6 +75,13 @@ dt { color: var(--muted); } dd { margin: 0; font: 12px var(--mono); overflow-wra
 select { font: inherit; font-size: 12.5px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--fg); min-width: 0; }
 .actions { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
 .k-build .hd i { background: #7a4fa0; }
+.k-layer .hd i { background: var(--accent); } .k-claim .hd i { background: var(--info); } .k-claim.pinned .hd i { background: var(--ok); } .k-question .hd i { background: var(--warn); }
+textarea { font: inherit; width: 100%; min-height: 180px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: var(--panel); color: var(--fg); resize: vertical; }
+.qcard { border: 1px solid var(--line); border-radius: 8px; padding: 10px; margin: 8px 0; }
+.qcard .opts { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; } .qcard .opts button { text-align: left; font-weight: 500; }
+.qcard .free { display: flex; gap: 6px; } .qcard .free input { flex: 1; }
+.qcard .skip { display: flex; gap: 6px; margin-top: 8px; } .qcard .skip button { font-weight: 500; font-size: 12px; padding: 4px 8px; }
+.proposal { border-left: 3px solid var(--warn); padding: 4px 8px; margin: 8px 0; background: var(--warnbg); font-size: 13px; }
 @media (max-width: 760px) { main { grid-template-columns: 1fr; grid-template-rows: 60vh auto; } }
 </style>
 </head>
@@ -84,7 +91,7 @@ select { font: inherit; font-size: 12.5px; padding: 4px 6px; border: 1px solid v
   <div class="stats" id="stats"></div>
   <input id="search" placeholder="Buscar pieza o material" aria-label="Buscar pieza o material">
   <form id="askForm"><input id="ask" placeholder="Pedir un asset: crear un ascensor" aria-label="Pedir un asset"><button type="submit">Desglosar</button></form>
-  <nav class="tabs"><button type="button" data-mode="tree">Árbol</button><button type="button" data-mode="catalog">Catálogo</button></nav>
+  <nav class="tabs"><button type="button" data-mode="context">Contexto</button><button type="button" data-mode="tree">Árbol</button><button type="button" data-mode="catalog">Catálogo</button></nav>
   <button id="back" type="button" hidden>Volver</button>
   <button id="reload" type="button">Releer el proyecto</button>
 </header>
@@ -95,6 +102,7 @@ select { font: inherit; font-size: 12.5px; padding: 4px 6px; border: 1px solid v
 </main>
 <script>
 const W = 200, GAP = 12, X = { project: 20, kit: 270, piece: 520, slot: 770, mat: 1060 };
+let ctxData = null, ctxLayer = null;
 let cat = null, openKit = null, sel = null, query = "", view = { x: 10, y: 10, z: 0.8 }, specView = null, job = null, mode = "tree", treeAt = null;
 const LEVEL = { game: "Juego", place: "Lugar", building: "Edificio", room: "Sala", module: "Módulo", scene: "Escena", asset: "Asset" };
 const lvl = l => LEVEL[l] || l;
@@ -108,13 +116,23 @@ async function load() {
   const r = await fetch("/api/catalog"); const j = await r.json();
   if (j.error) { side.innerHTML = `<div class="kind">Error</div><p>${esc(j.error)}</p>`; return; }
   cat = j; document.getElementById("proj").textContent = cat.project;
+  ctxData = await (await fetch("/api/context")).json();
   const n = s => cat.findings.filter(f => f.severity === s).length;
   document.getElementById("stats").innerHTML = `<span>${cat.kits.length} kits</span><span>${cat.pieces.length} piezas</span><span>${cat.materials.length} materiales</span>`
     + `<span class="error">${n("error")} errores</span><span class="warn">${n("warn")} avisos</span><span class="info">${n("info")} notas</span>`;
   if (specView && !cat.specs.find(x => x.asset.id === specView)) specView = null;
   if (!cat.tree) mode = "catalog";
   render();
-  if (!sel) { if (mode === "tree") { sel = cat.tree.root; render(); showTreeNode(cat.tree.nodes[sel]); } else showProject(); }
+  if (!sel && !ctxData.context.claims.length) mode = "context";
+  if (!sel) home();
+}
+function home() {
+  specView = null;
+  sel = mode === "tree" ? (treeAt || cat.tree?.root) : mode === "context" ? "game" : "project";
+  render();
+  if (mode === "tree" && cat.tree) showTreeNode(cat.tree.nodes[sel]);
+  else if (mode === "context") showContext();
+  else showProject();
 }
 
 function node(id, k, kind, title, sub, x, y, extra = "", badge = "") {
@@ -129,6 +147,7 @@ function render() {
   crumbs();
   if (specView) return renderSpec(cat.specs.find(x => x.asset.id === specView));
   if (mode === "tree" && cat.tree) return renderTree();
+  if (mode === "context") return renderContext();
   const nodes = [], edges = [];
   let y = 40;
   nodes.push(node("project", "project", "Proyecto", cat.project, cat.root, X.project, 40));
@@ -169,12 +188,21 @@ function render() {
     el.addEventListener("keydown", e => { if (e.key === "Enter") pick(el.dataset.id); });
   });
 }
-function draw(nodes, edges, cols) {
+function draw(nodes, edges, cols, bands) {
   world.querySelectorAll(".node, .col").forEach(e => e.remove());
   world.insertAdjacentHTML("beforeend", cols.map(([l, x]) => `<div class="col" style="left:${x}px;top:10px">${l}</div>`).join("") + nodes.map(n => n.html).join(""));
   const byCol = {};
   world.querySelectorAll(".node").forEach(el => (byCol[el.offsetLeft] ??= []).push(el));
-  for (const list of Object.values(byCol)) {
+  if (bands) {
+    // one band per group: its nodes in each column start level with the group's head
+    const el = id => world.querySelector(`.node[data-id="${CSS.escape(id)}"]`);
+    let y = 40;
+    for (const band of bands) {
+      let bottom = y;
+      for (const col of band) { let cy = y; for (const id of col) { const e = el(id); if (!e) continue; e.style.top = cy + "px"; cy += e.offsetHeight + GAP; } bottom = Math.max(bottom, cy); }
+      y = bottom + GAP * 2;
+    }
+  } else for (const list of Object.values(byCol)) {
     list.sort((a, b) => a.offsetTop - b.offsetTop);
     let y = 0;
     for (const el of list) { y = Math.max(y, el.offsetTop); el.style.top = y + "px"; y += el.offsetHeight + GAP; }
@@ -392,6 +420,98 @@ function showMat(m) {
   side.innerHTML = `<div class="kind">Material · ${m.source === "table" ? "tabla" : "textura"}</div><h2>${esc(m.key)}</h2><dl><dt>nombre</dt><dd>${esc(m.name)}</dd><dt>fichero</dt><dd>${esc(m.file)}</dd>${d}</dl>` + findingsOf(m.key);
 }
 
+// ---- The context of the project, by layers ----
+const CX = [20, 270, 520, 800];
+const claimsOf = l => ctxData.context.claims.filter(c => c.layer === l);
+const openQs = () => ctxData.context.questions.filter(q => q.status === "open");
+const layerName = id => ctxData.layers.find(l => l.id === id)?.name || id;
+function renderContext() {
+  const C = ctxData.context, nodes = [], edges = [];
+  nodes.push(node("game", "game", "Juego", cat.project, C.claims.length ? `${C.claims.length} afirmaciones · ${openQs().length} preguntas abiertas` : "sin contexto todavía", CX[0], 40));
+  const known = new Set(ctxData.layers.map(l => l.id));
+  const layers = [...ctxData.layers, ...[...new Set(C.claims.map(c => c.layer))].filter(l => !known.has(l)).map(id => ({ id, name: id, holds: "capa que no declara kiln.toml" }))];
+  let y = 40;
+  for (const l of layers) {
+    const cs = claimsOf(l.id), qs = openQs().filter(q => q.layer === l.id);
+    nodes.push(node("layer:" + l.id, "layer", "Capa", l.name, l.holds, CX[1], y, `<span class="pill ${cs.length ? "ok" : "warn"}">${cs.length} afirmaciones</span>${qs.length ? `<span class="pill warn">${qs.length} preguntas</span>` : ""}`));
+    edges.push(["game", "layer:" + l.id]);
+    for (const c of cs) {
+      const n = node("claim:" + c.id, "claim", c.pinned ? "Fijada" : "Afirmación", c.text, c.source.startsWith("answer:") ? "tu respuesta" : c.source.startsWith("file:") ? c.source.slice(5) : c.source === "text" ? "tu explicación" : c.source, CX[2], y,
+        (c.proposed ? `<span class="pill warn">propuesta del agente</span>` : "") + (c.conflicts ? `<span class="pill error">choca con otra</span>` : ""));
+      if (c.pinned) n.html = n.html.replace("k-claim", "k-claim pinned");
+      if (!matches(c.text)) n.html = n.html.replace('class="node', 'class="node dim');
+      nodes.push(n); edges.push(["layer:" + l.id, "claim:" + c.id]); y += 1;
+    }
+    for (const q of qs) { nodes.push(node("q:" + q.id, "question", "Pregunta" + (q.asked_by.startsWith("asset:") ? " · " + q.asked_by.slice(6) : ""), q.text, `${q.options.length} respuestas sugeridas`, CX[3], y)); edges.push(["layer:" + l.id, "q:" + q.id]); y += 1; }
+    y += 1;
+  }
+  const s = sel && sel.startsWith("claim:") ? C.claims.find(c => "claim:" + c.id === sel) : null;
+  if (s) for (const o of [...s.links, s.conflicts].filter(Boolean)) edges.push(["claim:" + s.id, "claim:" + o]);
+  const bands = [...layers.map(l => [["layer:" + l.id], claimsOf(l.id).map(c => "claim:" + c.id), openQs().filter(q => q.layer === l.id).map(q => "q:" + q.id)])];
+  draw(nodes, edges, [["Juego", CX[0]], ["Capas", CX[1]], ["Afirmaciones", CX[2]], ["Preguntas", CX[3]]], bands);
+  world.querySelectorAll(".node").forEach(el => { el.classList.toggle("sel", el.dataset.id === sel); el.onclick = () => pickContext(el.dataset.id); });
+}
+function pickContext(id) {
+  sel = id; render();
+  if (id === "game") return showContext();
+  if (id.startsWith("layer:")) return showLayer(id.slice(6));
+  if (id.startsWith("claim:")) return showClaim(ctxData.context.claims.find(c => c.id === id.slice(6)));
+  if (id.startsWith("q:")) { const q = ctxData.context.questions.find(x => x.id === id.slice(2)); side.innerHTML = `<div class="kind">Pregunta · ${esc(layerName(q.layer))}</div>` + qcard(q); wireQ(q); }
+}
+async function ctxPost(what, body) { const r = await post("/api/context/" + what, body); if (r.error) { alertSide(r.error); return false; } ctxData = await (await fetch("/api/context")).json(); render(); return true; }
+async function ctxJob(what) { if (job) return; const r = await post("/api/context/" + what, {}); if (r.error) return alertSide(r.error); job = r.job; follow(); }
+function showContext() {
+  const C = ctxData.context, qs = openQs();
+  side.innerHTML = `<div class="kind">Contexto del proyecto</div><h2>${esc(cat.project)}</h2>
+    <p class="note">Explica el juego con tus palabras: de qué va, época, estilo, qué ve y hace el jugador, reglas de los assets. «Ordenar» lo parte en capas; «Afinar» te hace preguntas.</p>
+    <textarea id="ctxText" placeholder="Un juego de...">${esc(C.text)}</textarea>
+    <div class="actions"><button type="button" id="ctxSave">Guardar</button><button type="button" id="ctxSort">Guardar y ordenar</button><button type="button" id="ctxRefine"${C.claims.length ? "" : " disabled"}>Afinar con preguntas</button></div>
+    <p class="note">Se guarda en ${esc(ctxData.file)} · ${C.claims.length} afirmaciones en ${new Set(C.claims.map(c => c.layer)).size} capas</p>`
+    + (qs.length ? `<div class="kind" style="margin-top:12px">Pregunta ${C.questions.length - qs.length + 1} de ${C.questions.length} · ${esc(layerName(qs[0].layer))}</div>` + qcard(qs[0]) : C.claims.length ? `<p class="note">No hay preguntas abiertas. «Afinar» pide otra ronda.</p>` : "");
+  const text = () => document.getElementById("ctxText").value;
+  document.getElementById("ctxSave").onclick = () => ctxPost("text", { text: text() }).then(ok => ok && showContext());
+  document.getElementById("ctxSort").onclick = async () => { if (await ctxPost("text", { text: text() })) ctxJob("sort"); };
+  document.getElementById("ctxRefine").onclick = () => ctxJob("refine");
+  if (qs.length) wireQ(qs[0], true);
+}
+function qcard(q) {
+  return `<div class="qcard"><b>${esc(q.text)}</b>${q.asked_by.startsWith("asset:") ? `<div class="note">La necesitó el asset ${esc(q.asked_by.slice(6))}</div>` : ""}
+    <div class="opts">${q.options.map((o, i) => `<button type="button" data-opt="${i}">${esc(o)}</button>`).join("")}</div>
+    <div class="free"><input id="qFree" placeholder="O con tus palabras" value="${esc(q.answer ?? "")}"><button type="button" id="qSend">Responder</button></div>
+    <div class="skip"><button type="button" id="qSkip">Saltar</button><button type="button" id="qNa">No aplica</button></div></div>`;
+}
+function wireQ(q, next) {
+  const done = ok => { if (!ok) return; if (next) showContext(); else { const n = openQs()[0]; n ? pickContext("q:" + n.id) : (sel = "game", render(), showContext()); } };
+  side.querySelectorAll("[data-opt]").forEach(b => b.onclick = () => ctxPost("answer", { id: q.id, answer: q.options[+b.dataset.opt], status: "answered" }).then(done));
+  document.getElementById("qSend").onclick = () => ctxPost("answer", { id: q.id, answer: document.getElementById("qFree").value, status: "answered" }).then(done);
+  document.getElementById("qFree").onkeydown = e => { if (e.key === "Enter") document.getElementById("qSend").click(); };
+  document.getElementById("qSkip").onclick = () => ctxPost("answer", { id: q.id, status: "skipped" }).then(done);
+  document.getElementById("qNa").onclick = () => ctxPost("answer", { id: q.id, status: "not_applicable" }).then(done);
+}
+function showLayer(id) {
+  const l = ctxData.layers.find(x => x.id === id) || { id, name: id, holds: "" }, cs = claimsOf(id);
+  side.innerHTML = `<div class="kind">Capa</div><h2>${esc(l.name)}</h2><p class="note">${esc(l.holds)}</p>`
+    + (cs.map(c => `<div class="finding">${c.pinned ? `<span class="pill ok">fijada</span> ` : ""}${esc(c.text)}</div>`).join("") || `<p class="note">Vacía.</p>`)
+    + `<div class="free actions"><input id="addClaim" placeholder="Añadir una afirmación a esta capa" style="flex:1"><button type="button" id="addBtn">Añadir</button></div>`;
+  document.getElementById("addBtn").onclick = () => ctxPost("claim", { action: "add", layer: id, text: document.getElementById("addClaim").value }).then(ok => ok && showLayer(id));
+}
+function showClaim(c) {
+  const ref = id => { const o = ctxData.context.claims.find(x => x.id === id); return o ? `<div class="finding"><span class="note">${esc(layerName(o.layer))}</span> ${esc(o.text)}</div>` : ""; };
+  side.innerHTML = `<div class="kind">Afirmación · ${esc(layerName(c.layer))}</div><h2>${c.pinned ? "Fijada por ti" : "Del agente"}</h2>
+    <textarea id="claimText" style="min-height:80px">${esc(c.text)}</textarea>
+    <div class="actions"><button type="button" id="cEdit">Guardar y fijar</button><button type="button" id="cPin">${c.pinned ? "Soltar" : "Fijar"}</button><button type="button" id="cDel">Borrar</button></div>
+    ${c.proposed ? `<div class="proposal"><b>El agente propone:</b> ${esc(c.proposed)}<div class="actions"><button type="button" id="cAcc">Aceptar</button><button type="button" id="cRej">Descartar</button></div></div>` : ""}
+    <dl><dt>origen</dt><dd>${esc(c.source)}</dd><dt>id</dt><dd>${esc(c.id)}</dd></dl>`
+    + (c.conflicts ? `<div class="kind">Choca con</div>` + ref(c.conflicts) : "") + (c.links.length ? `<div class="kind" style="margin-top:10px">Relacionadas</div>` + c.links.map(ref).join("") : "")
+    + `<p class="note">Lo que fijas no lo cambia el agente: como mucho, te propone otra versión.</p>`;
+  const act = (action, text = "") => ctxPost("claim", { id: c.id, action, text }).then(ok => { if (!ok) return; const n = ctxData.context.claims.find(x => x.id === c.id); n ? showClaim(n) : (sel = "layer:" + c.layer, render(), showLayer(c.layer)); });
+  document.getElementById("cEdit").onclick = () => act("edit", document.getElementById("claimText").value);
+  document.getElementById("cPin").onclick = () => act(c.pinned ? "unpin" : "pin");
+  document.getElementById("cDel").onclick = () => act("delete");
+  document.getElementById("cAcc")?.addEventListener("click", () => act("accept"));
+  document.getElementById("cRej")?.addEventListener("click", () => act("reject"));
+}
+
 function apply() { world.style.transform = `translate(${view.x}px,${view.y}px) scale(${view.z})`; }
 const stage = document.getElementById("stage");
 stage.addEventListener("pointerdown", e => { if (e.target.closest(".node")) return; const sx = e.clientX - view.x, sy = e.clientY - view.y; stage.setPointerCapture(e.pointerId);
@@ -402,8 +522,8 @@ stage.addEventListener("wheel", e => { e.preventDefault(); const r = stage.getBo
   const z = Math.min(1.6, Math.max(0.3, view.z * (e.deltaY < 0 ? 1.1 : 0.9))); view.x = mx - (mx - view.x) * z / view.z; view.y = my - (my - view.y) * z / view.z; view.z = z; apply(); }, { passive: false });
 document.getElementById("search").addEventListener("input", e => { query = e.target.value.trim().toLowerCase(); if (cat) render(); });
 document.getElementById("reload").addEventListener("click", load);
-document.getElementById("back").addEventListener("click", () => { specView = null; sel = mode === "tree" ? (treeAt || cat.tree?.root) : "project"; render(); mode === "tree" && cat.tree ? showTreeNode(cat.tree.nodes[sel]) : showProject(); });
-document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => { mode = b.dataset.mode; specView = null; sel = mode === "tree" ? (treeAt || cat.tree?.root) : "project"; render(); mode === "tree" && cat.tree ? showTreeNode(cat.tree.nodes[sel]) : showProject(); }));
+document.getElementById("back").addEventListener("click", home);
+document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => { mode = b.dataset.mode; home(); }));
 document.getElementById("askForm").addEventListener("submit", async e => {
   e.preventDefault(); const text = document.getElementById("ask").value.trim(); if (!text || job) return;
   const r = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json", "X-Kiln": "1" }, body: JSON.stringify({ text }) });
@@ -416,6 +536,7 @@ async function follow() {
   side.scrollTop = side.scrollHeight;
   if (j.status === "running") return setTimeout(follow, 1500);
   job = null; await load();
+  if (j.spec && ctxData && j.spec === ctxData.file) { mode = "context"; sel = "game"; render(); showContext(); side.insertAdjacentHTML("beforeend", `<div class="kind" style="margin-top:12px">Lo que hizo el agente</div>` + j.log.map(l => `<div class="log">${esc(l)}</div>`).join("")); return; }
   if (j.spec && j.spec.endsWith(".glb")) { const id = Object.keys(cat.builds).find(k => cat.builds[k].glb === j.spec); const sp = id && cat.specs.find(x => x.asset.id === id); if (sp) { specView = id; sel = "build"; render(); showBuild(sp); side.insertAdjacentHTML("beforeend", `<div class="kind" style="margin-top:12px">Registro</div>` + j.log.map(l => `<div class="log">${esc(l)}</div>`).join("")); } return; }
   if (j.spec) { const sp = cat.specs.find(x => x.file === j.spec); if (sp) { specView = sp.asset.id; sel = "asset"; render(); pickSpec(sp, "asset"); side.insertAdjacentHTML("beforeend", `<div class="kind" style="margin-top:12px">Lo que hizo el agente</div>` + j.log.map(l => `<div class="log">${esc(l)}</div>`).join("")); } }
 }

@@ -17,6 +17,14 @@ pieza, pon `status = "layout"` y no cambies nada más.
 
 ## 1. Encargo: qué es en este juego
 
+- Lee primero el contexto del proyecto cuya ruta te da Kiln: sus
+  afirmaciones (`claims`), por capas, mandan sobre lo que deduzcas tú. Si
+  para decidir algo te falta un dato que el contexto no dice, decide lo
+  más probable, dilo en `notes` y añade al contexto una pregunta
+  (`[[questions]]` con `id` nuevo `q<n>`, su `layer`, tres `options`,
+  `status = "open"` y `asked_by = "asset:<id del asset>"`). No cambies
+  nada más del contexto.
+
 - Lee la configuración de Kiln cuya ruta te da la petición (si no te da ninguna, `kiln.toml` en la raíz) y, si el proyecto los tiene, sus `CLAUDE.md`, su lore y sus
   principios. La petición se traduce al mundo de ese juego: en un juego
   medieval «un ascensor» sería un montacargas de torno; en uno de ciencia

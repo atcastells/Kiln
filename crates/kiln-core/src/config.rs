@@ -20,6 +20,41 @@ pub struct Config {
     /// The programs Kiln calls to produce (Blender, Godot) and where it writes.
     #[serde(default)]
     pub tools: Tools,
+    /// What the agent must know of the game (`kiln/context.toml`).
+    #[serde(default)]
+    pub context: ContextSection,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ContextSection {
+    #[serde(default = "default_context_file")]
+    pub file: String,
+    /// Layers of the context; the six of `context::default_layers` when empty.
+    #[serde(default)]
+    pub layers: Vec<crate::context::Layer>,
+}
+
+impl Default for ContextSection {
+    fn default() -> Self {
+        ContextSection {
+            file: default_context_file(),
+            layers: Vec::new(),
+        }
+    }
+}
+
+impl ContextSection {
+    pub fn layers(&self) -> Vec<crate::context::Layer> {
+        if self.layers.is_empty() {
+            crate::context::default_layers()
+        } else {
+            self.layers.clone()
+        }
+    }
+}
+
+fn default_context_file() -> String {
+    "kiln/context.toml".into()
 }
 
 #[derive(Debug, Clone, Deserialize)]

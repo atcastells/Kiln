@@ -7,6 +7,7 @@ pub mod build;
 pub mod catalog;
 pub mod check;
 pub mod config;
+pub mod context;
 pub mod glb;
 pub mod godot;
 pub mod license;
