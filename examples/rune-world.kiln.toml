@@ -1,0 +1,18 @@
+# kiln.toml for rune-world (copy it to the root of the game repo, or pass it
+# with --config). Paths are relative to the project root.
+[project]
+name = "Rune World"
+engine = "godot"
+
+[assets]
+kits = ["godot/kit"]
+specs = "data/assets"
+
+[materials]
+tables = ["data/buildings/materials.toml"]
+textures = ["godot/textures"]
+
+[rules]
+# Rune admits CC0 and CC-BY (docs/principios.md); NC, ND and SA do not enter, GPL not without a decision.
+licenses = ["CC0", "CC-BY"]
+max_tris = 20000

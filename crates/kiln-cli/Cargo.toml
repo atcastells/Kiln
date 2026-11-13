@@ -1,0 +1,12 @@
+[package]
+name = "kiln-cli"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kiln-core = { version = "0.1.0", path = "../kiln-core" }
+serde_json = "1.0.154"
+
+[[bin]]
+name = "kiln"
+path = "src/main.rs"
