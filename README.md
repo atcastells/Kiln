@@ -45,10 +45,28 @@ licenses = ["CC0", "CC-BY"]
 max_tris = 20000
 ```
 
+## Entrega 2: pedir un asset
+
+En el grafo, escribe la petición («crear un ascensor») y pulsa Desglosar.
+Kiln lanza Claude Code sin ventana (`claude -p`, con la skill
+`skills/asset/SKILL.md`) en el proyecto; el agente lee el proyecto y el
+catálogo y escribe la ficha en la carpeta `[assets] specs` de `kiln.toml`.
+El grafo sigue lo que hace y, al terminar, despliega la ficha: petición,
+asset, piezas, de dónde sale cada modelo (reutilizar, variante, buscar,
+retocar), material de la paleta y validación. `examples/specs/hoist.toml` es
+una ficha de ejemplo.
+
+- Necesita `claude` en el PATH (o su ruta en `KILN_CLAUDE`) con sesión iniciada.
+- El agente solo puede leer y escribir ficheros (sin terminal) y no baja nada:
+  las piezas «buscar» esperan tu permiso.
+- Solo la propia página puede lanzar al agente: la petición lleva una cabecera
+  propia y el servidor solo escucha en `127.0.0.1`.
+
 ## Lo que viene
 
-- Entrega 2: pedir un asset desde el grafo; Claude Code (`claude -p`) escribe la ficha y los nodos aparecen. El grafo pasa a Rete.js.
 - Entrega 3: producción y montaje con Blender y Godot, vista 3D en cada nodo, vínculo de ranuras con la paleta y app de escritorio (Tauri).
 - Entrega 4: el primer asset de punta a punta.
+- Entrega 5: componer escenas con módulos de piezas (un pasillo de suelo, techo, muros y luces).
+- El grafo pasará a Rete.js cuando los nodos se puedan editar.
 
 Los `.res` y escenas de Godot no se miden todavía: lo hará Godot sin ventana en la entrega 3.

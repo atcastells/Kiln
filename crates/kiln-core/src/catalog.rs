@@ -14,6 +14,8 @@ pub struct Catalog {
     pub kits: Vec<Kit>,
     pub pieces: Vec<Piece>,
     pub materials: Vec<Material>,
+    /// The asset specs of the project (`[assets] specs`).
+    pub specs: Vec<crate::spec::Spec>,
     pub findings: Vec<Finding>,
 }
 
@@ -88,6 +90,7 @@ pub fn index(root: &Path, config: &Config) -> Catalog {
         kits: Vec::new(),
         pieces: Vec::new(),
         materials: Vec::new(),
+        specs: Vec::new(),
         findings: Vec::new(),
     };
     for kits in &config.assets.kits {

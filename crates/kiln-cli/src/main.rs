@@ -4,6 +4,7 @@
 //!   kiln check  --project DIR [--config FILE]                findings; exit 1 on errors
 //!   kiln serve  --project DIR [--config FILE] [--port 4330]  the graph at http://127.0.0.1:PORT
 
+mod agent;
 mod serve;
 
 use kiln_core::{Catalog, Config, Severity};
