@@ -70,5 +70,14 @@ count = 2
 size_m = [0.5, 0.4, 0.5]
 moves = "translate_y"
 only_in = ["loaded"]
+# one palette material per zone of the model; the zones left out keep their own
+materials = { Wood = "pine" }
 source = { kind = "reuse", from = "harbor/crate" }
 at = [[-0.27, 0.08, 0], [0.27, 0.08, 0]]
+
+# A colour variant: the same assembly with other materials, as its own GLB.
+# Only what changes from the asset is listed, by `part/zone`.
+[[variants]]
+id = "weathered"
+name = "Curtida por el salitre"
+materials = { "post/Wood" = "oak", "crossbeam/Wood" = "oak", "load/Iron" = "rust" }

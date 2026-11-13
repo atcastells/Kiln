@@ -305,6 +305,7 @@ children = [{ key = "fixtures", field = "id", level = "asset" }]
             min: None,
             tris: None,
             material_slots: vec![],
+            split: None,
             images: None,
             licenses: vec![],
             credit: None,

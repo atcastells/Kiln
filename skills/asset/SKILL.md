@@ -66,6 +66,11 @@ inventarlas. Cada pieza que no sea `reuse` lleva `material` con una clave de
 la paleta (`materials[].key` del catálogo); si no hay ninguna adecuada, pon
 la clave que propones y explícalo en `notes`.
 
+Si la pieza del catálogo tiene varias ranuras de material
+(`material_slots`), elige por zona con `materials = { Wood = "pine" }` en
+lugar de `material`: las zonas que no nombres conservan el material del
+modelo. Usa los nombres de ranura tal como están en el catálogo.
+
 ## 4. Montaje: dónde va cada pieza
 
 Para cada pieza, una posición por copia (`at`, tantas como `count`), en

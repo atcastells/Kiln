@@ -15,6 +15,7 @@ pub mod review;
 pub mod sources;
 pub mod spec;
 pub mod tree;
+pub mod zones;
 
 pub use catalog::{Catalog, Finding, Kit, Material, Piece, Severity};
 pub use config::Config;
@@ -31,6 +32,10 @@ pub fn open(project: &Path) -> Result<Catalog, String> {
 pub fn open_with(project: &Path, config: Config) -> Result<Catalog, String> {
     let mut catalog = catalog::index(project, &config);
     godot::apply(project, &config, &mut catalog);
+    let splits = zones::load(project)?;
+    for p in &mut catalog.pieces {
+        p.split = zones::mode(&splits, &p.key).map(str::to_string);
+    }
     bindings::apply(&bindings::load(project, &config)?, &mut catalog);
     check::run(&config, &mut catalog);
     if let Some(dir) = &config.assets.specs {

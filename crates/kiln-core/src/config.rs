@@ -237,6 +237,9 @@ pub struct MaterialsSection {
     /// The file where each slot of a piece is bound to a palette material.
     #[serde(default = "default_bindings")]
     pub bindings: String,
+    /// Template of the Godot material of a palette key (`res://materials/{key}.tres`).
+    #[serde(default)]
+    pub godot: Option<String>,
 }
 
 impl Default for MaterialsSection {
@@ -248,6 +251,7 @@ impl Default for MaterialsSection {
             map_suffixes: default_maps(),
             color_keys: default_color_keys(),
             bindings: default_bindings(),
+            godot: None,
         }
     }
 }

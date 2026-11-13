@@ -29,18 +29,35 @@ pub fn set(
     slot: &str,
     material: &str,
 ) -> Result<(), String> {
+    let zones = BTreeMap::from([(slot.to_string(), material.to_string())]);
+    set_many(root, config, piece, &zones)
+}
+
+/// Binds (or unbinds, with an empty material) several slots of one piece in a
+/// single load and write.
+pub fn set_many(
+    root: &Path,
+    config: &Config,
+    piece: &str,
+    zones: &BTreeMap<String, String>,
+) -> Result<(), String> {
+    if zones.is_empty() {
+        return Err("no hay zonas que validar".into());
+    }
     let mut b = load(root, config)?;
-    if material.is_empty() {
-        if let Some(t) = b.get_mut(piece) {
-            t.remove(slot);
-            if t.is_empty() {
-                b.remove(piece);
+    for (slot, material) in zones {
+        if material.is_empty() {
+            if let Some(t) = b.get_mut(piece) {
+                t.remove(slot);
+                if t.is_empty() {
+                    b.remove(piece);
+                }
             }
+        } else {
+            b.entry(piece.into())
+                .or_default()
+                .insert(slot.clone(), material.clone());
         }
-    } else {
-        b.entry(piece.into())
-            .or_default()
-            .insert(slot.into(), material.into());
     }
     let path = root.join(&config.materials.bindings);
     if let Some(dir) = path.parent() {
@@ -63,7 +80,11 @@ pub fn apply(b: &Bindings, cat: &mut Catalog) {
             continue;
         };
         for (slot, mat) in slots {
-            if !p.material_slots.is_empty() && !p.material_slots.contains(slot) {
+            // a split piece gets its zones in Blender; the catalog cannot name them
+            if p.split.is_none()
+                && !p.material_slots.is_empty()
+                && !p.material_slots.contains(slot)
+            {
                 out.push((
                     key.clone(),
                     "binding_slot",
@@ -103,6 +124,27 @@ mod tests {
         set(&dir, &cfg, "kit/barrel", "Wood", "").unwrap();
         set(&dir, &cfg, "kit/barrel", "Iron", "").unwrap();
         assert!(load(&dir, &cfg).unwrap().is_empty());
+        let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn sets_many_zones_in_one_write() {
+        let dir = std::env::temp_dir().join(format!("kiln-bind-many-{}", std::process::id()));
+        let cfg = Config::parse("[project]\nname = \"t\"").unwrap();
+        let mut z = BTreeMap::new();
+        z.insert("Wood".to_string(), "oak".to_string());
+        z.insert("Iron".to_string(), "iron".to_string());
+        set_many(&dir, &cfg, "kit/barrel", &z).unwrap();
+        let b = load(&dir, &cfg).unwrap();
+        assert_eq!(b["kit/barrel"]["Wood"], "oak");
+        assert_eq!(b["kit/barrel"]["Iron"], "iron");
+        z.clear();
+        z.insert("Wood".to_string(), String::new());
+        set_many(&dir, &cfg, "kit/barrel", &z).unwrap();
+        let b = load(&dir, &cfg).unwrap();
+        assert!(!b["kit/barrel"].contains_key("Wood"));
+        assert_eq!(b["kit/barrel"]["Iron"], "iron");
+        assert!(set_many(&dir, &cfg, "kit/barrel", &BTreeMap::new()).is_err());
         let _ = std::fs::remove_dir_all(dir);
     }
 }

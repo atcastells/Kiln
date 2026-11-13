@@ -1,18 +1,19 @@
-# kiln.toml of an invented game, Puerto Niebla, to show the format. Copy it to
-# the root of your game (or pass it with --config) and change the paths, which
-# are relative to the project root.
+# kiln.toml of an invented game, Puerto Niebla, to show the format. It runs as
+# it is (`kiln serve --project examples`); for your game, copy it to its root
+# (or pass it with --config) and change the paths, relative to the project root.
 [project]
 name = "Puerto Niebla"
 engine = "godot"
 
 [assets]
 kits = ["godot/kits"]          # each subfolder is a kit: models, JSON manifests, LICENSE.md
-specs = "kiln/specs"
+specs = "specs"
 
 [materials]
 tables = ["data/materials.toml"]   # TOML arrays of tables with an `id`
 textures = ["godot/textures"]      # `<key>_albedo.<ext>`
 color_keys = ["color"]
+# godot = "res://materials/{key}.tres"   # the Godot material of each palette key
 
 [rules]
 licenses = ["CC0", "CC-BY"]
@@ -50,4 +51,4 @@ sites = ["polyhaven", "polypizza", "sketchfab"]
 godot_project = "godot"
 
 [context]
-file = "kiln/context.toml"
+file = "context.toml"

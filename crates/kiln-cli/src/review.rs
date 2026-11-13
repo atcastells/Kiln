@@ -272,6 +272,8 @@ pub fn run(
     let base = build_dir.join("review");
     let _ = std::fs::remove_dir_all(&base);
     std::fs::create_dir_all(&base).map_err(|e| e.to_string())?;
+    // keeps Godot from importing the rounds when the build is in its project
+    let _ = std::fs::write(base.join(".gdignore"), "");
     let model = cfg.agents.review_model.clone();
     let max = cfg.agents.review_rounds.clamp(1, 5);
     let mut rounds: Vec<Round> = Vec::new();

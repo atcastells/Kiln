@@ -8,7 +8,8 @@ It can also be pasted into a live Blender (MCP) with KILN_PLAN set.
 
 The plan is in glTF axes (Y up, metres); Blender is Z up, so a point
 (x, y, z) of the plan is (x, -z, y) here, and the glTF exporter turns it back.
-Writes the .blend, the .glb and report.json beside them.
+Writes the .blend, the .glb, report.json and materials.json beside them.
+Kiln puts paint.py and split.py in front of this file.
 """
 
 import json
@@ -33,29 +34,29 @@ def to_blender(v):
     return Vector((v[0], -v[2], v[1]))
 
 
-MATS = {}
+ZONES = {}
 
 
-def material(paint):
-    """The palette material as a Blender material: its colour map or its colour."""
-    key = paint["key"]
-    if key in MATS:
-        return MATS[key]
-    m = bpy.data.materials.new(key)
-    if m.node_tree is None:  # Blender 4: nodes are off by default
-        m.use_nodes = True
-    nodes, links = m.node_tree.nodes, m.node_tree.links
-    bsdf = next(n for n in nodes if n.type == "BSDF_PRINCIPLED")
-    albedo = paint.get("albedo")
-    if albedo and os.path.exists(albedo):
-        tex = nodes.new("ShaderNodeTexImage")
-        tex.image = bpy.data.images.load(albedo, check_existing=True)
-        links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
-    elif paint.get("color"):
-        bsdf.inputs["Base Color"].default_value = (*paint["color"], 1.0)
-    m["kiln_palette"] = key
-    MATS[key] = m
-    return m
+def dress(o, item):
+    """Gives every material slot of the copy its `part/zone` material."""
+    if not o.data.materials:
+        o.data.materials.append(None)
+    for i, slot in enumerate(o.data.materials):
+        zone = zone_of(slot)
+        name = item["part"] + "/" + zone
+        if name not in ZONES:
+            paint = (
+                item.get("zones", {}).get(zone)
+                or item.get("material")
+                or item.get("slots", {}).get(zone)
+            )
+            if slot is not None:
+                keep = slot.copy()
+                keep.name = name + OWN
+                keep["kiln_zone"] = zone
+                keep.use_fake_user = True
+            ZONES[name] = wear(name, paint, slot)
+        o.data.materials[i] = ZONES[name]
 
 
 def import_model(path):
@@ -123,6 +124,8 @@ def build(item, cache):
             src = import_model(model)
             if src is not None:
                 src.name = "src_" + os.path.basename(model)
+                if item.get("split"):
+                    split(src, item["split"])
                 cache[model] = (src, base_to_origin(src))
                 for c in src.users_collection:
                     c.objects.unlink(src)
@@ -157,16 +160,7 @@ def build(item, cache):
         )
     )
     o.location = to_blender(item["at"]) - base
-    if item.get("material"):
-        m = material(item["material"])
-        if not o.data.materials:
-            o.data.materials.append(m)
-        for i in range(len(o.data.materials)):
-            o.data.materials[i] = m
-    else:
-        for i, slot in enumerate(o.data.materials):
-            if slot is not None and slot.name in item.get("slots", {}):
-                o.data.materials[i] = material(item["slots"][slot.name])
+    dress(o, item)
     o["kiln_part"] = item["part"]
     o["kiln_kind"] = item["kind"]
     if item.get("moves"):
@@ -190,6 +184,7 @@ def main():
         if mesh.users == 0:
             bpy.data.meshes.remove(mesh)
     os.makedirs(os.path.dirname(plan["glb"]), exist_ok=True)
+    os.makedirs(os.path.dirname(plan["blend"]), exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=plan["blend"])
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.export_scene.gltf(
@@ -211,6 +206,8 @@ def main():
     }
     with open(plan["report"], "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2, ensure_ascii=False)
+    with open(plan["materials"], "w", encoding="utf-8") as f:
+        json.dump(worn(), f, indent=2, ensure_ascii=False, sort_keys=True)
     print("kiln: built", plan["glb"], report["tris"], "tris")
 
 

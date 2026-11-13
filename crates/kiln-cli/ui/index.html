@@ -371,7 +371,13 @@ function showPiece(p) {
     <dt>triángulos</dt><dd>${p.tris?.toLocaleString("es") ?? "—"}</dd><dt>texturas</dt><dd>${p.images ?? "—"}</dd><dt>ranuras</dt><dd>${esc(p.material_slots.join(", ") || "—")}</dd>
     <dt>licencia</dt><dd>${esc(p.licenses.join(", ") || "ninguna")}</dd>${p.credit ? `<dt>crédito</dt><dd>${esc(p.credit)}</dd>` : ""}<dt>medida por</dt><dd>${esc(p.measured_by || "nadie")}</dd>${man}</dl>`
     + (p.material_slots.length ? `<div class="kind" style="margin-top:12px">Material de cada ranura</div>` + p.material_slots.map(s => `<label class="slotrow"><span>${esc(s)}</span><select data-slot="${esc(s)}"><option value="">${cat.materials.some(m => m.key === s) ? "el de la paleta con su nombre" : "sin vincular"}</option>${cat.materials.map(m => `<option value="${esc(m.key)}"${p.bindings[s] === m.key ? " selected" : ""}>${esc(m.key)}${m.name !== m.key ? " · " + esc(m.name) : ""}</option>`).join("")}</select></label>`).join("") : "")
+    + (p.material_slots.length <= 1 && p.preview ? `<div class="kind" style="margin-top:12px">Partir en zonas</div><label class="slotrow"><span>al montar</span><select id="pSplit">${[["", "no partir"], ["loose", "por trozos sueltos"], ["texture", "por colores de la textura"]].map(([v, t]) => `<option value="${v}"${(p.split || "") === v ? " selected" : ""}>${t}</option>`).join("")}</select></label><p class="note">Las zonas salen al montar: part_1, part_2… o color_1, color_2…</p>` : "")
     + findingsOf(p.key);
+  document.getElementById("pSplit")?.addEventListener("change", async e => {
+    const r = await post("/api/split", { piece: p.key, mode: e.target.value });
+    if (r.error) return alertSide(r.error);
+    await load(); showPiece(cat.pieces.find(x => x.key === p.key));
+  });
   side.querySelectorAll("select[data-slot]").forEach(el => el.onchange = async () => {
     const r = await post("/api/bind", { piece: p.key, slot: el.dataset.slot, material: el.value });
     if (r.error) return alertSide(r.error);
@@ -425,9 +431,62 @@ function showBuild(sp) {
   side.innerHTML = `<div class="kind">Montaje</div><h2>${esc(sp.asset.name)}</h2>` + (b
     ? `<div class="view3d" id="v3d"></div><dl><dt>fichero</dt><dd>${esc(b.glb)}</dd><dt>medida</dt><dd>${fmt(b.size_m)}</dd><dt>triángulos</dt><dd>${b.tris.toLocaleString("es")}${sp.asset.budget_tris ? " de " + sp.asset.budget_tris.toLocaleString("es") : ""}</dd><dt>montado</dt><dd>${esc(b.built_at)}</dd></dl>`
       + `<div class="kind">Por terminar a mano (${b.items.filter(i => i.todo).length})</div>` + (b.items.filter(i => i.todo).map(i => `<div class="finding"><b>${esc(i.name)}</b>: ${esc(i.todo)}</div>`).join("") || `<p class="note">Nada.</p>`)
-    : `<p>Aún no está montado.</p>`) + buildActions(sp) + `<div id="reviewBox"></div>`;
+    : `<p>Aún no está montado.</p>`) + (b ? zonesBox(sp, b) : "") + buildActions(sp) + `<div id="reviewBox"></div>`;
   wireBuild(sp);
-  if (b) { view3d(b.glb); showReview(b.glb.replace(/[^/\\]+$/, "") + "review/review.json"); }
+  if (b) { wireZones(sp); view3d(zoneVariant && b.variants[zoneVariant] || b.glb).then(() => dressView(sp, b)); showReview(b.glb.replace(/[^/\\]+$/, "") + "review/review.json"); }
+}
+// ---- Materials by zone: one palette material for each `part/zone` of the build ----
+let zoneVariant = "", zoneAsset = null;
+const partOf = n => n.slice(0, n.indexOf("/")), zoneOf = n => n.slice(n.indexOf("/") + 1);
+// What the spec says a zone wears: the variant, the part's zone, the part, the catalog; "" is the model's own.
+function chosen(sp, name, variant) {
+  const p = sp.parts.find(x => x.id === partOf(name)), from = p && cat.pieces.find(c => c.key === p.source.from);
+  const v = variant && (sp.variants || []).find(x => x.id === variant);
+  const pal = k => k && cat.materials.some(m => m.key === k) ? k : "";
+  return pal(v?.materials?.[name]) || pal(p?.materials?.[zoneOf(name)]) || pal(p?.material) || pal(from?.bindings?.[zoneOf(name)]) || "";
+}
+function zonesBox(sp, b) {
+  if (zoneAsset !== sp.asset.id) { zoneAsset = sp.asset.id; zoneVariant = ""; }
+  const names = Object.keys(b.materials || {}); if (!names.length) return "";
+  const vars = (sp.variants || []).map(v => v.id); if (zoneVariant && !vars.includes(zoneVariant)) vars.push(zoneVariant);
+  const opts = n => { const v = (sp.variants || []).find(x => x.id === zoneVariant), k = zoneVariant ? (v?.materials?.[n] || "") : chosen(sp, n, "");
+    return `<option value="">${zoneVariant ? "como el asset base" : "el del modelo"}</option>` + cat.materials.map(m => `<option value="${esc(m.key)}"${m.key === k ? " selected" : ""}>${esc(m.key)}${m.name !== m.key ? " · " + esc(m.name) : ""}</option>`).join(""); };
+  let html = `<div class="kind" style="margin-top:12px">Materiales por zona</div><label class="slotrow"><span>variante</span><select id="zVar"><option value="">asset base</option>${vars.map(v => `<option value="${esc(v)}"${v === zoneVariant ? " selected" : ""}>${esc(v)}${b.variants[v] ? "" : " · sin aplicar"}</option>`).join("")}<option value="+">nueva variante…</option></select></label>`, last = null;
+  for (const n of names) {
+    if (partOf(n) !== last) { last = partOf(n); const p = sp.parts.find(x => x.id === last), can = !zoneVariant && p && Object.keys(p.materials || {}).length && ["reuse", "variant"].includes(p.source.kind) && cat.pieces.some(c => c.key === p.source.from);
+      html += `<div class="slotrow"><b>${esc(last)}</b>${can ? `<button type="button" data-validate="${esc(last)}" title="Deja estos materiales como valor por defecto de ${esc(p.source.from)} en el catálogo">Validar</button>` : "<i></i>"}</div>`; }
+    html += `<label class="slotrow"><span>${esc(zoneOf(n))}</span><select data-zone="${esc(n)}">${opts(n)}</select></label>`;
+  }
+  return html + `<div class="actions"><button type="button" id="doPaint">Aplicar materiales${zoneVariant ? " a la variante" : ""}</button></div><p class="note" id="zNote"></p>`;
+}
+// Shows in the 3D view what the spec says now, which the GLB may not wear yet.
+function dressView(sp, b) {
+  let pending = 0;
+  for (const n of Object.keys(b.materials || {})) {
+    const k = chosen(sp, n, zoneVariant), worn = zoneVariant && b.variants[zoneVariant] ? null : b.materials[n] || "";
+    if (worn === null || k !== worn) { viewer?.wear?.(n, k); if (worn !== null) pending++; }
+  }
+  const note = document.getElementById("zNote");
+  if (note) note.textContent = zoneVariant && !b.variants[zoneVariant] ? "Esta variante aún no tiene su GLB: «Aplicar materiales» lo crea." : pending ? `${pending} ${pending === 1 ? "zona cambiada" : "zonas cambiadas"} en la ficha que el GLB aún no lleva: «Aplicar materiales» lo pone al día.` : "";
+}
+function wireZones(sp) {
+  const id = sp.asset.id, now = () => cat.specs.find(x => x.asset.id === id);
+  document.getElementById("zVar")?.addEventListener("change", e => {
+    let v = e.target.value;
+    if (v === "+") { v = (prompt("Nombre corto de la variante (letras, números, guiones)") || "").trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, ""); }
+    zoneVariant = v; showBuild(now());
+  });
+  side.querySelectorAll("select[data-zone]").forEach(el => el.onchange = async () => {
+    const n = el.dataset.zone, r = await post("/api/material", { asset: id, part: partOf(n), zone: zoneOf(n), material: el.value, variant: zoneVariant });
+    if (r.error) return alertSide(r.error);
+    await load(); dressView(now(), cat.builds[id]);
+  });
+  side.querySelectorAll("button[data-validate]").forEach(el => el.onclick = async () => {
+    const r = await post("/api/validate", { asset: id, part: el.dataset.validate });
+    if (r.error) return alertSide(r.error);
+    await load(); showBuild(now());
+  });
+  document.getElementById("doPaint")?.addEventListener("click", async () => { if (job) return; const r = await post("/api/paint", { asset: id, variant: zoneVariant }); if (r.error) return alertSide(r.error); job = r.job; follow(); });
 }
 // ---- Visual review: the sheets of each round and what the reviewer found ----
 const SHEETS = [["1-turn.png", "Giro"], ["2-elevations.png", "Alzados"], ["3-parts.png", "Piezas"], ["4-silhouette.png", "Silueta"]];
@@ -473,7 +532,21 @@ async function view3d(path) {
   const ctl = new T.OrbitControls(cam, renderer.domElement); ctl.target.copy(mid); ctl.update();
   box.insertAdjacentHTML("beforeend", `<span class="note">${size.x.toFixed(2)} × ${size.y.toFixed(2)} × ${size.z.toFixed(2)} m · arrastra para girar</span>`);
   let on = true; const tick = () => { if (!on || !box.isConnected) return renderer.dispose(); renderer.render(scene, cam); requestAnimationFrame(tick); }; tick();
-  viewer = { stop() { on = false; } };
+  // Wears a palette material on the materials named `name`, at once; "" puts back what the GLB brought.
+  const first = new Map();
+  const wear = (name, key) => {
+    const m = cat.materials.find(x => x.key === key);
+    gltf.scene.traverse(o => { for (const mt of [].concat(o.material || [])) {
+      if (mt.name !== name) continue;
+      if (!first.has(mt)) first.set(mt, { color: mt.color.clone(), map: mt.map });
+      const was = first.get(mt);
+      if (!m) { mt.color.copy(was.color); mt.map = was.map; }
+      else if (m.albedo) { const t = new T.TextureLoader().load("/files/" + encodeURI(m.albedo)); t.colorSpace = T.SRGBColorSpace; t.flipY = false; t.wrapS = t.wrapT = T.RepeatWrapping; mt.map = t; mt.color.setRGB(1, 1, 1); }
+      else { mt.map = null; mt.color.setRGB(...(m.color || [0.8, 0.8, 0.8])); }
+      mt.needsUpdate = true;
+    } });
+  };
+  viewer = { stop() { on = false; }, wear };
 }
 function showMat(m) {
   const d = Object.entries(m.detail).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(JSON.stringify(v))}</dd>`).join("");
@@ -606,7 +679,7 @@ async function follow() {
   job = null; await load();
   if (j.spec && ctxData && j.spec === ctxData.file) { mode = "context"; sel = "game"; render(); showContext(); side.insertAdjacentHTML("beforeend", `<div class="kind" style="margin-top:12px">Lo que hizo el agente</div>` + j.log.map(l => `<div class="log">${esc(l)}</div>`).join("")); return; }
   if (j.spec && j.spec.endsWith("review/review.json")) { const id = Object.keys(cat.builds).find(k => j.spec.startsWith(cat.builds[k].glb.replace(/[^/\\]+$/, "")) || j.spec.includes("/" + k + "/review/")); const sp = id && cat.specs.find(x => x.asset.id === id); if (sp) { specView = id; sel = "build"; render(); showBuild(sp); side.insertAdjacentHTML("beforeend", `<details class="round"><summary class="kind">Registro</summary>` + j.log.map(l => `<div class="log">${esc(l)}</div>`).join("") + `</details>`); } return; }
-  if (j.spec && j.spec.endsWith(".glb")) { const id = Object.keys(cat.builds).find(k => cat.builds[k].glb === j.spec); const sp = id && cat.specs.find(x => x.asset.id === id); if (sp) { specView = id; sel = "build"; render(); showBuild(sp); side.insertAdjacentHTML("beforeend", `<div class="kind" style="margin-top:12px">Registro</div>` + j.log.map(l => `<div class="log">${esc(l)}</div>`).join("")); } return; }
+  if (j.spec && j.spec.endsWith(".glb")) { const id = Object.keys(cat.builds).find(k => cat.builds[k].glb === j.spec || Object.values(cat.builds[k].variants || {}).includes(j.spec)); const sp = id && cat.specs.find(x => x.asset.id === id); if (sp) { specView = id; sel = "build"; render(); showBuild(sp); side.insertAdjacentHTML("beforeend", `<div class="kind" style="margin-top:12px">Registro</div>` + j.log.map(l => `<div class="log">${esc(l)}</div>`).join("")); } return; }
   if (j.spec) { const sp = cat.specs.find(x => x.file === j.spec); if (sp) { specView = sp.asset.id; sel = "asset"; render(); pickSpec(sp, "asset"); side.insertAdjacentHTML("beforeend", `<div class="kind" style="margin-top:12px">Lo que hizo el agente</div>` + j.log.map(l => `<div class="log">${esc(l)}</div>`).join("")); } }
 }
 load();
