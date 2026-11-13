@@ -13,11 +13,13 @@ no modeles nada y no toques ningún fichero aparte de la ficha.
 ## 1. Encargo: qué es en este juego
 
 - Lee la configuración de Kiln cuya ruta te da la petición (si no te da ninguna, `kiln.toml` en la raíz) y, si el proyecto los tiene, sus `CLAUDE.md`, su lore y sus
-  principios. La petición se traduce a su mundo: en una aldea medieval
-  «un ascensor» es un montacargas de torno, no una cabina eléctrica.
-- Busca qué sistema del juego usaría el asset (`used_by`). Si no encuentras
-  ninguno, deja `used_by` vacío y dilo en `notes`: Kiln avisará a la persona
-  antes de seguir.
+  principios. La petición se traduce al mundo de ese juego: en un juego
+  medieval «un ascensor» sería un montacargas de torno; en uno de ciencia
+  ficción, una cabina.
+- Respeta las reglas del proyecto: las de `[rules]` en la configuración de
+  Kiln y las que escriba su documentación. Si `require_use` es `true`, busca
+  qué sistema del juego usaría el asset (`used_by`); si no encuentras
+  ninguno, deja `used_by` vacío y dilo en `notes`.
 - Decide sus estados visibles (`states`): abajo, arriba, cargado, abierto...
 - Pon un presupuesto de triángulos razonable para su tamaño (`budget_tris`).
 

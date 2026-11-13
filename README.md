@@ -43,7 +43,12 @@ textures = ["godot/textures"]                # texturas `<clave>_albedo.<ext>`
 [rules]
 licenses = ["CC0", "CC-BY"]
 max_tris = 20000
+require_use = false            # true: cada asset debe nombrar el sistema del juego que lo usa
 ```
+
+Kiln no supone nada de un proyecto concreto: sus reglas, sus carpetas, sus
+niveles y sus convenciones de nombres (`albedo_suffix`, `map_suffixes`) van
+en su `kiln.toml`. `examples/kiln.toml` es un ejemplo de un juego inventado.
 
 ## Entrega 2: pedir un asset
 

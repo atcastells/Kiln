@@ -254,7 +254,7 @@ function renderSpec(sp) {
   const nodes = [], edges = [], id = sp.asset.id;
   nodes.push(node("ask", "ask", "Petición", `«${sp.asset.asked || sp.asset.name}»`, sp.file, C.ask, 200));
   nodes.push(node("asset", "asset", "Asset · " + sp.asset.status, sp.asset.name, `${sp.asset.states.join(", ") || "sin estados"}`, C.asset, 180,
-    `<span class="pill ${sp.asset.used_by.length ? "ok" : "warn"}">${sp.asset.used_by.length ? "lo usan: " + esc(sp.asset.used_by.join(", ")) : "nadie lo usa"}</span>`));
+    sp.asset.used_by.length ? `<span class="pill ok">lo usan: ${esc(sp.asset.used_by.join(", "))}</span>` : ""));
   edges.push(["ask", "asset"]);
   const mats = new Set();
   sp.parts.forEach((p, i) => {

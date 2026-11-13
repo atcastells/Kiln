@@ -65,14 +65,38 @@ pub struct AssetsSection {
     pub specs: Option<String>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct MaterialsSection {
     /// TOML files with arrays of tables that carry an `id` (one material each).
     #[serde(default)]
     pub tables: Vec<String>,
-    /// Folders of textures named `<key>_albedo.<ext>`; each key is a material.
+    /// Folders of textures named `<key><albedo_suffix>.<ext>`; each key is a material.
     #[serde(default)]
     pub textures: Vec<String>,
+    /// The end of the colour map's file name (`_albedo`, `_diff`, `_basecolor`...).
+    #[serde(default = "default_albedo")]
+    pub albedo_suffix: String,
+    /// The ends of the other maps Kiln looks for beside it.
+    #[serde(default = "default_maps")]
+    pub map_suffixes: Vec<String>,
+}
+
+impl Default for MaterialsSection {
+    fn default() -> Self {
+        MaterialsSection {
+            tables: Vec::new(),
+            textures: Vec::new(),
+            albedo_suffix: default_albedo(),
+            map_suffixes: default_maps(),
+        }
+    }
+}
+
+fn default_albedo() -> String {
+    "_albedo".into()
+}
+fn default_maps() -> Vec<String> {
+    vec!["_normal".into(), "_roughness".into()]
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -89,6 +113,9 @@ pub struct Rules {
     /// Longest side below this, in metres, is flagged as a scale error.
     #[serde(default = "default_min_size")]
     pub min_size_m: f64,
+    /// Every asset must name a system of the game that uses it (`used_by`).
+    #[serde(default)]
+    pub require_use: bool,
 }
 
 impl Default for Rules {
@@ -98,6 +125,7 @@ impl Default for Rules {
             max_tris: default_tris(),
             max_size_m: default_max_size(),
             min_size_m: default_min_size(),
+            require_use: false,
         }
     }
 }
