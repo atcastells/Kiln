@@ -26,7 +26,7 @@ pub fn open_with(project: &Path, config: Config) -> Result<Catalog, String> {
     let mut catalog = catalog::index(project, &config);
     check::run(&config, &mut catalog);
     if let Some(dir) = &config.assets.specs {
-        catalog.specs = spec::load_all(project, dir, &mut catalog);
+        catalog.specs = spec::load_all(project, dir, &config.rules, &mut catalog);
         catalog
             .findings
             .sort_by(|a, b| b.severity.cmp(&a.severity).then(a.subject.cmp(&b.subject)));

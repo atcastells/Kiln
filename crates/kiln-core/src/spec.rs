@@ -24,7 +24,7 @@ pub struct Asset {
     /// The request as the person wrote it.
     #[serde(default)]
     pub asked: String,
-    /// Systems of the game that use it (Rune: what is drawn has a use).
+    /// Systems of the game that use it (required when `rules.require_use`).
     #[serde(default)]
     pub used_by: Vec<String>,
     #[serde(default, rename = "where")]
@@ -90,7 +90,12 @@ pub fn parse(text: &str) -> Result<Spec, String> {
 }
 
 /// Every spec in the folder, with a finding for each file that does not read.
-pub fn load_all(root: &Path, dir: &str, cat: &mut Catalog) -> Vec<Spec> {
+pub fn load_all(
+    root: &Path,
+    dir: &str,
+    rules: &crate::config::Rules,
+    cat: &mut Catalog,
+) -> Vec<Spec> {
     let mut out = Vec::new();
     let mut files: Vec<_> = std::fs::read_dir(root.join(dir))
         .map(|r| r.filter_map(|e| e.ok().map(|e| e.path())).collect())
@@ -111,7 +116,7 @@ pub fn load_all(root: &Path, dir: &str, cat: &mut Catalog) -> Vec<Spec> {
         {
             Ok(mut s) => {
                 s.file = rel;
-                check(&s, cat);
+                check(&s, rules, cat);
                 out.push(s);
             }
             Err(e) => cat.findings.push(Finding {
@@ -126,7 +131,7 @@ pub fn load_all(root: &Path, dir: &str, cat: &mut Catalog) -> Vec<Spec> {
 }
 
 /// The checks of a spec against the catalog.
-pub fn check(s: &Spec, cat: &mut Catalog) {
+pub fn check(s: &Spec, rules: &crate::config::Rules, cat: &mut Catalog) {
     let id = format!("asset:{}", s.asset.id);
     let mut out = Vec::new();
     let mut push = |sev, subject: String, code: &str, msg: String| {
@@ -137,12 +142,13 @@ pub fn check(s: &Spec, cat: &mut Catalog) {
             message: msg,
         })
     };
-    if s.asset.used_by.is_empty() {
+    if rules.require_use && s.asset.used_by.is_empty() {
         push(
             Severity::Warn,
             id.clone(),
             "no_use",
-            "ningún sistema del juego lo usa todavía".into(),
+            "el proyecto pide que cada asset tenga un sistema que lo use y este no tiene ninguno"
+                .into(),
         );
     }
     if s.parts.is_empty() {

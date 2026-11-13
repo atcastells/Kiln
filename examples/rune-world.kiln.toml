@@ -16,6 +16,8 @@ textures = ["godot/textures"]
 # Rune admits CC0 and CC-BY (docs/principios.md); NC, ND and SA do not enter, GPL not without a decision.
 licenses = ["CC0", "CC-BY"]
 max_tris = 20000
+# Rune draws nothing without a use in its simulation.
+require_use = true
 
 # The tree of the project, from the game down to its assets. Rune's world is
 # generated, so its nodes are kinds (the fortified house), not places.
