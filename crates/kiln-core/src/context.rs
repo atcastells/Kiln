@@ -248,6 +248,27 @@ impl Context {
         Ok(id.into())
     }
 
+    /// What the person has fixed, for an agent prompt: the pinned paragraph,
+    /// the pinned claims by layer and the answered questions. Empty if none.
+    pub fn settled_part(&self, layers: &[Layer]) -> String {
+        let mut out = Vec::new();
+        if self.intent.pinned && !self.intent.text.trim().is_empty() {
+            out.push(format!("Qué juego es: {}", self.intent.text.trim()));
+        }
+        for c in self.claims.iter().filter(|c| c.pinned) {
+            let layer = layers.iter().find(|l| l.id == c.layer).map_or(c.layer.as_str(), |l| l.name.as_str());
+            out.push(format!("{layer}: {}", c.text));
+        }
+        for q in self.questions.iter().filter(|q| q.status == "answered") {
+            if let Some(a) = &q.answer
+                && !self.claims.iter().any(|c| c.pinned && c.text == *a)
+            {
+                out.push(format!("{} {a}", q.text));
+            }
+        }
+        out.iter().map(|l| format!("- {l}\n")).collect()
+    }
+
     /// Keeps the person's pinned claims as they were after the agent wrote:
     /// a pinned claim the agent changed gets its version as a proposal, and
     /// one it dropped comes back.
@@ -340,6 +361,31 @@ impl Context {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_settled_part_lists_only_what_the_person_fixed() {
+        let mut c = Context {
+            claims: vec![claim("c1", "costa fría", true), claim("c2", "quizá barcos", false)],
+            questions: vec![
+                Question { id: "q1".into(), layer: "world".into(), text: "¿Época?".into(), status: "answered".into(), answer: Some("siglo XIX".into()), ..Default::default() },
+                Question { id: "q2".into(), layer: "world".into(), text: "¿Clima?".into(), status: "open".into(), ..Default::default() },
+            ],
+            ..Default::default()
+        };
+        c.intent = Intent { text: "Un puerto con niebla.".into(), pinned: true, ..Default::default() };
+        let s = c.settled_part(&default_layers());
+        let world = default_layers().into_iter().find(|l| l.id == "world").unwrap().name;
+        assert!(s.contains("Un puerto con niebla."));
+        assert!(s.contains(&format!("{world}: costa fría")));
+        assert!(s.contains("¿Época? siglo XIX"));
+        assert!(!s.contains("quizá barcos") && !s.contains("¿Clima?"));
+        c.intent.pinned = false;
+        assert!(!c.settled_part(&default_layers()).contains("Un puerto"));
+        assert_eq!(Context::default().settled_part(&default_layers()), "");
+        // An answer that is already a pinned claim (the wizard basics) is said once.
+        c.questions[0].answer = Some("costa fría".into());
+        assert_eq!(c.settled_part(&default_layers()).matches("costa fría").count(), 1);
+    }
 
     fn claim(id: &str, text: &str, pinned: bool) -> Claim {
         Claim {

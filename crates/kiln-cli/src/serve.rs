@@ -63,7 +63,7 @@ pub fn run(project: PathBuf, config: Option<PathBuf>, port: u16) -> Result<(), S
             let current = slot.read().unwrap().clone();
             let r = match current {
                 Some(ctx) => handle(stream, &ctx, &jobs),
-                None => handle_new(stream, &project, &slot),
+                None => handle_new(stream, &project, &slot, &jobs),
             };
             if let Err(e) = r {
                 eprintln!("petición fallida: {e}");
@@ -96,7 +96,7 @@ fn respond(mut stream: TcpStream, status: &str, kind: &str, body: &[u8]) -> std:
 
 /// The server of a folder without `kiln.toml`: the page and the first step
 /// of the wizard, which writes the project and opens it.
-fn handle_new(stream: TcpStream, project: &Path, slot: &Slot) -> std::io::Result<()> {
+fn handle_new(stream: TcpStream, project: &Path, slot: &Slot, jobs: &Jobs) -> std::io::Result<()> {
     let req = read_request(&stream)?;
     let json = |v: serde_json::Value| serde_json::to_vec(&v).unwrap_or_default();
     let (status, kind, body) = match (req.method.as_str(), req.path.as_str()) {
@@ -107,7 +107,15 @@ fn handle_new(stream: TcpStream, project: &Path, slot: &Slot) -> std::io::Result
             "kinds": kiln_core::config::KINDS,
             "basics": kiln_core::new_game::BASICS,
         }))),
+        ("GET", p) if p.starts_with("/api/jobs/") => match job_of(jobs, p) {
+            Some(job) => ("200 OK", "application/json", json(serde_json::to_value(job).unwrap_or_default())),
+            None => ("404 Not Found", "application/json", br#"{"error":"no existe ese trabajo"}"#.to_vec()),
+        },
         ("POST", _) if !from_page(&req) => ("403 Forbidden", "application/json", br#"{"error":"solo desde la pagina de Kiln"}"#.to_vec()),
+        ("POST", "/api/chat") => match turn_of(&req.body) {
+            Ok(t) => ("200 OK", "application/json", json(serde_json::json!({ "job": agent::chat(jobs, project.to_path_buf(), None, t) }))),
+            Err(e) => ("400 Bad Request", "application/json", json(serde_json::json!({ "error": e }))),
+        },
         ("POST", "/api/new") => {
             let made = serde_json::from_slice::<kiln_core::new_game::NewGame>(&req.body)
                 .map_err(|e| e.to_string())
@@ -378,6 +386,17 @@ fn handle(stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result<()>
                 Err(e) => bad(&e),
             }
         }
+        ("POST", "/api/chat") => match turn_of(&req.body) {
+            Ok(mut t) => {
+                t.history.clear();
+                json(serde_json::json!({ "job": agent::chat(jobs, ctx.project.clone(), Some(ctx.clone()), t) }))
+            }
+            Err(e) => bad(&e),
+        },
+        ("GET", "/api/chat") => match kiln_core::chat::load(&ctx.chat_file()) {
+            Ok(c) => json(serde_json::json!({ "messages": c.messages })),
+            Err(e) => bad(&e),
+        },
         ("POST", "/api/context/sort") => {
             json(serde_json::json!({ "job": agent::start(jobs, ctx.clone(), Task::Sort) }))
         }
@@ -448,11 +467,7 @@ fn handle(stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result<()>
             Some((kind, body)) => ("200 OK", kind, body),
             None => ("404 Not Found", "text/plain", b"no existe".to_vec()),
         },
-        ("GET", p) if p.starts_with("/api/jobs/") => match p[10..]
-            .parse::<u64>()
-            .ok()
-            .and_then(|id| jobs.lock().unwrap().get((id.max(1) - 1) as usize).cloned())
-        {
+        ("GET", p) if p.starts_with("/api/jobs/") => match job_of(jobs, p) {
             Some(job) => json(serde_json::to_value(job).unwrap_or_default()),
             None => (
                 "404 Not Found",
@@ -463,6 +478,38 @@ fn handle(stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result<()>
         _ => ("404 Not Found", "text/plain", b"no existe".to_vec()),
     };
     respond(stream, status, kind, &body)
+}
+
+fn job_of(jobs: &Jobs, path: &str) -> Option<agent::Job> {
+    let id = path.strip_prefix("/api/jobs/")?.parse::<u64>().ok()?;
+    jobs.lock().unwrap().get((id.max(1) - 1) as usize).cloned()
+}
+
+use kiln_core::chat::MAX_TEXT_CHARS as MAX_TEXT;
+
+#[derive(serde::Deserialize)]
+struct TurnRequest {
+    step: String,
+    message: String,
+    #[serde(default)]
+    history: Vec<kiln_core::chat::Message>,
+    #[serde(default)]
+    draft: Option<serde_json::Value>,
+}
+
+/// A chat turn from the page, checked: a known step, a message of up to
+/// `MAX_TEXT` characters, and the history cleaned by `chat::clean`.
+fn turn_of(body: &[u8]) -> Result<agent::Turn, String> {
+    let r: TurnRequest = serde_json::from_slice(body).map_err(|e| format!("petición mal formada: {e}"))?;
+    if !["1", "2", "3", "4", "5", "contexto"].contains(&r.step.as_str()) {
+        return Err(format!("paso desconocido: {}", r.step));
+    }
+    let message = r.message.trim();
+    if message.is_empty() || message.chars().count() > MAX_TEXT {
+        return Err(format!("el mensaje debe tener entre 1 y {MAX_TEXT} caracteres"));
+    }
+    let history = kiln_core::chat::clean(r.history);
+    Ok(agent::Turn { step: r.step, message: message.into(), history, draft: r.draft })
 }
 
 /// The project catalog as JSON, read again on every request.
