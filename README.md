@@ -346,13 +346,19 @@ at = [[2.2, 0.2, 0]]
 - En el GLB, los materiales guardan el camino entero:
   `old_hoist/post/Wood`.
 - En el grafo de la ficha, doble clic en la fuente de un asset entra en su
-  ficha.
+  ficha, y su panel tiene «Entrar en su ficha».
+- Arriba, la miga de pan enseña el camino por el que has bajado
+  (`Frente del puerto › Muelle de carga › Grúa`); cada tramo sube.
+- El panel del asset dice de qué assets está hecho, dónde se usa y cuántas
+  veces, y si está por rehacer.
+- El buscador de arriba también encuentra assets, con su camino; Intro abre
+  el primero.
 
 El ejemplo está en `examples/specs/cargo_quay.toml`.
 
 ## Lo que viene
 
 - El primer asset de punta a punta y la app de escritorio (Tauri).
-- Assets hechos de assets, paso 2: miga de pan de composición, «dónde se usa» y buscador de fichas; después, la vista 3D con el padre en gris y los anclajes.
+- Assets hechos de assets, lo que falta: la vista 3D con el padre en gris, el árbol que sigue por las piezas-asset, el agente que pide un nivel cada vez y los anclajes.
 - Kiln como servidor MCP, para que cualquier Claude le pida catálogo o assets.
 - El grafo pasará a Rete.js cuando los nodos se puedan editar.
