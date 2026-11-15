@@ -64,6 +64,10 @@ retocar), material de la paleta y validación. `examples/specs/hoist.toml` es
 una ficha de ejemplo para Puerto Niebla.
 
 - Necesita `claude` en el PATH (o su ruta en `KILN_CLAUDE`) con sesión iniciada.
+- Usa tu suscripción de Claude, con la sesión de `claude` (`claude auth status`
+  dice `authMethod: "claude.ai"`). Kiln quita `ANTHROPIC_API_KEY` y
+  `ANTHROPIC_AUTH_TOKEN` al lanzarlo, para que una clave del entorno no
+  pase a cobrar por la API. Cada mensaje gasta del límite de uso de la suscripción.
 - El agente solo puede leer y escribir ficheros (sin terminal) y no baja nada:
   las piezas «buscar» esperan tu permiso.
 - Solo la propia página puede lanzar al agente: la petición lleva una cabecera
@@ -319,6 +323,27 @@ estaba. Los proyectos que ya tenían `kiln.toml` se abren como antes.
 ```bash
 mkdir ../mi-juego && target/release/kiln serve --project ../mi-juego
 ```
+
+## Entrega 10: hablar con el agente en el asistente
+
+Cada paso del asistente tiene al lado un panel «Hablar con el agente», y la
+pestaña Contexto lo tiene en su ficha. Es un solo hilo: el agente recuerda
+los últimos 20 mensajes y sabe en qué paso estás.
+
+- Puedes debatir («¿encaja una cámara cenital con esto?») o pedir mejoras
+  («dame tres nombres», «otras opciones de cámara», «hazlo más oscuro»).
+- Cada mensaje lleva lo que ya has fijado: el nombre y lo básico elegidos,
+  y desde el paso 3 el párrafo fijado, las afirmaciones fijadas y tus
+  respuestas. El agente cuenta con ello y no lo contradice; si cree que algo
+  debe cambiar, lo dice.
+- Pasos 1 y 2: aún no hay proyecto, así que el agente solo lee y propone.
+  Sus nombres y opciones salen como botones; la carpeta sigue vacía hasta
+  «Crear el proyecto».
+- Desde el paso 3 cambia el contexto (`kiln/context.toml`). Lo que fijaste
+  no lo toca: deja una propuesta con Aceptar y Descartar. Tu explicación
+  tampoco: si la mejora, sale «Usar este texto».
+- El hilo se guarda en `chat.toml`, junto al contexto. Los mensajes de los
+  pasos 1 y 2 se guardan al crear el proyecto.
 
 ## Lo que viene
 

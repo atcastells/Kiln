@@ -5,6 +5,7 @@
 pub mod bindings;
 pub mod build;
 pub mod catalog;
+pub mod chat;
 pub mod check;
 pub mod config;
 pub mod context;

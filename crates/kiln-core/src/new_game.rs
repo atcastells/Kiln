@@ -12,6 +12,9 @@ pub struct NewGame {
     /// The answer to each basic question, by its id.
     #[serde(default)]
     pub basics: BTreeMap<String, String>,
+    /// What the person and the agent said in the wizard, sent by the page.
+    #[serde(default)]
+    pub chat: Vec<crate::chat::Message>,
 }
 
 /// A question every game answers first, with the claim its answer makes.
@@ -135,6 +138,13 @@ pub fn scaffold(dir: &Path, game: &NewGame) -> Result<Vec<String>, String> {
     ];
     context::save(&dir.join("kiln/context.toml"), &ctx)?;
     out.push("kiln/context.toml".into());
+    if !game.chat.is_empty() {
+        let chat = crate::chat::Chat {
+            messages: crate::chat::clean(game.chat.clone()),
+        };
+        crate::chat::save(&dir.join("kiln/chat.toml"), &chat)?;
+        out.push("kiln/chat.toml".into());
+    }
     out.push(write(crate::config::FILE, &toml_text)?);
     Ok(out)
 }
@@ -161,7 +171,35 @@ mod tests {
             .map(|(id, a)| (id.to_string(), a.to_string()))
             .into_iter()
             .collect(),
+            ..Default::default()
         }
+    }
+
+    fn msg(who: &str, step: &str, text: &str) -> crate::chat::Message {
+        crate::chat::Message {
+            who: who.into(),
+            step: step.into(),
+            text: text.into(),
+        }
+    }
+
+    #[test]
+    fn the_wizard_chat_is_kept_in_the_project() {
+        let d = dir("chat");
+        let mut g = game();
+        g.chat = vec![msg("agent", "1", "hola"), msg("person", "1", "un faro")];
+        let files = scaffold(&d, &g).unwrap();
+        assert!(files.contains(&"kiln/chat.toml".to_string()));
+        let saved = crate::chat::load(&d.join("kiln/chat.toml")).unwrap();
+        assert_eq!(saved.messages, g.chat);
+    }
+
+    #[test]
+    fn without_chat_there_is_no_chat_file() {
+        let d = dir("nochat");
+        let files = scaffold(&d, &game()).unwrap();
+        assert!(!d.join("kiln/chat.toml").exists());
+        assert!(!files.contains(&"kiln/chat.toml".to_string()));
     }
 
     #[test]

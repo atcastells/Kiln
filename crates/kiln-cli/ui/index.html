@@ -90,13 +90,49 @@ textarea { font: inherit; width: 100%; min-height: 180px; padding: 8px 10px; bor
 .qcard .free { display: flex; gap: 6px; } .qcard .free input { flex: 1; }
 .qcard .skip { display: flex; gap: 6px; margin-top: 8px; } .qcard .skip button { font-weight: 500; font-size: 12px; padding: 4px 8px; }
 [hidden] { display: none !important; }
-#wizard { flex: 1; overflow: auto; }
-#wizard .wz { max-width: 640px; margin: 0 auto; padding: 8px 0 40px; display: flex; flex-direction: column; gap: 12px; }
-#wizard h2 { font-size: 22px; margin: 0; } #wizard p { margin: 0; }
+#wizard { flex: 1; overflow: auto; padding: 28px 0 48px; }
+#wizard .wz { max-width: 620px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+#wizard .steps { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; list-style: none; margin: 0; padding: 0; }
+#wizard .steps li { font: 500 10.5px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#wizard .steps li::before { content: ""; display: block; height: 3px; border-radius: 2px; background: var(--line); margin-bottom: 7px; }
+#wizard .steps li.done::before { background: var(--ok); } #wizard .steps li.on { color: var(--fg); } #wizard .steps li.on::before { background: var(--accent); }
+#wizard .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 24px; display: flex; flex-direction: column; gap: 16px; }
+#wizard h2 { font-size: 24px; letter-spacing: -.01em; margin: 0; } #wizard p { margin: 0; }
+#wizard .card > .note:first-of-type { font-size: 13.5px; line-height: 1.5; margin-top: -8px; }
+#wizard .path { font: 12px var(--mono); color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; overflow-wrap: anywhere; }
+#wizard .field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; }
+#wizard .field input { font-size: 16px; font-weight: 400; padding: 11px 12px; }
+#wizard .facts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+#wizard .fact { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--bg); }
+#wizard .fact span { display: block; font: 500 10.5px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 3px; }
+#wizard .fact b { font-size: 14px; } #wizard .fact small { display: block; font-size: 12px; color: var(--muted); margin-top: 2px; }
 #wizard .wz input, #wizard .wz textarea { width: 100%; flex: none; } #wizard .qcard .free input { width: auto; flex: 1; }
-#wizard .opts button.on { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
-#wizard .nav { display: flex; gap: 8px; justify-content: flex-end; } #wizard .nav .go { background: var(--accent); border-color: var(--accent); color: #fff; }
+#wizard .qcard { border: 0; border-top: 1px solid var(--line); border-radius: 0; padding: 14px 0 0; margin: 0; }
+#wizard .qcard .opts { flex-direction: row; flex-wrap: wrap; }
+#wizard .opts button.on { border-color: var(--accent); background: var(--warnbg); box-shadow: 0 0 0 1px var(--accent); }
+#wizard .nav { display: flex; gap: 8px; justify-content: flex-end; border-top: 1px solid var(--line); padding-top: 16px; }
+#wizard .nav > :first-child:not(.go) { margin-right: auto; }
+#wizard .nav button { padding: 9px 16px; font-size: 14px; }
+#wizard .nav .go { background: var(--accent); border-color: var(--accent); color: #fff; }
+#wizard .nav .go:hover:not(:disabled) { filter: brightness(1.08); }
 #wizard .nav .go:disabled { opacity: .5; cursor: default; }
+#wizard .wzgrid { display: grid; grid-template-columns: minmax(0, 620px) minmax(0, 360px); gap: 20px; justify-content: center; align-items: start; }
+#wizard .wz { margin: 0; }
+#wizard .talk { position: sticky; top: 0; margin-top: 40px; max-height: calc(100vh - 110px); }
+.talk { display: flex; flex-direction: column; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; min-width: 0; }
+.talk .msgs { flex: 1; overflow: auto; display: flex; flex-direction: column; gap: 8px; min-height: 80px; }
+.msg { max-width: 92%; padding: 8px 10px; border-radius: 10px; font-size: 13px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.msg small { display: block; font: 500 10px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-bottom: 2px; }
+.msg.person { align-self: flex-end; background: var(--warnbg); } .msg.agent { align-self: flex-start; background: var(--bg); border: 1px solid var(--line); }
+.msg.busy { color: var(--muted); font-size: 12px; }
+.offer { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; border-top: 1px solid var(--line); padding-top: 8px; }
+.offer small { width: 100%; font: 500 10px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.offer button { font-size: 12px; padding: 4px 8px; font-weight: 500; text-align: left; }
+.tin { display: flex; gap: 6px; align-items: flex-end; } .tin textarea { min-height: 0; height: 62px; flex: 1; resize: none; font-size: 13px; }
+#side .talk { margin-top: 14px; padding: 12px; } #side .talk .msgs { max-height: 340px; }
+.talk .go { background: var(--accent); border-color: var(--accent); color: #fff; } .talk .go:disabled { opacity: .5; cursor: default; }
+@media (max-width: 1000px) { #wizard .wzgrid { grid-template-columns: minmax(0, 620px); } #wizard .talk { position: static; margin-top: 0; max-height: 70vh; } }
+@media (max-width: 520px) { #wizard { padding-top: 12px; } #wizard .card { padding: 16px; } #wizard .facts { grid-template-columns: 1fr; } #wizard .steps li:not(.on) { color: transparent; } #wizard .steps li.on { overflow: visible; } }
 #wizard .lrow { border-top: 1px solid var(--line); padding: 8px 0; } #wizard .lrow b { display: block; margin-bottom: 4px; }
 #wizard .crow { display: flex; gap: 8px; align-items: center; justify-content: space-between; font-size: 13px; padding: 3px 0; }
 #wizard .crow button { font-size: 12px; padding: 3px 8px; flex: none; }
@@ -114,7 +150,7 @@ textarea { font: inherit; width: 100%; min-height: 180px; padding: 8px 10px; bor
   <button id="back" type="button" hidden>Volver</button>
   <button id="reload" type="button">Releer el proyecto</button>
 </header>
-<section id="wizard" hidden></section>
+<section id="wizard" hidden><div class="wzgrid"><div id="wzMain"></div><aside id="talk" class="talk" aria-label="Hablar con el agente"></aside></div></section>
 <div id="crumbs"></div>
 <main>
   <div id="stage"><div id="world"><svg id="edges"></svg></div></div>
@@ -612,7 +648,10 @@ function showContext() {
     <textarea id="ctxText" placeholder="Un juego de...">${esc(C.text)}</textarea>
     <div class="actions"><button type="button" id="ctxSave">Guardar</button><button type="button" id="ctxSort">Guardar y ordenar</button><button type="button" id="ctxRefine"${C.claims.length ? "" : " disabled"}>Afinar con preguntas</button></div>
     <p class="note">Se guarda en ${esc(ctxData.file)} · ${C.claims.length} afirmaciones en ${new Set(C.claims.map(c => c.layer)).size} capas</p>`
-    + (qs.length ? `<div class="kind" style="margin-top:12px">Pregunta ${C.questions.length - qs.length + 1} de ${C.questions.length} · ${esc(layerName(qs[0].layer))}</div>` + qcard(qs[0]) : C.claims.length ? `<p class="note">No hay preguntas abiertas. «Afinar» pide otra ronda.</p>` : "");
+    + (qs.length ? `<div class="kind" style="margin-top:12px">Pregunta ${C.questions.length - qs.length + 1} de ${C.questions.length} · ${esc(layerName(qs[0].layer))}</div>` + qcard(qs[0]) : C.claims.length ? `<p class="note">No hay preguntas abiertas. «Afinar» pide otra ronda.</p>` : "")
+    + `<aside class="talk" id="ctxTalk" aria-label="Hablar con el agente"></aside>`;
+  const after = () => { render(); showContext(); };
+  if (talk.loaded) talkRender($("ctxTalk"), "contexto", after); else talkLoad().then(() => talkRender($("ctxTalk"), "contexto", after));
   const text = () => document.getElementById("ctxText").value;
   document.getElementById("ctxSave").onclick = () => ctxPost("text", { text: text() }).then(ok => ok && showContext());
   document.getElementById("ctxSort").onclick = async () => { if (await ctxPost("text", { text: text() })) ctxJob("sort"); };
@@ -697,7 +736,7 @@ async function follow() {
 
 // Start wizard: a folder without kiln.toml, or a project made here whose start is not settled yet.
 const WZ = ["Proyecto", "Lo básico", "Tu juego", "Preguntas", "Asentar"];
-let wz = { step: 1, name: "", basics: {}, info: null };
+let wz = { step: 1, name: "", basics: {}, extra: {}, info: null };
 const wzEl = document.getElementById("wizard");
 async function start() {
   const n = await (await fetch("/api/new")).json();
@@ -707,29 +746,35 @@ async function start() {
   document.getElementById("crumbs").hidden = true; wzEl.hidden = false;
   if (wz.step > 2) { ctxData = await (await fetch("/api/context")).json(); wz.name ||= (await (await fetch("/api/catalog")).json()).project; }
   document.getElementById("proj").textContent = wz.name || "juego nuevo";
+  if (wz.step > 2 && !talk.loaded) await talkLoad();
   wzRender();
 }
+// After a turn from step 3 on: the agent may have changed the context; same step, fresh data.
+async function wzAfterTalk() { wz.info = { ...wz.info, ...(await (await fetch("/api/new")).json()), step: wz.step }; wzRender(); }
 function wzFrame(body, nav) {
-  wzEl.innerHTML = `<div class="wz"><div class="kind">Paso ${wz.step} de 5 · ${WZ[wz.step - 1]}</div>${body}<div class="nav">${nav}</div></div>`;
+  const steps = WZ.map((t, i) => `<li class="${i + 1 < wz.step ? "done" : i + 1 === wz.step ? "on" : ""}"${i + 1 === wz.step ? ' aria-current="step"' : ""}>${i + 1} · ${t}</li>`).join("");
+  $("wzMain").innerHTML = `<div class="wz"><ol class="steps" aria-label="Paso ${wz.step} de 5">${steps}</ol><div class="card">${body}<div class="nav">${nav}</div></div></div>`;
+  if (talk.step !== String(wz.step)) talk.offer = null;
+  talkRender($("talk"), String(wz.step), wzAfterTalk);
 }
 const $ = id => document.getElementById(id);
 function wzRender() {
   const s = wz.step, C = ctxData?.context;
   if (s === 1) {
-    wzFrame(`<h2>Un juego nuevo</h2><p class="note">En ${esc(wz.info.folder)}. Kiln escribe aquí su kiln.toml y el contexto del juego; no toca nada más.</p>
-      <label>Nombre del juego<input id="wzName" value="${esc(wz.name)}" placeholder="Puerto Niebla"></label>
-      <dl><dt>Tipo</dt><dd>Juego (de momento, el único tipo)</dd><dt>Motor</dt><dd>Godot 4</dd></dl>`, `<button type="button" class="go" id="wzNext">Seguir</button>`);
+    wzFrame(`<h2>Un juego nuevo</h2><p class="note">En <span class="path">${esc(wz.info.folder)}</span>. Kiln escribe aquí su <span class="path">kiln.toml</span> y el contexto del juego; no toca nada más.</p>
+      <label class="field">Nombre del juego<input id="wzName" value="${esc(wz.name)}" placeholder="Puerto Niebla" autocomplete="off"></label>
+      <div class="facts"><div class="fact"><span>Tipo</span><b>Juego</b><small>De momento, el único tipo</small></div><div class="fact"><span>Motor</span><b>Godot 4</b></div></div>`, `<button type="button" class="go" id="wzNext">Seguir</button>`);
     const go = () => { wz.name = $("wzName").value.trim(); if (wz.name) { wz.step = 2; wzRender(); } else $("wzName").focus(); };
     $("wzNext").onclick = go; $("wzName").onkeydown = e => { if (e.key === "Enter") go(); }; $("wzName").focus();
   } else if (s === 2) {
     wzFrame(`<h2>Lo básico</h2><p class="note">Cinco cosas que cualquier asset necesita saber. Elige una o escribe la tuya; puedes dejar alguna en blanco.</p>`
-      + wz.info.basics.map(b => `<div class="qcard"><b>${esc(b.text)}</b><div class="opts">${b.options.map((o, i) => `<button type="button" data-b="${b.id}" data-i="${i}" class="${wz.basics[b.id] === o ? "on" : ""}">${esc(o)}</button>`).join("")}</div>
-        <div class="free"><input data-free="${b.id}" placeholder="O con tus palabras" value="${esc(b.options.includes(wz.basics[b.id]) ? "" : wz.basics[b.id] ?? "")}"></div></div>`).join(""),
+      + wz.info.basics.map(b => `<div class="qcard"><b>${esc(b.text)}</b><div class="opts">${optsOf(b).map((o, i) => `<button type="button" data-b="${b.id}" data-i="${i}" class="${wz.basics[b.id] === o ? "on" : ""}">${esc(o)}</button>`).join("")}</div>
+        <div class="free"><input data-free="${b.id}" placeholder="O con tus palabras" value="${esc(optsOf(b).includes(wz.basics[b.id]) ? "" : wz.basics[b.id] ?? "")}"></div></div>`).join(""),
       `<button type="button" id="wzBack">Atrás</button><button type="button" class="go" id="wzMake">Crear el proyecto</button>`);
-    wzEl.querySelectorAll("[data-b]").forEach(btn => btn.onclick = () => { const b = wz.info.basics.find(x => x.id === btn.dataset.b); wz.basics[b.id] = b.options[+btn.dataset.i]; wzRender(); });
+    wzEl.querySelectorAll("[data-b]").forEach(btn => btn.onclick = () => { const b = wz.info.basics.find(x => x.id === btn.dataset.b); wz.basics[b.id] = optsOf(b)[+btn.dataset.i]; wzRender(); });
     wzEl.querySelectorAll("[data-free]").forEach(inp => inp.oninput = () => { if (inp.value.trim()) wz.basics[inp.dataset.free] = inp.value.trim(); });
     $("wzBack").onclick = () => { wz.step = 1; wzRender(); };
-    $("wzMake").onclick = async () => { const r = await post("/api/new", { name: wz.name, basics: wz.basics }); if (r.error) return wzError(r.error); wz.step = 3; start(); };
+    $("wzMake").onclick = async () => { const r = await post("/api/new", { name: wz.name, basics: wz.basics, chat: talkThread() }); talk.loaded = true; if (r.error) return wzError(r.error); wz.step = 3; start(); };
   } else if (s === 3) {
     wzFrame(`<h2>Tu juego, con tus palabras</h2><p class="note">De qué va, dónde y cuándo pasa, qué hace el jugador y cómo se ve. Si se parece a un juego que existe, dilo. El agente lo parte en afirmaciones por capa, escribe un párrafo de qué juego es y te hace preguntas.</p>
       <textarea id="wzText" placeholder="Un juego de...">${esc(C.text)}</textarea><div id="wzLog"></div>`,
@@ -766,7 +811,8 @@ function wzRender() {
       <div class="kind">Por capa</div>`
       + ctxData.layers.map(l => { const cs = C.claims.filter(c => c.layer === l.id);
         return `<div class="lrow"><b>${esc(l.name)} ${cs.some(c => c.pinned) ? `<span class="pill ok">fijada</span>` : `<span class="pill warn">nada fijado</span>`}</b>`
-          + cs.map(c => `<div class="crow"><span>${c.conflicts ? `<span class="pill error">choca</span> ` : ""}${esc(c.text)}</span>${c.pinned ? `<span class="note">fijada</span>` : `<button type="button" data-pin="${esc(c.id)}">Fijar</button>`}${c.conflicts ? `<button type="button" data-del="${esc(c.id)}">Borrar</button>` : ""}</div>`).join("")
+          + cs.map(c => `<div class="crow"><span>${c.conflicts ? `<span class="pill error">choca</span> ` : ""}${esc(c.text)}</span>${c.pinned ? `<span class="note">fijada</span>` : `<button type="button" data-pin="${esc(c.id)}">Fijar</button>`}${c.conflicts ? `<button type="button" data-del="${esc(c.id)}">Borrar</button>` : ""}</div>`
+            + (c.proposed ? `<div class="proposal"><b>El agente propone:</b> ${esc(c.proposed)}<div class="actions"><button type="button" data-acc="${esc(c.id)}">Aceptar</button><button type="button" data-rej="${esc(c.id)}">Descartar</button></div></div>` : "")).join("")
           + `<div class="free"><input data-add="${esc(l.id)}" placeholder="Añadir una afirmación a ${esc(l.name)}"></div></div>`; }).join("")
       + (missing.length ? `<div class="finding"><b>Falta:</b> ${missing.map(esc).join(" · ")}</div>` : `<p class="note">Todo listo.</p>`),
       `<button type="button" id="wzQs">Más preguntas</button><button type="button" class="go" id="wzSettle"${missing.length ? " disabled" : ""}>Asentar y abrir el proyecto</button>`);
@@ -775,6 +821,8 @@ function wzRender() {
     $("wzAcc")?.addEventListener("click", () => wzPost("intent", { action: "accept" }).then(again));
     $("wzRej")?.addEventListener("click", () => wzPost("intent", { action: "reject" }).then(again));
     wzEl.querySelectorAll("[data-pin]").forEach(b => b.onclick = () => wzPost("claim", { id: b.dataset.pin, action: "pin" }).then(again));
+    wzEl.querySelectorAll("[data-acc]").forEach(b => b.onclick = () => wzPost("claim", { id: b.dataset.acc, action: "accept" }).then(again));
+    wzEl.querySelectorAll("[data-rej]").forEach(b => b.onclick = () => wzPost("claim", { id: b.dataset.rej, action: "reject" }).then(again));
     wzEl.querySelectorAll("[data-del]").forEach(b => b.onclick = () => wzPost("claim", { id: b.dataset.del, action: "delete" }).then(again));
     wzEl.querySelectorAll("[data-add]").forEach(inp => inp.onkeydown = e => { if (e.key === "Enter" && inp.value.trim()) wzPost("claim", { action: "add", layer: inp.dataset.add, text: inp.value }).then(again); });
     $("wzQs").onclick = async () => { if (await wzJob("refine")) { wz.step = 4; start(); } };
@@ -782,6 +830,60 @@ function wzRender() {
       document.querySelectorAll("header > *").forEach(e => e.hidden = e.id === "back"); document.getElementById("crumbs").hidden = false; start(); };
   }
 }
+const optsOf = b => [...b.options, ...(wz.extra[b.id] || []).filter(o => !b.options.includes(o))];
+
+// ---- Talking to the agent: one thread for the wizard and the Context tab ----
+const talk = { msgs: [], offer: null, busy: false, log: [], loaded: false, step: "1", after: null, el: null };
+const TALK_HINT = { 1: "Pídele nombres, o cuéntale de qué va y que te proponga uno.", 2: "Pregúntale qué cámara o estilo encaja con tu idea, o pídele otras opciones.",
+  3: "Cuéntale tu idea a medias y pídele que te ayude a explicarla.", 4: "Pregúntale por qué hace una pregunta, o pídele otras opciones.",
+  5: "Pídele cambios en el párrafo o en las afirmaciones; lo que fijaste solo lo propone.", contexto: "Pídele cambios en el contexto; lo que fijaste solo lo propone." };
+// The thread as the agent and the project keep it: errors shown here stay here.
+const talkThread = () => talk.msgs.filter(m => !m.local).map(({ who, step, text }) => ({ who, step, text }));
+async function talkLoad() { const r = await (await fetch("/api/chat")).json(); if (r.messages) talk.msgs = r.messages; talk.loaded = true; }
+function talkRender(el, step, after) {
+  if (!el) return;
+  const keep = el.querySelector("#tText")?.value ?? "";
+  Object.assign(talk, { el, step, after });
+  const o = talk.offer || {}, basics = wz.info?.basics || [];
+  el.innerHTML = `<div class="kind">Hablar con el agente</div><div class="msgs">`
+    + (talk.msgs.map(m => `<div class="msg ${m.who === "agent" ? "agent" : "person"}"><small>${m.who === "agent" ? "Agente" : "Tú"} · ${m.step === "contexto" ? "contexto" : "paso " + esc(m.step)}</small>${esc(m.text)}</div>`).join("")
+      || `<p class="note">${TALK_HINT[step]} Sabe lo que ya has fijado.</p>`)
+    + (talk.busy ? `<div class="msg agent busy"><small>El agente trabaja</small>${talk.log.slice(-3).map(esc).join("\n")}</div>` : "") + `</div>`
+    + (o.names?.length && step === "1" ? `<div class="offer"><small>Nombres</small>${o.names.map(n => `<button type="button" data-tname="${esc(n)}">${esc(n)}</button>`).join("")}</div>` : "")
+    + (step === "2" ? Object.entries(o.basics || {}).map(([id, vs]) => { const b = basics.find(x => x.id === id); return b ? `<div class="offer"><small>${esc(b.label)}</small>${vs.map(v => `<button type="button" data-tbasic="${esc(id)}" data-v="${esc(v)}">${esc(v)}</button>`).join("")}</div>` : ""; }).join("") : "")
+    + (o.text && (step === "3" || step === "contexto") ? `<div class="offer"><small>Tu explicación, reescrita</small><button type="button" id="tUseText">Usar este texto</button></div>` : "")
+    + `<div class="tin"><textarea id="tText" placeholder="Pídele algo o discútelo" aria-label="Mensaje para el agente"${talk.busy ? " disabled" : ""}>${esc(keep)}</textarea><button type="button" class="go" id="tSend"${talk.busy ? " disabled" : ""}>Enviar</button></div>`;
+  const box = el.querySelector(".msgs"); box.scrollTop = box.scrollHeight;
+  el.querySelector("#tSend").onclick = talkSend;
+  el.querySelector("#tText").onkeydown = e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); talkSend(); } };
+  el.querySelectorAll("[data-tname]").forEach(b => b.onclick = () => { wz.name = b.dataset.tname; if ($("wzName")) $("wzName").value = wz.name; });
+  el.querySelectorAll("[data-tbasic]").forEach(b => b.onclick = () => { wz.basics[b.dataset.tbasic] = b.dataset.v; wzRender(); });
+  el.querySelector("#tUseText")?.addEventListener("click", () => { const box = step === "3" ? $("wzText") : $("ctxText"); if (box) box.value = o.text; });
+}
+async function talkSend() {
+  const input = talk.el.querySelector("#tText"), message = input.value.trim(), step = talk.step, before = step === "1" || step === "2";
+  if (!message || talk.busy) return;
+  if (step === "1" && $("wzName")) wz.name = $("wzName").value.trim();
+  if (step === "3" && $("wzText") && $("wzText").value.trim() !== (ctxData?.context?.text || "").trim() && !(await wzPost("text", { text: $("wzText").value }))) return;
+  const r = await post("/api/chat", before ? { step, message, history: talkThread(), draft: { name: wz.name, basics: wz.basics } } : { step, message });
+  if (r.error) { talk.msgs.push({ who: "agent", step, text: "No se pudo enviar: " + r.error, local: true }); return talkRender(talk.el, step, talk.after); }
+  input.value = ""; talk.msgs.push({ who: "person", step, text: message }); Object.assign(talk, { busy: true, log: [], offer: null });
+  talkRender(talk.el, step, talk.after);
+  for (;;) {
+    await new Promise(ok => setTimeout(ok, 1200));
+    const j = await (await fetch("/api/jobs/" + r.job)).json(); talk.log = j.log || [];
+    if (j.status === "running") { talkRender(talk.el, step, talk.after); continue; }
+    talk.busy = false;
+    talk.msgs.push(j.status === "done" ? { who: "agent", step, text: j.reply || "(sin respuesta)" } : { who: "agent", step, text: "No pude responder: " + (talk.log.at(-1) || "error"), local: true });
+    talk.offer = j.status === "done" ? j.offer || null : null;
+    for (const [id, vs] of Object.entries(talk.offer?.basics || {})) wz.extra[id] = [...new Set([...(wz.extra[id] || []), ...vs])];
+    break;
+  }
+  if (!before) { ctxData = await (await fetch("/api/context")).json(); if (talk.after) return talk.after(); }
+  else if (step === "2") wzRender();
+  talkRender(talk.el, step, talk.after);
+}
+
 async function wzPost(what, body) { const r = await post("/api/context/" + what, body); if (r.error) { wzError(r.error); return false; } ctxData = await (await fetch("/api/context")).json(); return true; }
 function wzError(e) { wzEl.querySelector(".nav").insertAdjacentHTML("beforebegin", `<div class="finding error">${esc(e)}</div>`); }
 async function wzJob(what) {

@@ -22,6 +22,12 @@ pub struct Job {
     pub log: Vec<String>,
     /// The spec it wrote, relative to the project root.
     pub spec: Option<String>,
+    /// What the agent said to the person, without the `kiln` block.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub reply: Option<String>,
+    /// What the agent offers for the wizard, from its `kiln` block.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub offer: Option<kiln_core::chat::Offer>,
 }
 
 pub type Jobs = Arc<Mutex<Vec<Job>>>;
@@ -66,6 +72,8 @@ pub fn start(jobs: &Jobs, ctx: Arc<Ctx>, task: Task) -> u64 {
             status: "running".into(),
             log: vec!["Leyendo el catálogo del proyecto".into()],
             spec: None,
+            reply: None,
+            offer: None,
         });
         id
     };
@@ -107,6 +115,8 @@ where
             status: "running".into(),
             log: Vec::new(),
             spec: None,
+            reply: None,
+            offer: None,
         });
         id
     };
@@ -134,6 +144,210 @@ fn log(jobs: &Jobs, id: u64, line: String) {
     if let Some(job) = jobs.lock().unwrap().get_mut((id - 1) as usize) {
         job.log.push(line);
     }
+}
+
+impl Ctx {
+    /// The thread of the chat with the agent, next to the context.
+    pub fn chat_file(&self) -> PathBuf {
+        self.context_file.with_file_name("chat.toml")
+    }
+}
+
+/// One message of the person to the agent, at one step of the wizard or in the Context tab.
+pub struct Turn {
+    pub step: String,
+    pub message: String,
+    pub history: Vec<kiln_core::chat::Message>,
+    pub draft: Option<Value>,
+}
+
+const CHAT_WINDOW: usize = 20;
+
+/// What the page's draft already fixes before the project exists: the name
+/// and each basic the person chose, with its label.
+pub fn draft_settled(draft: Option<&Value>) -> String {
+    let Some(d) = draft else { return String::new() };
+    let mut out = String::new();
+    if let Some(n) = d.get("name").and_then(Value::as_str).map(str::trim).filter(|n| !n.is_empty()) {
+        out.push_str(&format!("- Nombre: {n}\n"));
+    }
+    for b in &kiln_core::new_game::BASICS {
+        if let Some(a) = d.pointer(&format!("/basics/{}", b.id)).and_then(Value::as_str).map(str::trim).filter(|a| !a.is_empty()) {
+            out.push_str(&format!("- {}: {a}\n", b.label));
+        }
+    }
+    out
+}
+
+/// `settled` is what the person already fixed (`draft_settled` or
+/// `Context::settled_part`): the prompt states it so the agent builds on it.
+pub fn chat_prompt(
+    turn: &Turn,
+    history: &[kiln_core::chat::Message],
+    ctx: Option<&Ctx>,
+    settled: &str,
+) -> String {
+    let settled = if settled.is_empty() {
+        String::new()
+    } else {
+        format!("\nYa fijado por la persona (cuenta con ello y no lo contradigas; si crees que algo debe cambiar, dilo y propónlo):\n{settled}")
+    };
+    let setting = match ctx {
+        None => format!(
+            "Aún no hay proyecto: no escribas ficheros.\nBorrador del asistente: {}\nOpciones básicas: {}",
+            turn.draft.as_ref().map(Value::to_string).unwrap_or_else(|| "{}".into()),
+            serde_json::to_string(&kiln_core::new_game::BASICS).unwrap_or_default()
+        ),
+        Some(c) => format!(
+            "Contexto del proyecto: {}\nCapas: {}\nEdita solo el fichero de contexto.",
+            c.context_file.display(),
+            serde_json::to_string(&c.layers).unwrap_or_default()
+        ),
+    };
+    let thread = history[history.len().saturating_sub(CHAT_WINDOW)..]
+        .iter()
+        .map(|m| {
+            let who = if m.who == "agent" { "agente" } else { "persona" };
+            format!("{who} (paso {}): {}", m.step, m.text)
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+    format!(
+        "Conversas con la persona. Sigue la skill kiln-context que tienes en tu prompt de sistema (modo conversar).\nPaso: {}\n{setting}\n{settled}\nHilo:\n{thread}\n\nMensaje nuevo de la persona: {}",
+        turn.step, turn.message
+    )
+}
+
+/// The reply as the thread keeps it: the text plus its offer, numbered as
+/// the buttons show it, so a later turn can refer to «the second one».
+pub fn with_offer(reply: Option<String>, offer: Option<&kiln_core::chat::Offer>) -> Option<String> {
+    let summary = offer.map(kiln_core::chat::Offer::summary).filter(|s| !s.is_empty());
+    match (reply, summary) {
+        (Some(r), Some(s)) => Some(format!("{r}\n\n{s}")),
+        (r, s) => r.or(s),
+    }
+}
+
+pub fn chat_tools(ctx: Option<&Ctx>) -> Vec<String> {
+    let mut tools = vec!["Read", "Glob", "Grep"];
+    if ctx.is_some() {
+        tools.extend(["Write", "Edit"]);
+    }
+    tools.into_iter().map(String::from).collect()
+}
+
+/// A chat turn: its own path, because it must also work before the project exists.
+pub fn chat(jobs: &Jobs, project: PathBuf, ctx: Option<Arc<Ctx>>, turn: Turn) -> u64 {
+    let id = {
+        let mut j = jobs.lock().unwrap();
+        let id = j.len() as u64 + 1;
+        j.push(Job {
+            id,
+            asked: turn.message.chars().take(80).collect(),
+            status: "running".into(),
+            log: vec!["Leyendo el hilo".into()],
+            spec: None,
+            reply: None,
+            offer: None,
+        });
+        id
+    };
+    let jobs = jobs.clone();
+    std::thread::spawn(move || {
+        let result = run_chat(&jobs, id, &project, ctx.as_deref(), &turn);
+        let mut j = jobs.lock().unwrap();
+        let job = &mut j[(id - 1) as usize];
+        match result {
+            Ok((reply, offer)) => {
+                job.reply = reply;
+                job.offer = offer;
+                job.status = "done".into();
+            }
+            Err(e) => {
+                job.log.push(format!("Error: {e}"));
+                job.status = "failed".into();
+            }
+        }
+    });
+    id
+}
+
+type ChatReply = (Option<String>, Option<kiln_core::chat::Offer>);
+
+fn run_chat(
+    jobs: &Jobs,
+    id: u64,
+    project: &Path,
+    ctx: Option<&Ctx>,
+    turn: &Turn,
+) -> Result<ChatReply, String> {
+    let chat_file = ctx.map(Ctx::chat_file);
+    let history = match &chat_file {
+        Some(f) => kiln_core::chat::load(f)?.messages,
+        None => turn.history.clone(),
+    };
+    let before = match ctx {
+        Some(c) => Some(kiln_core::context::load(&c.context_file)?),
+        None => None,
+    };
+    let settled = match (ctx, &before) {
+        (Some(c), Some(b)) => b.settled_part(&c.layers),
+        _ => draft_settled(turn.draft.as_ref()),
+    };
+    let prompt = chat_prompt(turn, &history, ctx, &settled);
+    let mut cmd = claude();
+    cmd.args(["-p", &prompt, "--output-format", "stream-json", "--verbose", "--append-system-prompt", CONTEXT_SKILL])
+        .arg("--allowedTools")
+        .args(chat_tools(ctx))
+        .args(["--disallowedTools", "Bash"]);
+    if let Some(dir) = ctx.and_then(|c| c.context_file.parent()) {
+        std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
+        cmd.args(["--permission-mode", "acceptEdits", "--add-dir"]).arg(dir);
+    }
+    let mut child = cmd
+        .current_dir(project)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .map_err(|e| format!("no se puede lanzar Claude Code (`claude`): {e}. Instálalo o pon su ruta en KILN_CLAUDE"))?;
+    let out = child.stdout.take().unwrap();
+    let mut final_reply = None;
+    for line in BufReader::new(out).lines().map_while(Result::ok) {
+        if let Some(l) = describe(&line, project) {
+            log(jobs, id, l);
+        }
+        if let Some(t) = final_text(&line) {
+            final_reply = Some(t);
+        }
+    }
+    let status = child.wait().map_err(|e| e.to_string())?;
+    if !status.success() {
+        let mut err = String::new();
+        if let Some(mut e) = child.stderr.take() {
+            use std::io::Read;
+            let _ = e.read_to_string(&mut err);
+        }
+        return Err(format!("Claude Code salió con {status}: {}", err.trim()));
+    }
+    let text = final_reply.ok_or("Claude Code terminó sin dar respuesta")?;
+    let (reply, offer) = reply_of(&text);
+    let reply = with_offer(reply, offer.as_ref());
+    if let (Some(c), Some(before)) = (ctx, &before)
+        && let Ok(mut after) = kiln_core::context::load(&c.context_file)
+        && after != *before
+    {
+        after.guard_pinned(before);
+        kiln_core::context::save(&c.context_file, &after)?;
+    }
+    if let Some(f) = &chat_file {
+        let mut thread = kiln_core::chat::load(f)?;
+        for (who, text) in [("person", turn.message.clone()), ("agent", reply.clone().unwrap_or_else(|| "(sin respuesta)".into()))] {
+            thread.messages.push(kiln_core::chat::Message { who: who.into(), step: turn.step.clone(), text });
+        }
+        kiln_core::chat::save(f, &thread)?;
+    }
+    Ok((reply, offer))
 }
 
 fn run(jobs: &Jobs, id: u64, ctx: &Ctx, task: &Task) -> Result<Option<String>, String> {
@@ -284,16 +498,20 @@ fn run(jobs: &Jobs, id: u64, ctx: &Ctx, task: &Task) -> Result<Option<String>, S
         }))
 }
 
+/// Claude Code as the person is logged in to it: Kiln runs on their
+/// subscription, so an API key in the environment must not take over.
 pub fn claude() -> Command {
-    if let Ok(path) = std::env::var("KILN_CLAUDE") {
-        return Command::new(path);
-    }
-    if cfg!(windows) {
+    let mut c = if let Ok(path) = std::env::var("KILN_CLAUDE") {
+        Command::new(path)
+    } else if cfg!(windows) {
         let mut c = Command::new("cmd");
         c.args(["/C", "claude"]);
-        return c;
-    }
-    Command::new("claude")
+        c
+    } else {
+        Command::new("claude")
+    };
+    c.env_remove("ANTHROPIC_API_KEY").env_remove("ANTHROPIC_AUTH_TOKEN");
+    c
 }
 
 /// The most recently written spec file and its time.
@@ -304,6 +522,25 @@ fn newest(dir: &Path) -> Option<(PathBuf, SystemTime)> {
         .filter(|e| e.path().extension().is_some_and(|x| x == "toml"))
         .filter_map(|e| Some((e.path(), e.metadata().ok()?.modified().ok()?)))
         .max_by_key(|(_, t)| *t)
+}
+
+/// The final text of the agent, from the `result` event of the stream.
+pub fn final_text(line: &str) -> Option<String> {
+    let v: Value = serde_json::from_str(line).ok()?;
+    if v.get("type")?.as_str()? != "result" {
+        return None;
+    }
+    if v.get("is_error").and_then(Value::as_bool).unwrap_or(false) {
+        return None;
+    }
+    v.get("result")?.as_str().map(str::to_string)
+}
+
+/// The reply for the person and the offer, from the final text.
+pub fn reply_of(text: &str) -> (Option<String>, Option<kiln_core::chat::Offer>) {
+    let (reply, offer) = kiln_core::chat::split_offer(text);
+    let reply = reply.trim();
+    ((!reply.is_empty()).then(|| reply.to_string()), offer)
 }
 
 /// A line for the page from one event of the stream, or none.
@@ -357,5 +594,119 @@ pub fn describe(line: &str, project: &Path) -> Option<String> {
                 )
             }),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn final_text_of_a_success_result() {
+        let l = r#"{"type":"result","subtype":"success","is_error":false,"result":"Hola"}"#;
+        assert_eq!(final_text(l), Some("Hola".to_string()));
+    }
+
+    #[test]
+    fn final_text_ignores_errors_other_events_and_garbage() {
+        let err = r#"{"type":"result","subtype":"error","is_error":true,"result":"boom"}"#;
+        let asst = r#"{"type":"assistant","message":{"content":[{"type":"text","text":"x"}]}}"#;
+        assert_eq!(final_text(err), None);
+        assert_eq!(final_text(asst), None);
+        assert_eq!(final_text("not json"), None);
+    }
+
+    #[test]
+    fn reply_of_splits_the_block() {
+        let t = "Te propongo estos nombres.\n\n```kiln\n{\"names\":[\"Alba\",\"Brisa\"]}\n```";
+        let (reply, offer) = reply_of(t);
+        assert_eq!(reply.as_deref(), Some("Te propongo estos nombres."));
+        assert_eq!(offer.unwrap().names, vec!["Alba", "Brisa"]);
+    }
+
+    fn turn_with(n: usize) -> Turn {
+        Turn {
+            step: "2".into(),
+            message: "mensaje nuevo".into(),
+            history: (1..=n)
+                .map(|i| kiln_core::chat::Message {
+                    who: if i % 2 == 0 { "agent" } else { "person" }.into(),
+                    step: "2".into(),
+                    text: format!("texto-{i:02}-fin"),
+                })
+                .collect(),
+            draft: Some(serde_json::json!({"names": ["Alba"]})),
+        }
+    }
+
+    #[test]
+    fn chat_prompt_without_project_keeps_the_last_20_and_forbids_writing() {
+        let t = turn_with(25);
+        let p = chat_prompt(&t, &t.history, None, "");
+        assert!(!p.contains("texto-05-fin"));
+        assert!(p.contains("texto-06-fin") && p.contains("texto-25-fin"));
+        assert!(p.contains("paso 2") && p.contains("mensaje nuevo"));
+        assert!(p.contains("no escribas"));
+        assert!(p.contains("Alba"));
+    }
+
+    #[test]
+    fn chat_prompt_with_project_names_the_context_file() {
+        let ctx = Ctx {
+            project: PathBuf::from("/p"),
+            config: None,
+            specs_dir: "specs".into(),
+            roots: vec![],
+            context_file: PathBuf::from("/p/kiln/context.toml"),
+            layers: vec![],
+        };
+        let t = turn_with(1);
+        let p = chat_prompt(&t, &t.history, Some(&ctx), "");
+        assert!(p.contains("/p/kiln/context.toml") && p.contains("Edita solo el fichero de contexto"));
+        assert!(!p.contains("no escribas"));
+        assert!(chat_tools(Some(&ctx)).contains(&"Write".to_string()));
+    }
+
+    #[test]
+    fn the_draft_settles_the_name_and_the_chosen_basics() {
+        let d = serde_json::json!({"name": "Salitre", "basics": {"camera": "primera persona", "style": ""}});
+        let s = draft_settled(Some(&d));
+        assert!(s.contains("- Nombre: Salitre") && s.contains("- Cámara: primera persona"));
+        assert_eq!(s.lines().count(), 2);
+        assert_eq!(draft_settled(None), "");
+    }
+
+    #[test]
+    fn chat_prompt_carries_what_is_settled() {
+        let t = turn_with(1);
+        let p = chat_prompt(&t, &t.history, None, "- Cámara: primera persona\n");
+        assert!(p.contains("Ya fijado") && p.contains("- Cámara: primera persona"));
+        assert!(p.contains("no lo contradigas"));
+        assert!(!chat_prompt(&t, &t.history, None, "").contains("Ya fijado"));
+    }
+
+    #[test]
+    fn claude_runs_on_the_subscription_not_on_an_api_key() {
+        let cmd = claude();
+        let removed: Vec<_> = cmd.get_envs().filter(|(_, v)| v.is_none()).map(|(k, _)| k.to_string_lossy().into_owned()).collect();
+        for k in ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"] {
+            assert!(removed.contains(&k.to_string()), "{k} should be removed");
+        }
+    }
+
+    #[test]
+    fn chat_tools_without_project_cannot_write() {
+        let tools = chat_tools(None);
+        assert_eq!(tools, ["Read", "Glob", "Grep"]);
+    }
+
+    #[test]
+    fn reply_of_only_a_block_has_no_reply() {
+        let said = with_offer(Some("Mira.".into()), Some(&kiln_core::chat::Offer { names: vec!["Alba".into()], ..Default::default() }));
+        assert_eq!(said.as_deref(), Some("Mira.\n\nPropuse: nombres 1) Alba"));
+        assert_eq!(with_offer(None, None), None);
+        let (reply, offer) = reply_of("```kiln\n{\"names\":[\"Alba\"]}\n```");
+        assert_eq!(reply, None);
+        assert!(offer.is_some());
     }
 }
