@@ -356,27 +356,46 @@ at = [[2.2, 0.2, 0]]
 
 El ejemplo está en `examples/specs/cargo_quay.toml`.
 
-## Integración ASTRA: validar contenido (K001)
+## Validar contenido
 
-Opcional. Kiln comprueba las definiciones de contenido de ASTRA, escritas en
-RON, contra su catálogo y contra las escenas de Godot. Kiln prepara y valida
-contenido: no es el motor de ASTRA, no habla con su runtime ni con sus
-guardados. Un `kiln.toml` sin esta sección funciona igual que antes.
+Opcional y por proyecto. Kiln no sabe nada de ningún juego: cada proyecto
+declara en su `kiln.toml` qué tipos de contenido tiene y cómo se
+relacionan, y Kiln comprueba sus ficheros RON contra ese esquema, contra el
+catálogo de assets y contra las escenas de Godot. Kiln prepara y valida
+contenido; no es el motor del juego ni toca sus guardados. Un `kiln.toml`
+sin `[content]` funciona igual que antes.
+
+Cada **conjunto** (`[content.<conjunto>]`) agrupa unos ficheros de
+definiciones y los tipos que contienen:
 
 ```toml
 [tools]
 godot_project = "godot"
 
-[integrations.astra]
-enabled = true
-definitions = ["data/astra/**/*.ron"]               # globs desde la raíz
-godot_manifest = "kiln/astra_scene_manifest.json"   # opcional
-greybox = false   # true: un asset que falta en el catálogo es aviso, no error
-```
+[content.world]
+definitions = ["data/content/**/*.ron"]
+manifest = "kiln/content_manifest.json"
+greybox = false
+id_meta = "astra_id"
 
-El esquema RON es **provisional y no canónico**: cambiará con el de
-producción de ASTRA. Cada fichero es una lista de definiciones con IDs
-estáticos de contenido, que no son los `PersistentId` del runtime:
+[content.world.kinds.Sector]
+id = "id"
+scene = "scene"
+
+[content.world.kinds.Door]
+id = "id"
+refs = { connects = "Sector" }
+distinct = ["connects"]
+node_meta = { connects = "astra_connects" }
+
+[content.world.kinds.Object]
+id = "id"
+asset = "asset"
+
+[content.world.kinds.Installation]
+id = "id"
+refs = { sector = "Sector", objects = "Object" }
+```
 
 ```ron
 [
@@ -388,46 +407,229 @@ estáticos de contenido, que no son los `PersistentId` del runtime:
 ]
 ```
 
-En Godot, los nodos de las escenas llevan su ID en los metadatos:
-`astra_id`, y las puertas además `astra_connects` (dos IDs). Para
-actualizar el manifiesto después de tocar una escena:
+Es la fixture `examples/content/`. Los IDs son estáticos de contenido, no
+los que el juego asigne en ejecución.
 
-```bash
-kiln astra-manifest --project examples/astra   # Godot sin ventana lee las escenas de los sectores
-kiln check --project examples/astra            # valida RON, catálogo, escenas y manifiesto
+### Referencia del esquema
+
+Una clave que no esté en esta lista es un error (`content_schema`), nunca
+se ignora, y el conjunto afectado no se valida hasta que se arregle.
+
+**Conjunto** (`[content.<conjunto>]`)
+
+| Clave | Qué es |
+|-------|--------|
+| `definitions` | Obligatoria. Globs desde la raíz del proyecto con los ficheros RON. No puede estar vacía. |
+| `manifest` | Fichero JSON (dentro del proyecto) donde `kiln content-manifest` deja lo que Godot ve en las escenas. Sin ella no se comparan escenas. |
+| `greybox` | `true`: un asset que falta en el catálogo es aviso, no error. Por defecto `false`. |
+| `id_meta` | Metadato de los nodos de Godot que lleva su ID. Por defecto `content_id`. |
+| `root` | Si el fichero es un registro `( ... )` y los elementos son una lista de ese campo, su nombre. Exige `default_kind`. Sin ella el fichero es una lista. |
+| `default_kind` | Tipo de los elementos sin nombre (`( ... )` en vez de `Tipo( ... )`). Debe estar declarado. |
+| `kinds` | Los tipos, `[content.<conjunto>.kinds.<Tipo>]`. |
+
+**Tipo**
+
+| Clave | Qué comprueba |
+|-------|---------------|
+| `id` | Obligatoria. Campo de texto con el ID del elemento. IDs repetidos: `content_duplicate_id`. |
+| `id_prefix` | El ID en la escena es prefijo + valor del campo. Las referencias aceptan el valor con o sin prefijo. |
+| `scene` | Campo con una ruta `res://` relativa y sin `..` que debe existir en `[tools] godot_project`, y el nodo con el ID debe estar en esa escena. |
+| `asset` | Campo con una clave de pieza (`kit/pieza`) que debe estar en el catálogo. |
+| `refs` | `campo = "Tipo"`. Cada valor del campo (suelto, tupla o lista) debe ser el ID de un elemento de ese tipo. |
+| `distinct` | Campos cuyos valores (tupla o lista) deben ser todos distintos. |
+| `node_meta` | `campo = "metadato"`. El campo debe valer lo mismo que ese metadato del nodo, según el manifiesto. |
+| `markers` | Sublistas contra nodos hijos del nodo de la escena (ver abajo). |
+| `fields` | Reglas por campo (ver abajo). |
+
+**Marcador** (`markers = [ { ... } ]`): una lista de elementos que se
+corresponde con hijos directos del nodo.
+
+| Clave | Qué es |
+|-------|--------|
+| `field` | Campo del elemento con la lista. Si falta, se toma como lista vacía. |
+| `name` | Campo de cada elemento de la lista con su nombre. |
+| `node` | Nombre del nodo hijo esperado; debe contener `{name}`. |
+| `meta` | Campos del elemento que deben valer lo mismo que el metadato del hijo con ese nombre. |
+
+Un hijo que encaja con el patrón `node` y no corresponde a ningún elemento
+de la lista es `content_marker_extra`.
+
+**Regla de campo** (`fields = [ { ... } ]`)
+
+| Clave | Qué comprueba |
+|-------|---------------|
+| `name` | Obligatoria. El campo. |
+| `required` | `true`: el campo debe estar. Un campo ausente sin `required` no se comprueba. |
+| `type` | `string`, `int`, `float`, `bool`, `ident` (palabra sin comillas), `list`, `tuple` o `struct`. Un `int` vale como `float`. |
+| `one_of` | Lista cerrada de valores admitidos, para texto o `ident`. No puede estar vacía. |
+| `min`, `max` | Rango admitido, para números. `min` no puede ser mayor que `max`. |
+
+### Un segundo ejemplo: una biblioteca en un solo fichero
+
+Un registro con una lista (`root`), elementos sin nombre (`default_kind`),
+prefijo de ID y marcadores:
+
+```toml
+[tools]
+godot_project = "godot"
+
+[content.library]
+definitions = ["data/modules.ron"]
+manifest = "kiln/library_manifest.json"
+root = "modules"            # el fichero es un registro y sus elementos son esta lista
+default_kind = "Module"     # tipo de los elementos sin nombre
+
+[content.library.kinds.Module]
+id = "key"
+id_prefix = "module:"       # en la escena el ID es «module:<key>»
+scene = "scene"
+markers = [
+    { field = "connectors", name = "name", node = "conn_{name}", meta = ["side", "offset"] },
+]
+fields = [
+    { name = "kind", required = true, one_of = ["Access", "Workshop"] },
+    { name = "size", type = "tuple" },
+]
 ```
 
-`[tools] godot_project` es obligatorio con la integración: sin él, cada
-sector da `astra_scene_missing`. `astra-manifest` necesita además Godot 4
-(`[tools] godot`).
+```ron
+(
+    modules: [
+        (
+            key: "access",
+            kind: Access,
+            size: (3, 2),
+            connectors: [(name: "east", side: East, offset: 0)],
+            scene: "res://modules/access.tscn",
+        ),
+    ],
+)
+```
 
-`astra-manifest` lee las escenas sin instanciarlas, así que no se ejecutan
-los scripts de los nodos, pero Godot sí carga los recursos que la escena
-enlaza, y con ellos sus scripts. Como `kiln godot`, úsalo solo en proyectos
-de confianza. Escribe el JSON de `godot_manifest` (dentro del proyecto), que
-se versiona con el proyecto. El JSON es un fichero técnico generado: la fuente del
-contenido sigue siendo el RON.
+La escena `access.tscn` tendría un nodo raíz con el metadato
+`content_id = "module:access"` y un hijo `conn_east` con los metadatos
+`side` y `offset`.
 
-Los hallazgos salen en `kiln check` y en `kiln serve` como los demás, con
-`<fichero>#<id>`. Si hay algún error, la salida es distinta de cero.
+### Los dos comandos
+
+```bash
+kiln content-manifest --project examples/content   # Godot sin ventana lee las escenas
+kiln check --project examples/content              # valida RON, catálogo, escenas y manifiesto
+```
+
+Salida de los dos sobre la fixture:
+
+```
+$ kiln content-manifest --project examples/content
+world: Godot lee 2 escenas (godot)
+world: manifiesto en <ruta absoluta>/examples/content/kiln/content_manifest.json
+$ kiln check --project examples/content
+2 piezas, 0 errores, 0 avisos
+```
+
+Y con una definición rota (una puerta que conecta con un sector que no
+existe, y una instalación cuyo `sector` es un objeto):
+
+```
+ERROR  world:data/content/world.ron#door:warehouse_yard content_unknown_ref  `connects` hace referencia a «sector:nowhere», que no existe
+ERROR  world:data/content/world.ron#door:warehouse_yard content_manifest_mismatch `connects` distinto: definición [sector:warehouse, sector:nowhere], manifiesto ["sector:warehouse","sector:yard"]
+ERROR  world:data/content/world.ron#installation:loading_bay content_wrong_kind   `sector`: «object:crate» debería ser Sector y es Object
+2 piezas, 3 errores, 0 avisos
+```
+
+Si hay algún error, `kiln check` sale con código distinto de cero. Los
+hallazgos salen también en `kiln serve`, en la pestaña **Contenido**: cada
+conjunto con sus tipos, sus elementos (tipo, ID, fichero y línea) y los
+hallazgos de cada uno. La pestaña no aparece si el proyecto no declara
+ningún conjunto.
+
+`content-manifest` necesita `[tools] godot_project` y Godot 4
+(`[tools] godot`). Escribe el manifiesto de cada conjunto que declara
+`manifest` (o solo el de `--set NOMBRE`). Lee las escenas sin instanciarlas,
+así que no se ejecutan los scripts de los nodos, pero Godot sí carga los
+recursos que la escena enlaza, y con ellos sus scripts. Como `kiln godot`,
+úsalo solo en proyectos de confianza. El manifiesto es un fichero técnico
+generado que se versiona con el proyecto: la fuente del contenido sigue
+siendo el RON.
+
+### Manifiesto de escenas (versión 2)
+
+```json
+{
+  "version": 2,
+  "set": "world",
+  "scenes": [
+    {
+      "scene": "res://astra/warehouse.tscn",
+      "nodes": [
+        {
+          "id": "sector:warehouse",
+          "meta": {},
+          "children": [ { "name": "DoorToYard", "meta": { "astra_connects": ["sector:warehouse", "sector:yard"], "astra_id": "door:warehouse_yard" } } ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+Un nodo entra en la lista si tiene el metadato `id_meta`; ese valor es su
+`id` y se quita de `meta`. `children` son sus hijos directos con sus
+metadatos. Una versión distinta de 2, o un `set` que no es el del conjunto,
+es `content_manifest_syntax`. Una escena que Godot no carga sale con un
+campo `error`.
+
+### El RON que lee Kiln
+
+Kiln lee su propio subconjunto de RON, porque el crate `ron` pierde los
+nombres de las estructuras, las palabras sin comillas y el orden de los
+campos.
+
+Admite: listas `[a, b]`, tuplas `(a, b)`, estructuras con nombre
+`Tipo(campo: valor)` o sin él `(campo: valor)`, cadenas con las escapadas
+`\"`, `\\`, `\n` y `\t`, enteros y decimales (con `_` y signo), `true` y
+`false`, palabras sin comillas (`East`), comas finales y comentarios `//` y
+`/* */`. El anidamiento máximo es 64.
+
+No admite: mapas `{ }`, `Some(...)` (`None` se lee como una palabra sin
+comillas), estructuras con nombre y valores posicionales `Tipo(1, 2)`,
+números hexadecimales, cadenas crudas `r"..."`, caracteres `'a'`, otros
+escapes (`\u{..}`, `\r`) ni atributos `#![enable(...)]`. Un
+error de lectura es un hallazgo `content_syntax` con línea y columna, nunca
+una caída.
+
+### Hallazgos
+
+Salen en `kiln check` y en `kiln serve` como los demás, con el asunto
+`<conjunto>:<fichero>#<id>` (o `<conjunto>:<fichero>` si no es de un
+elemento, y `<conjunto>` si es de todo el conjunto).
 
 | code | Cuándo |
 |------|--------|
-| `astra_ron_syntax` | El RON no se lee o no encaja con el esquema (con línea y columna). |
-| `astra_no_definitions` | Aviso: los globs no encuentran ningún fichero. |
-| `astra_duplicate_id` | Un ID repetido. |
-| `astra_unknown_ref` | Una puerta o una instalación nombra un ID que no existe. |
-| `astra_wrong_kind` | La referencia existe pero es de otro tipo. |
-| `astra_door_endpoint` | Una puerta conecta un sector consigo mismo. |
-| `astra_asset_missing` | El asset no es una pieza del catálogo (aviso con `greybox = true`). |
-| `astra_scene_missing` | La escena `res://` del sector no existe en el proyecto Godot. |
-| `astra_manifest_missing` | Aviso: falta el manifiesto; hay que ejecutar `kiln astra-manifest`. |
-| `astra_manifest_syntax` | El JSON del manifiesto no se lee. |
-| `astra_manifest_mismatch` | El manifiesto y el RON no coinciden: IDs, escena de un sector o conexiones de una puerta. |
+| `content_schema` | El esquema del `kiln.toml` no vale: clave desconocida, tipo sin declarar, `root` sin `default_kind`, `min` mayor que `max`... |
+| `content_no_definitions` | Aviso: los globs de `definitions` no encuentran ningún fichero. |
+| `content_syntax` | El RON no se lee, o no tiene la forma que pide `root` (con línea y columna). |
+| `content_unknown_kind` | Un elemento con un tipo que el esquema no declara, o sin nombre y sin `default_kind`. |
+| `content_missing_id` | Un elemento sin el campo `id` del tipo, o que no es de texto. |
+| `content_duplicate_id` | Un ID repetido. |
+| `content_unknown_ref` | Una referencia (`refs`) nombra un ID que no existe, o un valor que no es texto. |
+| `content_wrong_kind` | La referencia existe pero es de otro tipo. |
+| `content_not_distinct` | Un campo de `distinct` repite un valor. |
+| `content_asset_missing` | El asset no es una pieza del catálogo (aviso con `greybox = true`). |
+| `content_scene_missing` | La escena `res://` no es válida, no existe en el proyecto Godot o falta `[tools] godot_project`. |
+| `content_field_missing` | Falta un campo con `required = true`. |
+| `content_field_type` | El campo no es del `type` que pide la regla. |
+| `content_field_range` | Un número fuera de `min`/`max`. |
+| `content_field_value` | Un valor que no está en `one_of`. |
+| `content_manifest_missing` | Aviso: falta el manifiesto; hay que ejecutar `kiln content-manifest`. |
+| `content_manifest_syntax` | El JSON del manifiesto no se lee, o su versión o su conjunto no son los esperados. |
+| `content_manifest_mismatch` | El manifiesto y el RON no coinciden: el nodo falta o está en otra escena, un metadato (`node_meta`) cambia, o hay un nodo sin definición. |
+| `content_marker_missing` | Falta el nodo hijo que pide un elemento de un marcador. |
+| `content_marker_mismatch` | El hijo existe pero un metadato (`meta`) no vale lo mismo que el campo. |
+| `content_marker_extra` | Hay un nodo hijo con el patrón del marcador que no corresponde a ningún elemento. |
 
-La fixture está en `examples/astra/`. El test que exporta con Godot de
-verdad se ejecuta a mano:
-`cargo test -p kiln-cli -- --ignored astra`.
+El test que exporta con Godot de verdad se ejecuta a mano (necesita
+Godot 4 en el `PATH`): `cargo test -p kiln-cli -- --ignored content`.
 
 ## Lo que viene
 
