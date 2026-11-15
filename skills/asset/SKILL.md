@@ -60,6 +60,12 @@ Abre el catálogo y, para cada pieza, elige una fuente (`source.kind`):
   dos o tres palabras).
 - `retouch`: una pieza del catálogo como base para retocar en Blender
   (`from` y `why`).
+- `asset`: otro asset del proyecto que ya tiene ficha (`from` = su
+  `asset.id`, de `specs[]` del catálogo). Llega montado y con sus
+  materiales, como una caja cerrada: no le pongas `material` ni
+  `materials`; si quieres otros colores, elige una de sus variantes con
+  `variant`. Úsalo para las partes grandes que ya existen o que merecen su
+  propia ficha (un motor, una grúa), en vez de repetir sus piezas.
 
 Prefiere siempre reutilizar. Usa claves del catálogo tal como están, sin
 inventarlas. Cada pieza que no sea `reuse` lleva `material` con una clave de

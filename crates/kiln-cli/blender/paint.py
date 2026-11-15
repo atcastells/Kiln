@@ -45,7 +45,8 @@ def wear(name, paint, own):
             bsdf.inputs["Base Color"].default_value = (*paint["color"], 1.0)
     m["kiln_name"] = name
     m["kiln_zone"] = name.split("/", 1)[1]
-    m["kiln_palette"] = paint["key"] if paint else ""
+    # a model's own material keeps the palette key it already wore, if any
+    m["kiln_palette"] = paint["key"] if paint else (own.get("kiln_palette", "") if own is not None else "")
     return m
 
 
