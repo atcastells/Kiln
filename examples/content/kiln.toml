@@ -1,0 +1,39 @@
+# Minimal fixture for Kiln's generic content validator: the schema of the
+# `world` set is declared here, not in Kiln.
+#   kiln check --project examples/content
+[project]
+name = "Content fixture"
+engine = "godot"
+
+[assets]
+kits = ["kits"]
+
+[rules]
+licenses = ["CC0"]
+
+[tools]
+godot_project = "godot"
+
+[content.world]
+definitions = ["data/content/**/*.ron"]
+manifest = "kiln/content_manifest.json"
+greybox = false
+id_meta = "astra_id"
+
+[content.world.kinds.Sector]
+id = "id"
+scene = "scene"
+
+[content.world.kinds.Door]
+id = "id"
+refs = { connects = "Sector" }
+distinct = ["connects"]
+node_meta = { connects = "astra_connects" }
+
+[content.world.kinds.Object]
+id = "id"
+asset = "asset"
+
+[content.world.kinds.Installation]
+id = "id"
+refs = { sector = "Sector", objects = "Object" }

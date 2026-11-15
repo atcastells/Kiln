@@ -95,6 +95,14 @@ textarea { font: inherit; width: 100%; min-height: 180px; padding: 8px 10px; bor
 .qcard .opts { display: flex; flex-direction: column; gap: 6px; margin: 8px 0; } .qcard .opts button { text-align: left; font-weight: 500; }
 .qcard .free { display: flex; gap: 6px; } .qcard .free input { flex: 1; }
 .qcard .skip { display: flex; gap: 6px; margin-top: 8px; } .qcard .skip button { font-weight: 500; font-size: 12px; padding: 4px 8px; }
+#contentView { overflow: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 14px; min-width: 0; }
+#contentView h2 { font-size: 16px; margin: 2px 0 6px; }
+#contentView section + section { margin-top: 22px; border-top: 1px solid var(--line); padding-top: 14px; }
+#contentView table { border-collapse: collapse; width: 100%; font-size: 12.5px; margin-top: 8px; }
+#contentView th { text-align: left; font: 500 11px var(--mono); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+#contentView th, #contentView td { padding: 5px 8px 5px 0; border-top: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+#contentView td.m, #contentView td:first-child { white-space: nowrap; }
+#contentView td.m { font: 12px var(--mono); }
 [hidden] { display: none !important; }
 #wizard { flex: 1; overflow: auto; }
 #wizard .wz { max-width: 640px; margin: 0 auto; padding: 8px 0 40px; display: flex; flex-direction: column; gap: 12px; }
@@ -116,7 +124,7 @@ textarea { font: inherit; width: 100%; min-height: 180px; padding: 8px 10px; bor
   <div class="stats" id="stats"></div>
   <div id="searchBox"><input id="search" placeholder="Buscar pieza, material o asset" aria-label="Buscar pieza, material o asset" autocomplete="off"><div id="hits" hidden></div></div>
   <form id="askForm"><input id="ask" placeholder="Pedir un asset: crear un ascensor" aria-label="Pedir un asset"><button type="submit">Desglosar</button></form>
-  <nav class="tabs"><button type="button" data-mode="context">Contexto</button><button type="button" data-mode="tree">Árbol</button><button type="button" data-mode="catalog">Catálogo</button></nav>
+  <nav class="tabs"><button type="button" data-mode="context">Contexto</button><button type="button" data-mode="tree">Árbol</button><button type="button" data-mode="content" id="tabContent" hidden>Contenido</button><button type="button" data-mode="catalog">Catálogo</button></nav>
   <button id="back" type="button" hidden>Volver</button>
   <button id="reload" type="button">Releer el proyecto</button>
 </header>
@@ -124,6 +132,7 @@ textarea { font: inherit; width: 100%; min-height: 180px; padding: 8px 10px; bor
 <div id="crumbs"></div>
 <main>
   <div id="stage"><div id="world"><svg id="edges"></svg></div></div>
+  <div id="contentView" hidden></div>
   <aside id="side"></aside>
 </main>
 <script>
@@ -147,6 +156,8 @@ async function load() {
   document.getElementById("stats").innerHTML = `<span>${cat.kits.length} kits</span><span>${cat.pieces.length} piezas</span><span>${cat.materials.length} materiales</span>`
     + `<span class="error">${n("error")} errores</span><span class="warn">${n("warn")} avisos</span><span class="info">${n("info")} notas</span>`;
   if (specView && !cat.specs.find(x => x.asset.id === specView)) specView = null;
+  document.getElementById("tabContent").hidden = !cat.content.length;
+  if (!cat.content.length && mode === "content") mode = "tree";
   if (!cat.tree) mode = "catalog";
   render();
   if (!sel && !ctxData.context.claims.length) mode = "context";
@@ -158,6 +169,7 @@ function home() {
   render();
   if (mode === "tree" && cat.tree) showTreeNode(cat.tree.nodes[sel]);
   else if (mode === "context") showContext();
+  else if (mode === "content") showContentSide();
   else showProject();
 }
 
@@ -171,6 +183,10 @@ function render() {
   document.getElementById("back").hidden = !specView;
   document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", !specView && b.dataset.mode === mode));
   crumbs();
+  const onContent = mode === "content" && !specView;
+  document.getElementById("stage").hidden = onContent;
+  document.getElementById("contentView").hidden = !onContent;
+  if (onContent) return renderContent();
   if (specView) return renderSpec(cat.specs.find(x => x.asset.id === specView));
   if (mode === "tree" && cat.tree) return renderTree();
   if (mode === "context") return renderContext();
@@ -414,6 +430,28 @@ function pick(id) {
   if (id.startsWith("piece:")) return showPiece(cat.pieces.find(p => p.key === id.slice(6)));
   if (id.startsWith("mat:")) return showMat(cat.materials.find(m => m.key === id.slice(4)));
   if (id.startsWith("slot:")) { const key = id.slice(5, id.lastIndexOf(":")); return showPiece(cat.pieces.find(p => p.key === key)); }
+}
+// A content set: its kinds, its elements and the findings of each, by subject `<set>:<file>#<id>`.
+function renderContent() {
+  const own = (set, f) => f.subject === set || f.subject.startsWith(set + ":");
+  const list = fs => fs.map(x => `<div class="finding">${pill(x.severity)} ${esc(x.message)} <code>${esc(x.code)}</code></div>`).join("");
+  document.getElementById("contentView").innerHTML = cat.content.map(c => {
+    const subjects = new Set(c.elements.map(e => `${c.name}:${e.file}#${e.id}`));
+    const loose = cat.findings.filter(f => own(c.name, f) && !subjects.has(f.subject));
+    return `<section><div class="kind">Conjunto de contenido</div><h2>${esc(c.name)}</h2>
+      <div class="stats">${c.kinds.map(k => `<span>${esc(k.name)} · ${k.count}</span>`).join("")}
+        ${c.errors || c.warnings ? `<span class="error">${c.errors} errores</span><span class="warn">${c.warnings} avisos</span>` : `<span class="ok">sin problemas</span>`}</div>
+      ${loose.length ? `<div class="kind" style="margin-top:12px">Del conjunto</div>` + list(loose) : ""}
+      <table><tr><th>Tipo</th><th>Id</th><th>Fichero</th><th>Comprobaciones</th></tr>${c.elements.map(e => {
+        const fs = cat.findings.filter(f => f.subject === `${c.name}:${e.file}#${e.id}`);
+        return `<tr><td>${esc(e.kind)}</td><td class="m">${esc(e.id)}</td><td class="m">${esc(e.file)}:${e.line}</td><td>${list(fs)}</td></tr>`; }).join("")}</table></section>`;
+  }).join("");
+}
+function showContentSide() {
+  const top = cat.findings.filter(f => f.severity !== "info");
+  side.innerHTML = `<div class="kind">Contenido</div><h2>${esc(cat.project)}</h2><p class="note">Los conjuntos de contenido que declara kiln.toml en [content.&lt;conjunto&gt;].</p>
+    <div class="kind" style="margin-top:12px">Lo que hay que mirar (${top.length})</div>`
+    + (top.map(x => `<div class="finding">${pill(x.severity)} <b style="overflow-wrap:anywhere">${esc(x.subject)}</b>: ${esc(x.message)}</div>`).join("") || `<p class="note">Nada: solo notas.</p>`);
 }
 function findingsOf(subject) {
   const f = cat.findings.filter(x => x.subject === subject);

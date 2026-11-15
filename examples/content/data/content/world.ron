@@ -1,4 +1,4 @@
-// Provisional, non-canonical ASTRA definitions to exercise Kiln's validator.
+// Definitions to exercise the content validator.
 // Static content ids: not the runtime's PersistentId.
 [
     Sector(id: "sector:warehouse", scene: "res://astra/warehouse.tscn"),

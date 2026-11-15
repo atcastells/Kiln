@@ -144,6 +144,7 @@ mod tests {
             specs: vec![],
             tree: None,
             builds: Default::default(),
+            content: vec![],
             findings: vec![],
         }
     }

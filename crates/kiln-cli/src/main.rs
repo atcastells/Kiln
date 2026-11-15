@@ -7,10 +7,10 @@
 //!   kiln paint  --project DIR [--config FILE] --asset ID [--variant ID]   wear its materials again, no assembling
 //!   kiln godot  --project DIR [--config FILE]                Godot measures its own pieces
 //!   kiln review --project DIR [--config FILE] --asset ID     build, render, review and fix, up to 3 rounds
-//!   kiln astra-manifest --project DIR [--config FILE]        Godot lists the ASTRA ids of the sector scenes
+//!   kiln content-manifest --project DIR [--config FILE] [--set NAME]   Godot lists the ids of the scenes of the content sets
 
 mod agent;
-mod astra;
+mod content;
 mod fetch;
 mod production;
 mod review;
@@ -28,6 +28,7 @@ struct Args {
     port: u16,
     asset: Option<String>,
     variant: Option<String>,
+    set: Option<String>,
 }
 
 fn parse() -> Result<Args, String> {
@@ -41,6 +42,7 @@ fn parse() -> Result<Args, String> {
         port: 4330,
         asset: None,
         variant: None,
+        set: None,
     };
     while let Some(flag) = it.next() {
         let mut val = || it.next().ok_or(format!("falta el valor de {flag}"));
@@ -50,6 +52,7 @@ fn parse() -> Result<Args, String> {
             "--out" => a.out = Some(PathBuf::from(val()?)),
             "--asset" => a.asset = Some(val()?),
             "--variant" => a.variant = Some(val()?),
+            "--set" => a.set = Some(val()?),
             "--port" => a.port = val()?.parse().map_err(|_| "--port debe ser un número")?,
             other => return Err(format!("opción desconocida {other}\n{USAGE}")),
         }
@@ -59,7 +62,7 @@ fn parse() -> Result<Args, String> {
     Ok(a)
 }
 
-const USAGE: &str = "uso: kiln <index|check|serve|build|paint|review|godot|astra-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--asset ID] [--variant ID]";
+const USAGE: &str = "uso: kiln <index|check|serve|build|paint|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--asset ID] [--variant ID] [--set NAME]";
 
 pub fn load(
     project: &std::path::Path,
@@ -163,10 +166,13 @@ fn main() -> ExitCode {
                 production::measure(&args.project, args.config.as_deref(), |l| eprintln!("{l}"))
                     .map(|_| ExitCode::SUCCESS)
             }
-            "astra-manifest" => {
-                astra::export(&args.project, args.config.as_deref(), |l| eprintln!("{l}"))
-                    .map(|_| ExitCode::SUCCESS)
-            }
+            "content-manifest" => content::export(
+                &args.project,
+                args.config.as_deref(),
+                args.set.as_deref(),
+                |l| eprintln!("{l}"),
+            )
+            .map(|_| ExitCode::SUCCESS),
             _ => Err(USAGE.into()),
         }
     };

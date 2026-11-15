@@ -588,6 +588,7 @@ materials = { "beam/wood" = "pine", "ghost/wood" = "oak" }
             specs: vec![],
             tree: None,
             builds: Default::default(),
+            content: vec![],
             findings: vec![],
         };
         check(&parse(ZONES).unwrap(), &Default::default(), &mut cat);
