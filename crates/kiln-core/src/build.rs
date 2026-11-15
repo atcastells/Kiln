@@ -87,6 +87,10 @@ pub struct Report {
     pub items: Vec<ReportItem>,
     #[serde(default)]
     pub built_at: String,
+    /// The assets it is made of that changed since it was assembled, or that
+    /// are to be assembled again themselves: it is to be assembled again.
+    #[serde(default, skip_deserializing)]
+    pub stale: Vec<String>,
     /// `part/zone` -> the palette key it wears (none: the model's own); set
     /// by Kiln when read, from materials.json.
     #[serde(default)]
@@ -138,10 +142,11 @@ pub fn paints(
                     .from
                     .as_ref()
                     .and_then(|f| cat.pieces.iter().find(|c| &c.key == f));
+                let open = p.source.kind != "asset";
                 let keys = [
                     var.and_then(|v| v.materials.get(name.as_str())),
-                    p.materials.get(zone),
-                    p.material.as_ref(),
+                    p.materials.get(zone).filter(|_| open),
+                    p.material.as_ref().filter(|_| open),
                     piece.and_then(|c| c.bindings.get(zone)),
                 ];
                 keys.into_iter()
@@ -151,6 +156,21 @@ pub fn paints(
             (name.clone(), found)
         })
         .collect()
+}
+
+/// The GLB a built asset left, or the one of its colour variant; `None`
+/// while it has not been assembled.
+pub fn child_glb(
+    root: &Path,
+    config: &Config,
+    id: &str,
+    variant: Option<&str>,
+) -> Option<std::path::PathBuf> {
+    let name = match variant {
+        Some(v) => format!("{id}--{v}.glb"),
+        None => format!("{id}.glb"),
+    };
+    Some(out_dir(root, config, id).join(name)).filter(|f| f.exists())
 }
 
 /// The Blender file of a built asset. It sits in a hidden folder because a
@@ -187,15 +207,26 @@ pub fn plan(root: &Path, config: &Config, cat: &Catalog, spec: &Spec) -> Plan {
             .from
             .as_ref()
             .and_then(|f| cat.pieces.iter().find(|c| &c.key == f))
-            .filter(|_| p.source.kind != "search");
-        let model = piece
-            .and_then(|c| c.preview.as_ref())
-            .map(|f| root.join(f).to_string_lossy().into_owned());
+            .filter(|_| !matches!(&p.source.kind[..], "search" | "asset"));
+        let child = (p.source.kind == "asset")
+            .then_some(p.source.from.as_deref())
+            .flatten();
+        let model = match child {
+            Some(c) => child_glb(root, config, c, p.source.variant.as_deref())
+                .map(|f| f.to_string_lossy().into_owned()),
+            None => piece
+                .and_then(|c| c.preview.as_ref())
+                .map(|f| root.join(f).to_string_lossy().into_owned()),
+        };
+        let child_size = child.and_then(|c| cat.builds.get(c)).and_then(|r| r.size_m);
         let size = p
             .size_m
             .or(piece.and_then(|c| c.size_m))
+            .or(child_size)
             .unwrap_or([BOX_M; 3]);
         let todo = match (&p.source.kind[..], &model) {
+            ("asset", None) => Some(format!("caja: monta antes «{}»", child.unwrap_or("?"))),
+            ("asset", Some(_)) => None,
             ("search", _) => Some(format!(
                 "caja en lugar de un modelo por buscar: {}",
                 p.source.query.as_deref().unwrap_or(&p.what)
@@ -243,10 +274,13 @@ pub fn plan(root: &Path, config: &Config, cat: &Catalog, spec: &Spec) -> Plan {
                 part: p.id.clone(),
                 kind: p.source.kind.clone(),
                 model: model.clone(),
-                // A reused piece keeps its size unless it has no model to keep.
-                fit: p.source.kind != "reuse" || model.is_none(),
+                // A reused piece or a built asset keeps its size unless it has
+                // no model to keep.
+                fit: !matches!(&p.source.kind[..], "reuse" | "asset") || model.is_none(),
                 size_m: if p.source.kind == "reuse" {
                     piece.and_then(|c| c.size_m).unwrap_or(size)
+                } else if p.source.kind == "asset" {
+                    child_size.unwrap_or(size)
                 } else {
                     size
                 },
@@ -255,8 +289,17 @@ pub fn plan(root: &Path, config: &Config, cat: &Catalog, spec: &Spec) -> Plan {
                 only_in: p.only_in.clone(),
                 moves: p.moves.clone(),
                 todo: todo.clone(),
-                material: p.material.as_deref().and_then(find_paint),
-                zones: zones.clone(),
+                // an asset is a closed box: it comes with its own materials
+                material: p
+                    .material
+                    .as_deref()
+                    .filter(|_| child.is_none())
+                    .and_then(find_paint),
+                zones: if child.is_none() {
+                    zones.clone()
+                } else {
+                    BTreeMap::new()
+                },
                 split: split.clone(),
                 slots: slots.clone(),
             });
@@ -273,6 +316,46 @@ pub fn plan(root: &Path, config: &Config, cat: &Catalog, spec: &Spec) -> Plan {
         auto_layout: auto,
         materials: dir.join("materials.json").to_string_lossy().into(),
         items,
+    }
+}
+
+/// Marks each built asset whose children changed after it was assembled: a
+/// child assembled later, not assembled, or to be assembled again itself.
+fn mark_stale(
+    root: &Path,
+    config: &Config,
+    specs: &[Spec],
+    reports: &mut BTreeMap<String, Report>,
+) {
+    let built = |id: &str| {
+        std::fs::metadata(out_dir(root, config, id).join(format!("{id}.glb")))
+            .and_then(|m| m.modified())
+            .ok()
+    };
+    // children first, so a stale child makes its parents stale in one pass
+    let mut ids: Vec<String> = Vec::new();
+    for s in specs {
+        for id in crate::spec::order(specs, &s.asset.id).unwrap_or_default() {
+            if !ids.contains(&id) {
+                ids.push(id);
+            }
+        }
+    }
+    for id in ids {
+        let (Some(s), Some(at)) = (specs.iter().find(|s| s.asset.id == id), built(&id)) else {
+            continue;
+        };
+        let stale: Vec<String> = crate::spec::made_of(s)
+            .into_iter()
+            .filter(|c| {
+                built(c).is_none_or(|t| t > at)
+                    || reports.get(*c).is_some_and(|r| !r.stale.is_empty())
+            })
+            .map(String::from)
+            .collect();
+        if let Some(r) = reports.get_mut(&id) {
+            r.stale = stale;
+        }
     }
 }
 
@@ -307,7 +390,7 @@ fn lay_out(items: &mut [Item]) {
 
 /// Reads what Blender reported for each spec that has been built.
 pub fn reports(root: &Path, config: &Config, specs: &[Spec]) -> BTreeMap<String, Report> {
-    specs
+    let mut out = specs
         .iter()
         .filter_map(|s| {
             let dir = out_dir(root, config, &s.asset.id);
@@ -327,7 +410,9 @@ pub fn reports(root: &Path, config: &Config, specs: &[Spec]) -> BTreeMap<String,
                 .collect();
             Some((s.asset.id.clone(), r))
         })
-        .collect()
+        .collect::<BTreeMap<_, _>>();
+    mark_stale(root, config, specs, &mut out);
+    out
 }
 
 #[cfg(test)]
@@ -471,5 +556,57 @@ materials = { "beam/wood" = "pine", "flat/x" = "ghost" }
         // behind c (its back at z = 0.5) by a metre, plus half their depth
         assert!((v[0].at[2] - 2.0).abs() < 1e-9);
         assert_eq!(v[2].at, [0.0, 0.0, 0.0]);
+    }
+
+    #[test]
+    fn an_asset_part_uses_the_built_child_and_goes_stale_after_it() {
+        let root = std::env::temp_dir().join(format!("kiln-nest-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let config = Config::parse("[project]\nname = \"t\"\n").unwrap();
+        let ship = crate::spec::parse(
+            "[asset]\nid = \"ship\"\nname = \"S\"\n[[parts]]\nid = \"engine\"\nwhat = \"m\"\ncount = 2\nmaterial = \"oak\"\nat = [[-1, 0, 0], [1, 0, 0]]\n[parts.source]\nkind = \"asset\"\nfrom = \"engine\"\nvariant = \"old\"\n",
+        )
+        .unwrap();
+        let engine = crate::spec::parse(
+            "[asset]\nid = \"engine\"\nname = \"E\"\n[[parts]]\nid = \"b\"\nwhat = \"b\"\n[parts.source]\nkind = \"reuse\"\nfrom = \"kit/beam\"\n[[variants]]\nid = \"old\"\n",
+        )
+        .unwrap();
+        let mut cat = cat();
+        // not built yet: a box that says what to assemble first
+        let p = plan(&root, &config, &cat, &ship);
+        assert_eq!(
+            p.items[0].todo.as_deref(),
+            Some("caja: monta antes «engine»")
+        );
+        assert!(p.items[0].material.is_none());
+
+        let write = |id: &str, name: &str, size: &str| {
+            let d = out_dir(&root, &config, id);
+            std::fs::create_dir_all(&d).unwrap();
+            std::fs::write(d.join(name), b"glb").unwrap();
+            std::fs::write(
+                d.join("report.json"),
+                format!("{{\"size_m\": {size}, \"tris\": 120}}"),
+            )
+            .unwrap();
+        };
+        write("engine", "engine.glb", "[1.0, 2.0, 3.0]");
+        write("engine", "engine--old.glb", "[1.0, 2.0, 3.0]");
+        let specs = vec![ship.clone(), engine];
+        cat.builds = reports(&root, &config, &specs);
+        let p = plan(&root, &config, &cat, &ship);
+        let it = &p.items[1];
+        assert!(it.model.as_deref().unwrap().ends_with("engine--old.glb"));
+        assert!(!it.fit && it.todo.is_none());
+        assert_eq!(it.size_m, [1.0, 2.0, 3.0]);
+        assert_eq!(it.at, [1.0, 0.0, 0.0]);
+
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        write("ship", "ship.glb", "[3.0, 2.0, 3.0]");
+        assert!(reports(&root, &config, &specs)["ship"].stale.is_empty());
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        write("engine", "engine.glb", "[1.0, 2.0, 3.0]");
+        assert_eq!(reports(&root, &config, &specs)["ship"].stale, ["engine"]);
+        let _ = std::fs::remove_dir_all(&root);
     }
 }

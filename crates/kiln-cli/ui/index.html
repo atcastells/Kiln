@@ -304,7 +304,7 @@ function askFor(id, from) {
 
 function specLevel(sp) { const subs = ["asset:" + sp.asset.id, ...sp.parts.map(p => `part:${sp.asset.id}/${p.id}`)]; const f = cat.findings.filter(x => subs.includes(x.subject)).map(x => x.severity); return f.includes("error") ? "error" : f.includes("warn") ? "warn" : f.length ? "info" : null; }
 
-const SRC = { reuse: ["Reutilizar", "ok"], variant: ["Variante", "info"], search: ["Buscar", "warn"], retouch: ["Retocar", "info"] };
+const SRC = { reuse: ["Reutilizar", "ok"], variant: ["Variante", "info"], search: ["Buscar", "warn"], retouch: ["Retocar", "info"], asset: ["Asset", "ok"] };
 function renderSpec(sp) {
   const C = { ask: 20, asset: 260, part: 500, src: 750, mat: 1000, check: 1250 };
   const nodes = [], edges = [], id = sp.asset.id;
@@ -315,11 +315,11 @@ function renderSpec(sp) {
   const mats = new Set();
   sp.parts.forEach((p, i) => {
     const y = 40 + i * 90, pid = `part:${id}/${p.id}`;
-    nodes.push(node(pid, "piece", "Pieza" + (p.count > 1 ? " ×" + p.count : ""), p.what, `${p.size_m ? fmt(p.size_m) : "medida libre"}${p.moves ? " · " + p.moves : ""}`, C.part, y, pill(worst(pid))));
+    nodes.push(node(pid, "piece", "Pieza" + (p.count > 1 ? " ×" + p.count : ""), p.what, `${p.size_m ? fmt(p.size_m) : p.source.kind === "asset" ? (cat.builds[p.source.from]?.size_m ? fmt(cat.builds[p.source.from].size_m) : "sin montar") : "medida libre"}${p.moves ? " · " + p.moves : ""}`, C.part, y, pill(worst(pid))));
     edges.push(["asset", pid]);
     const [label, lv] = SRC[p.source.kind] || [p.source.kind, "error"];
     const sid = "src:" + p.id;
-    nodes.push(node(sid, "src", label, p.source.from || (p.source.query ? `buscar «${p.source.query}»` : "—"), p.source.why || "", C.src, y, `<span class="pill ${lv}">${p.source.kind === "search" ? "espera tu permiso" : label.toLowerCase()}</span>`));
+    nodes.push(node(sid, "src", label, (p.source.from ? p.source.from + (p.source.variant ? " · " + p.source.variant : "") : "") || (p.source.query ? `buscar «${p.source.query}»` : "—"), p.source.why || "", C.src, y, `<span class="pill ${lv}">${p.source.kind === "search" ? "espera tu permiso" : label.toLowerCase()}</span>`));
     edges.push([pid, sid]);
     if (p.material) {
       const known = cat.materials.find(m => m.key === p.material);
@@ -335,7 +335,9 @@ function renderSpec(sp) {
     b ? `<span class="pill ${b.items.some(i => i.todo) ? "warn" : "ok"}">${b.items.filter(i => i.todo).length} por terminar a mano</span>` : `<span class="pill info">${placed ? "listo para montar" : "pide colocarlas"}</span>`));
   edges.push(["check", "build"]);
   draw(nodes, edges, [["Petición", C.ask], ["Asset", C.asset], ["Piezas", C.part], ["Modelo", C.src], ["Material", C.mat], ["Validación", C.check], ["Montaje", C.check + 250]]);
-  world.querySelectorAll(".node").forEach(el => { el.classList.toggle("sel", el.dataset.id === sel); el.onclick = () => pickSpec(sp, el.dataset.id); });
+  world.querySelectorAll(".node").forEach(el => { el.classList.toggle("sel", el.dataset.id === sel); el.onclick = () => pickSpec(sp, el.dataset.id);
+    const child = sp.parts.find(p => "src:" + p.id === el.dataset.id && p.source.kind === "asset");
+    if (child && cat.specs.some(s => s.asset.id === child.source.from)) { el.title = "Doble clic para entrar en «" + child.source.from + "»"; el.ondblclick = () => pick("spec:" + child.source.from); } });
 }
 function pickSpec(sp, id) {
   sel = id; renderSpec(sp);

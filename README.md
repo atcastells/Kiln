@@ -320,9 +320,39 @@ estaba. Los proyectos que ya tenían `kiln.toml` se abren como antes.
 mkdir ../mi-juego && target/release/kiln serve --project ../mi-juego
 ```
 
+## Entrega 10: assets hechos de assets
+
+Una ficha puede usar otra ficha como pieza, con la fuente `asset`. Así se
+hacen cosas grandes por niveles, cada uno con su ficha, su montaje y su
+revisión: el muelle de carga usa dos grúas, la grúa usa sus piezas.
+
+```toml
+[[parts]]
+id = "old_hoist"
+what = "grúa de carga curtida por el salitre"
+source = { kind = "asset", from = "hoist", variant = "weathered" }
+at = [[2.2, 0.2, 0]]
+```
+
+- Cada asset es una caja cerrada: llega montado, con su medida y sus
+  materiales. Para cambiarle los colores se elige una de sus variantes.
+- `kiln build --asset cargo_quay` monta antes, de abajo arriba, los assets
+  que usa y que no estén montados o estén por rehacer.
+- Un asset montado queda «por rehacer» (`stale` en `builds`) si alguno de los
+  que usa se montó después que él.
+- Kiln avisa si una ficha usa una que no existe o una variante que no tiene,
+  si una ficha acaba dentro de sí misma, y si los triángulos de lo que usa
+  pasan de `budget_tris`.
+- En el GLB, los materiales guardan el camino entero:
+  `old_hoist/post/Wood`.
+- En el grafo de la ficha, doble clic en la fuente de un asset entra en su
+  ficha.
+
+El ejemplo está en `examples/specs/cargo_quay.toml`.
+
 ## Lo que viene
 
 - El primer asset de punta a punta y la app de escritorio (Tauri).
-- Componer escenas con módulos de piezas (un pasillo de suelo, techo, muros y luces).
+- Assets hechos de assets, paso 2: miga de pan de composición, «dónde se usa» y buscador de fichas; después, la vista 3D con el padre en gris y los anclajes.
 - Kiln como servidor MCP, para que cualquier Claude le pida catálogo o assets.
 - El grafo pasará a Rete.js cuando los nodos se puedan editar.

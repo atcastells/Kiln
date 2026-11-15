@@ -46,6 +46,12 @@ pub fn open_with(project: &Path, config: Config) -> Result<Catalog, String> {
             .sort_by(|a, b| b.severity.cmp(&a.severity).then(a.subject.cmp(&b.subject)));
     }
     catalog.builds = build::reports(project, &config, &catalog.specs);
+    let specs = std::mem::take(&mut catalog.specs);
+    spec::nesting(&specs, &mut catalog);
+    catalog.specs = specs;
+    catalog
+        .findings
+        .sort_by(|a, b| b.severity.cmp(&a.severity).then(a.subject.cmp(&b.subject)));
     catalog.tree = Some(tree::build(project, &config, &catalog));
     Ok(catalog)
 }
