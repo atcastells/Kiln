@@ -324,7 +324,6 @@ estaba. Los proyectos que ya tenían `kiln.toml` se abren como antes.
 mkdir ../mi-juego && target/release/kiln serve --project ../mi-juego
 ```
 
-<<<<<<< HEAD
 ## Entrega 10: hablar con el agente en el asistente
 
 Cada paso del asistente tiene al lado un panel «Hablar con el agente», y la
@@ -345,7 +344,7 @@ los últimos 20 mensajes y sabe en qué paso estás.
   tampoco: si la mejora, sale «Usar este texto».
 - El hilo se guarda en `chat.toml`, junto al contexto. Los mensajes de los
   pasos 1 y 2 se guardan al crear el proyecto.
-=======
+
 ## Entrega 10: assets hechos de assets
 
 Una ficha puede usar otra ficha como pieza, con la fuente `asset`. Así se
@@ -682,7 +681,6 @@ Godot 4 en el `PATH`): `cargo test -p kiln-cli -- --ignored content`.
 Las tablas de compatibilidad entre conectores no están implementadas:
 ningún contenido usa todavía clases de conector. Hoy solo se comprueba que
 el `side` de cada conector esté en una lista cerrada (`within` + `one_of`).
->>>>>>> origin/main
 
 ## Lo que viene
 
