@@ -6,10 +6,76 @@ use crate::{fetch, production, review};
 use std::io::{BufRead, BufReader, Read, Write};
 use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 
 const PAGE: &str = include_str!("../ui/index.html");
 const THREE: &str = include_str!("../ui/vendor/three.js");
+
+/// The modules of the new UI, served under `/ui/<path>`. A new file is one
+/// more line here; `--ui-dir` reads the same paths from disk instead.
+const UI_FILES: &[(&str, &str)] = &[
+    ("app/index.html", include_str!("../ui/app/index.html")),
+    ("app/main.js", include_str!("../ui/app/main.js")),
+    ("app/store.js", include_str!("../ui/app/store.js")),
+    ("app/html.js", include_str!("../ui/app/html.js")),
+    ("app/api.js", include_str!("../ui/app/api.js")),
+    ("app/router.js", include_str!("../ui/app/router.js")),
+    ("app/derive.js", include_str!("../ui/app/derive.js")),
+];
+
+/// `kiln serve --ui-dir`: read the UI modules from here, not from the binary.
+static UI_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+type Reply = (&'static str, &'static str, Vec<u8>);
+
+fn ui_mime(path: &str) -> Option<&'static str> {
+    match path.rsplit_once('.')?.1 {
+        "js" | "mjs" => Some("text/javascript; charset=utf-8"),
+        "css" => Some("text/css; charset=utf-8"),
+        "html" => Some("text/html; charset=utf-8"),
+        _ => None,
+    }
+}
+
+/// A UI file by its path under `ui/`. Only plain names (letters, digits,
+/// `.`, `_`, `-`) are accepted, so nothing can climb out of the folder.
+fn ui_file(rel: &str, dir: Option<&Path>) -> Option<(&'static str, Vec<u8>)> {
+    let plain = |c: &str| {
+        !c.is_empty()
+            && c != "."
+            && c != ".."
+            && c.bytes().all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+    };
+    if !rel.split('/').all(plain) {
+        return None;
+    }
+    let kind = ui_mime(rel)?;
+    let body = match dir {
+        Some(d) => std::fs::read(d.join(rel)).ok()?,
+        None => UI_FILES.iter().find(|(n, _)| *n == rel)?.1.as_bytes().to_vec(),
+    };
+    Some((kind, body))
+}
+
+/// `/ui/<path>` and the entry of the new UI (`/app`); `None` for any other
+/// path, so the caller keeps routing.
+fn route_ui(path: &str, dir: Option<&Path>) -> Option<Reply> {
+    let path = path.split(['?', '#']).next().unwrap_or("");
+    let rel = match path {
+        "/app" | "/app/" => "app/index.html",
+        p => p.strip_prefix("/ui/")?,
+    };
+    Some(match ui_file(rel, dir) {
+        Some((kind, body)) => ("200 OK", kind, body),
+        None => ("404 Not Found", "text/plain", b"no existe".to_vec()),
+    })
+}
+
+fn route_ui_served(path: &str) -> Option<Reply> {
+    route_ui(path, UI_DIR.get().map(PathBuf::as_path))
+}
 
 /// The project the server works on; `None` while the folder has no
 /// `kiln.toml` and the start wizard is open.
@@ -41,7 +107,16 @@ fn make_ctx(project: &Path, config: Option<PathBuf>) -> Result<Ctx, String> {
     })
 }
 
-pub fn run(project: PathBuf, config: Option<PathBuf>, port: u16) -> Result<(), String> {
+pub fn run(
+    project: PathBuf,
+    config: Option<PathBuf>,
+    port: u16,
+    ui_dir: Option<PathBuf>,
+) -> Result<(), String> {
+    if let Some(d) = ui_dir {
+        eprintln!("interfaz leida de {}", d.display());
+        let _ = UI_DIR.set(d);
+    }
     let new = config.is_none() && !project.join(kiln_core::config::FILE).exists();
     let slot: Slot = Arc::new(RwLock::new(if new {
         None
@@ -85,10 +160,21 @@ fn from_page(req: &Request) -> bool {
             .is_some_and(|h| h.starts_with("127.0.0.1:") || h.starts_with("localhost:"))
 }
 
-fn respond(mut stream: TcpStream, status: &str, kind: &str, body: &[u8]) -> std::io::Result<()> {
+fn respond(stream: TcpStream, status: &str, kind: &str, body: &[u8]) -> std::io::Result<()> {
+    respond_with(stream, status, kind, body, None)
+}
+
+fn respond_with(
+    mut stream: TcpStream,
+    status: &str,
+    kind: &str,
+    body: &[u8],
+    etag: Option<&str>,
+) -> std::io::Result<()> {
+    let etag = etag.map(|e| format!("ETag: {e}\r\n")).unwrap_or_default();
     write!(
         stream,
-        "HTTP/1.1 {status}\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n",
+        "HTTP/1.1 {status}\r\nContent-Type: {kind}\r\nContent-Length: {}\r\nCache-Control: no-store\r\n{etag}Connection: close\r\n\r\n",
         body.len()
     )?;
     stream.write_all(body)
@@ -101,6 +187,8 @@ fn handle_new(stream: TcpStream, project: &Path, slot: &Slot, jobs: &Jobs) -> st
     let json = |v: serde_json::Value| serde_json::to_vec(&v).unwrap_or_default();
     let (status, kind, body) = match (req.method.as_str(), req.path.as_str()) {
         ("GET", "/" | "/index.html") => ("200 OK", "text/html; charset=utf-8", PAGE.as_bytes().to_vec()),
+        ("GET", p) if route_ui_served(p).is_some() => route_ui_served(p).unwrap(),
+        ("GET", "/api/jobs") => ("200 OK", "application/json", json(jobs_list(jobs))),
         ("GET", "/api/new") => ("200 OK", "application/json", json(serde_json::json!({
             "step": 1,
             "folder": project.display().to_string(),
@@ -178,6 +266,11 @@ fn read_request(stream: &TcpStream) -> std::io::Result<Request> {
 
 fn handle(stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result<()> {
     let req = read_request(&stream)?;
+    if req.method == "GET" && req.path == "/api/catalog" {
+        let inm = req.headers.iter().find(|(h, _)| h == "if-none-match").map(|(_, v)| v.as_str());
+        let (status, etag, body) = catalog_reply(ctx, inm);
+        return respond_with(stream, status, "application/json", &body, etag.as_deref());
+    }
     let from_page = from_page(&req);
     let body: serde_json::Value = serde_json::from_slice(&req.body).unwrap_or_default();
     let field = |k: &str| {
@@ -206,7 +299,8 @@ fn handle(stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result<()>
             "text/html; charset=utf-8",
             PAGE.as_bytes().to_vec(),
         ),
-        ("GET", "/api/catalog") => catalog_response(ctx),
+        ("GET", p) if route_ui_served(p).is_some() => route_ui_served(p).unwrap(),
+        ("GET", "/api/jobs") => json(jobs_list(jobs)),
         // Only the page itself may post here: a custom header forces a CORS
         // preflight this server never answers, so another site cannot.
         ("POST", _) if !from_page => (
@@ -477,7 +571,31 @@ fn handle(stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result<()>
         },
         _ => ("404 Not Found", "text/plain", b"no existe".to_vec()),
     };
+    // Whatever a write changed on disk, the next catalog is read again.
+    if req.method == "POST" {
+        drop_catalog(&ctx.project);
+    }
     respond(stream, status, kind, &body)
+}
+
+/// Active jobs and the latest finished ones, for a page that reloaded and
+/// needs to find its job again. Logs stay out: `/api/jobs/<id>` has them.
+fn jobs_list(jobs: &Jobs) -> serde_json::Value {
+    const FINISHED_KEPT: usize = 5;
+    let all = jobs.lock().unwrap();
+    let recent: Vec<u64> = all
+        .iter()
+        .rev()
+        .filter(|j| j.status != "running")
+        .take(FINISHED_KEPT)
+        .map(|j| j.id)
+        .collect();
+    let list: Vec<_> = all
+        .iter()
+        .filter(|j| j.status == "running" || recent.contains(&j.id))
+        .map(|j| serde_json::json!({ "id": j.id, "label": j.asked, "state": j.status }))
+        .collect();
+    serde_json::json!({ "jobs": list })
 }
 
 fn job_of(jobs: &Jobs, path: &str) -> Option<agent::Job> {
@@ -512,20 +630,119 @@ fn turn_of(body: &[u8]) -> Result<agent::Turn, String> {
     Ok(agent::Turn { step: r.step, message: message.into(), history, draft: r.draft })
 }
 
-/// The project catalog as JSON, read again on every request.
-fn catalog_response(ctx: &Ctx) -> (&'static str, &'static str, Vec<u8>) {
-    match crate::load(&ctx.project, ctx.config.as_deref()) {
-        Ok(cat) => (
-            "200 OK",
-            "application/json",
-            serde_json::to_vec(&cat).unwrap_or_default(),
-        ),
-        Err(e) => (
-            "500 Internal Server Error",
-            "application/json",
-            serde_json::to_vec(&serde_json::json!({ "error": e })).unwrap_or_default(),
-        ),
+/// A catalog built and serialized, kept while the project files do not change.
+struct CatalogEntry {
+    fingerprint: u64,
+    reply: Option<(Arc<Vec<u8>>, String)>,
+    /// How many times the loader ran for this project; tests read it.
+    loads: usize,
+}
+
+fn catalogs() -> &'static Mutex<HashMap<PathBuf, CatalogEntry>> {
+    static C: OnceLock<Mutex<HashMap<PathBuf, CatalogEntry>>> = OnceLock::new();
+    C.get_or_init(Default::default)
+}
+
+/// Paths, sizes and modification times of everything under the project
+/// (the loader reads specs, content, bindings, build reports and the Godot
+/// cache from there) and of the config file when it lives elsewhere. Only
+/// stats, no reads; `target`, `.git` and `node_modules` are not catalog input.
+fn fingerprint(ctx: &Ctx) -> u64 {
+    fn stat(h: &mut impl Hasher, path: &Path, meta: &std::fs::Metadata) {
+        path.hash(h);
+        meta.len().hash(h);
+        meta.modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_nanos())
+            .hash(h);
     }
+    fn walk(h: &mut impl Hasher, dir: &Path) {
+        let mut entries: Vec<_> = std::fs::read_dir(dir).into_iter().flatten().flatten().collect();
+        entries.sort_by_key(|e| e.file_name());
+        for e in entries {
+            let name = e.file_name();
+            if matches!(name.to_str(), Some("target" | ".git" | "node_modules")) {
+                continue;
+            }
+            let Ok(meta) = e.metadata() else { continue };
+            stat(h, &e.path(), &meta);
+            if meta.is_dir() {
+                walk(h, &e.path());
+            }
+        }
+    }
+    let mut h = std::collections::hash_map::DefaultHasher::new();
+    if let Some(c) = &ctx.config
+        && let Ok(meta) = std::fs::metadata(c)
+    {
+        stat(&mut h, c, &meta);
+    }
+    walk(&mut h, &ctx.project);
+    h.finish()
+}
+
+fn etag_matches(header: &str, etag: &str) -> bool {
+    header
+        .split(',')
+        .map(str::trim)
+        .any(|t| t == "*" || t.strip_prefix("W/").unwrap_or(t) == etag)
+}
+
+/// The catalog answer: `200` with its `ETag`, or `304` when the caller's
+/// `If-None-Match` is the current one. The catalog is loaded again only when
+/// the fingerprint of the project files changed or a write dropped it.
+fn catalog_reply(ctx: &Ctx, if_none_match: Option<&str>) -> (&'static str, Option<String>, Vec<u8>) {
+    let fp = fingerprint(ctx);
+    let mut map = catalogs().lock().unwrap();
+    let entry = map.entry(ctx.project.clone()).or_insert(CatalogEntry {
+        fingerprint: fp,
+        reply: None,
+        loads: 0,
+    });
+    if entry.fingerprint != fp {
+        entry.fingerprint = fp;
+        entry.reply = None;
+    }
+    if entry.reply.is_none() {
+        entry.loads += 1;
+        match crate::load(&ctx.project, ctx.config.as_deref()) {
+            Ok(cat) => {
+                let body = serde_json::to_vec(&cat).unwrap_or_default();
+                let mut h = std::collections::hash_map::DefaultHasher::new();
+                body.hash(&mut h);
+                entry.reply = Some((Arc::new(body), format!("\"{:016x}\"", h.finish())));
+            }
+            Err(e) => {
+                let body = serde_json::to_vec(&serde_json::json!({ "error": e })).unwrap_or_default();
+                return ("500 Internal Server Error", None, body);
+            }
+        }
+    }
+    let (body, etag) = entry.reply.clone().unwrap();
+    drop(map);
+    if if_none_match.is_some_and(|h| etag_matches(h, &etag)) {
+        return ("304 Not Modified", Some(etag), Vec::new());
+    }
+    ("200 OK", Some(etag), body.as_ref().clone())
+}
+
+/// Forget the cached catalog of a project (after a write).
+fn drop_catalog(project: &Path) {
+    if let Some(e) = catalogs().lock().unwrap().get_mut(project) {
+        e.reply = None;
+    }
+}
+
+#[cfg(test)]
+fn catalog_loads(project: &Path) -> usize {
+    catalogs().lock().unwrap().get(project).map_or(0, |e| e.loads)
+}
+
+#[cfg(test)]
+fn catalog_response(ctx: &Ctx) -> Reply {
+    let (status, _, body) = catalog_reply(ctx, None);
+    (status, "application/json", body)
 }
 
 /// The spec file of an asset, absolute.
@@ -611,5 +828,163 @@ mod tests {
     #[test]
     fn catalog_without_content_serves_an_empty_list() {
         assert_eq!(served("")["content"].as_array().unwrap().len(), 0);
+    }
+
+    // ---- UI modules (T4)
+
+    #[test]
+    fn ui_modules_are_served_with_their_mime_type() {
+        let (status, kind, body) = route_ui("/ui/app/main.js", None).unwrap();
+        assert_eq!(status, "200 OK");
+        assert!(kind.starts_with("text/javascript"), "{kind}");
+        assert!(!body.is_empty());
+        let (_, kind, page) = route_ui("/ui/app/index.html", None).unwrap();
+        assert!(kind.starts_with("text/html"));
+        assert_eq!(route_ui("/app", None).unwrap().2, page);
+        assert_eq!(route_ui("/app/", None).unwrap().2, page);
+        assert_eq!(route_ui("/ui/app/main.js?v=2", None).unwrap().0, "200 OK");
+        assert_eq!(ui_mime("a/b.css"), Some("text/css; charset=utf-8"));
+    }
+
+    #[test]
+    fn ui_unknown_and_traversal_paths_are_404() {
+        for p in [
+            "/ui/app/nope.js",
+            "/ui/../src/serve.rs",
+            "/ui/app/../app/main.js",
+            "/ui/%2e%2e/index.html",
+            "/ui//app/main.js",
+            "/ui/app\\main.js",
+            "/ui/",
+            "/ui/app/main.txt",
+        ] {
+            assert_eq!(route_ui(p, None).unwrap().0, "404 Not Found", "{p}");
+        }
+        assert!(route_ui("/", None).is_none());
+        assert!(route_ui("/api/catalog", None).is_none());
+    }
+
+    fn scratch(name: &str) -> PathBuf {
+        let d = std::env::temp_dir().join(format!("kiln-serve-test-{name}-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&d);
+        std::fs::create_dir_all(&d).unwrap();
+        d
+    }
+
+    #[test]
+    fn ui_dir_reads_from_disk_and_stays_inside() {
+        let root = scratch("uidir");
+        let dir = root.join("ui");
+        std::fs::create_dir_all(dir.join("app")).unwrap();
+        std::fs::write(dir.join("app/main.js"), "// from disk").unwrap();
+        std::fs::write(root.join("secret.js"), "// secret").unwrap();
+        let (status, _, body) = route_ui("/ui/app/main.js", Some(&dir)).unwrap();
+        assert_eq!((status, body.as_slice()), ("200 OK", &b"// from disk"[..]));
+        assert_eq!(route_ui("/ui/../secret.js", Some(&dir)).unwrap().0, "404 Not Found");
+        assert_eq!(route_ui("/ui/app/missing.js", Some(&dir)).unwrap().0, "404 Not Found");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    // ---- catalog cache (T9)
+
+    fn copy_dir(from: &Path, to: &Path) {
+        std::fs::create_dir_all(to).unwrap();
+        for e in std::fs::read_dir(from).unwrap().flatten() {
+            let (src, dst) = (e.path(), to.join(e.file_name()));
+            if src.is_dir() { copy_dir(&src, &dst) } else { std::fs::copy(&src, &dst).unwrap(); }
+        }
+    }
+
+    fn project_copy(name: &str) -> (PathBuf, Ctx) {
+        let root = scratch(name);
+        copy_dir(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/content"), &root);
+        let ctx = make_ctx(&root, None).unwrap();
+        (root, ctx)
+    }
+
+    #[test]
+    fn catalog_is_loaded_once_for_two_requests() {
+        let (root, ctx) = project_copy("cache-hit");
+        let a = catalog_reply(&ctx, None);
+        let b = catalog_reply(&ctx, None);
+        assert_eq!((a.0, b.0), ("200 OK", "200 OK"));
+        assert_eq!(a.2, b.2);
+        assert_eq!(catalog_loads(&ctx.project), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn touching_a_project_file_reloads_the_catalog() {
+        let (root, ctx) = project_copy("cache-touch");
+        catalog_reply(&ctx, None);
+        let f = std::fs::OpenOptions::new().write(true).open(root.join("kiln.toml")).unwrap();
+        f.set_modified(std::time::SystemTime::now() + std::time::Duration::from_secs(5)).unwrap();
+        catalog_reply(&ctx, None);
+        assert_eq!(catalog_loads(&ctx.project), 2);
+        catalog_reply(&ctx, None);
+        assert_eq!(catalog_loads(&ctx.project), 2);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn build_and_git_folders_do_not_invalidate_but_a_new_file_does() {
+        let (root, ctx) = project_copy("cache-skip");
+        catalog_reply(&ctx, None);
+        std::fs::create_dir_all(root.join("target")).unwrap();
+        std::fs::write(root.join("target/junk"), "x").unwrap();
+        catalog_reply(&ctx, None);
+        assert_eq!(catalog_loads(&ctx.project), 1);
+        std::fs::write(root.join("new-file.toml"), "x").unwrap();
+        catalog_reply(&ctx, None);
+        assert_eq!(catalog_loads(&ctx.project), 2);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn dropping_the_cache_forces_a_reload() {
+        let (root, ctx) = project_copy("cache-drop");
+        catalog_reply(&ctx, None);
+        drop_catalog(&ctx.project);
+        catalog_reply(&ctx, None);
+        assert_eq!(catalog_loads(&ctx.project), 2);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn catalog_answers_304_when_the_etag_matches() {
+        let (root, ctx) = project_copy("cache-304");
+        let (status, etag, body) = catalog_reply(&ctx, None);
+        let etag = etag.unwrap();
+        assert_eq!(status, "200 OK");
+        assert!(!body.is_empty() && etag.starts_with('"') && etag.ends_with('"'));
+        let (status, tag2, body) = catalog_reply(&ctx, Some(&etag));
+        assert_eq!((status, tag2.as_deref(), body.len()), ("304 Not Modified", Some(etag.as_str()), 0));
+        assert_eq!(catalog_reply(&ctx, Some("W/\"other\", *")).0, "304 Not Modified");
+        assert_eq!(catalog_reply(&ctx, Some("\"other\"")).0, "200 OK");
+        assert_eq!(catalog_loads(&ctx.project), 1);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    // ---- jobs list (T10)
+
+    fn job(id: u64, status: &str) -> agent::Job {
+        agent::Job { id, asked: format!("tarea {id}"), status: status.into(), log: vec!["linea".into()], spec: None, reply: None, offer: None }
+    }
+
+    #[test]
+    fn jobs_list_has_active_and_the_latest_finished_without_logs() {
+        let jobs: Jobs = Default::default();
+        {
+            let mut j = jobs.lock().unwrap();
+            for i in 1..=9 { j.push(job(i, if i == 2 { "running" } else if i % 2 == 0 { "failed" } else { "done" })); }
+        }
+        let v = jobs_list(&jobs);
+        let list = v["jobs"].as_array().unwrap();
+        let ids: Vec<u64> = list.iter().map(|j| j["id"].as_u64().unwrap()).collect();
+        assert_eq!(ids, vec![2, 5, 6, 7, 8, 9]);
+        assert_eq!(list[0]["state"], "running");
+        assert_eq!(list[0]["label"], "tarea 2");
+        assert!(list[0].get("log").is_none());
+        assert_eq!(jobs_list(&Default::default())["jobs"].as_array().unwrap().len(), 0);
     }
 }

@@ -9,6 +9,10 @@ UPDATE=""
 case "${1:-}" in "") ;; --update-baseline) UPDATE="--update-baseline" ;; *) echo "uso: $0 [--update-baseline]" >&2; exit 2 ;; esac
 command -v node >/dev/null || { echo "node is required to run the UI tests" >&2; exit 2; }
 
+echo "== unit tests (node --test)"
+node --test 'crates/kiln-cli/ui/tests/unit/*.test.mjs' 2>&1 | grep -E '^(not ok|# (tests|pass|fail))' || true
+node --test 'crates/kiln-cli/ui/tests/unit/*.test.mjs' >/dev/null 2>&1 || { echo "FAIL: ui unit tests failed" >&2; exit 1; }
+
 OUT="$(mktemp -d "${TMPDIR:-/tmp}/kiln-ui-test.XXXXXX")"
 PIDS=()
 cleanup() {

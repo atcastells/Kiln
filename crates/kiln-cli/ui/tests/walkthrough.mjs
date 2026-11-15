@@ -66,6 +66,21 @@ async function walk(chrome, name, port) {
   } finally { await d.close(); }
 }
 
+// The new UI at /app: its module graph loads from the binary and it shows the project name.
+async function walkApp(chrome, name, port) {
+  const d = await Driver.open(chrome.port, `${name}/app`);
+  try {
+    const cat = await api(port, "/api/catalog");
+    await d.goto(`http://127.0.0.1:${port}/app`);
+    const shown = await d.waitFor(`() => (document.getElementById("kiln-project")?.textContent ?? "") !== "..."`);
+    await d.settle({ quiet: 300 });
+    check(name, "app: /app loads and shows the project name", shown && (await d.page.eval(`document.getElementById("kiln-project").textContent`)) === cat.project);
+    check(name, "app: no JS errors", d.errors.length === 0, d.errors.join(" | "));
+  } catch (e) {
+    check(name, "app: ran to the end", false, e.stack?.split("\n").slice(0, 3).join(" "));
+  } finally { await d.close(); }
+}
+
 const matches = (q, text) => String(text).toLowerCase().includes(q);
 
 async function searchNarrows(d, name, view, q, expectDim) {
@@ -292,6 +307,7 @@ console.log(`Chrome: ${chrome.version}`);
 let perf = null;
 try {
   for (const [name, port] of Object.entries(targets)) await walk(chrome, name, port);
+  for (const [name, port] of Object.entries(targets)) if (name !== "wizard") await walkApp(chrome, name, port);
   if (targets.synthetic) perf = await measure(chrome, targets.synthetic);
 } finally { chrome.kill(); }
 
