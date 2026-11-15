@@ -101,6 +101,9 @@ pub struct FieldRule {
     pub min: Option<f64>,
     #[serde(default)]
     pub max: Option<f64>,
+    /// List field whose items (structs) are checked instead of the element.
+    #[serde(default)]
+    pub within: Option<String>,
 }
 
 /// Why a set of the schema cannot be used; becomes a `content_schema` finding.
@@ -152,6 +155,18 @@ impl ContentSet {
     fn check(&self) -> Option<String> {
         if self.definitions.is_empty() {
             return Some("definitions no puede estar vacío".into());
+        }
+        let confined = |p: &str| {
+            let path = std::path::Path::new(p);
+            !path.has_root()
+                && !p.starts_with(['/', '\\'])
+                && path.components().all(|c| matches!(c, std::path::Component::Normal(_) | std::path::Component::CurDir))
+        };
+        if let Some(p) = self.definitions.iter().find(|p| !confined(p)) {
+            return Some(format!("definitions `{p}` debe ser relativo al proyecto y sin «..»"));
+        }
+        if let Some(p) = self.manifest.as_deref().filter(|p| !confined(p)) {
+            return Some(format!("manifest `{p}` debe ser relativo al proyecto y sin «..»"));
         }
         let declared = |k: &str| self.kinds.contains_key(k);
         match (&self.default_kind, &self.root) {
@@ -363,5 +378,22 @@ id = "id"
         assert_eq!(map.keys().collect::<Vec<_>>(), vec!["good"]);
         assert_eq!(problems.len(), 1);
         assert_eq!(problems[0].set, "bad");
+    }
+
+    #[test]
+    fn paths_must_stay_inside_the_project() {
+        problem(sets("[content.s]\ndefinitions = [\"../**/*.ron\"]\n"), "definitions");
+        problem(sets("[content.s]\ndefinitions = [\"a/../../x.ron\"]\n"), "..");
+        problem(sets("[content.s]\ndefinitions = [\"/etc/*.ron\"]\n"), "definitions");
+        problem(sets("[content.s]\ndefinitions = [\"a/*.ron\"]\nmanifest = \"../m.json\"\n"), "manifest");
+        problem(sets("[content.s]\ndefinitions = [\"a/*.ron\"]\nmanifest = \"/tmp/m.json\"\n"), "manifest");
+        let (map, problems) = sets("[content.s]\ndefinitions = [\"./a/**/*.ron\"]\nmanifest = \"k/m.json\"\n");
+        assert!(map.contains_key("s") && problems.is_empty(), "{problems:?}");
+    }
+
+    #[test]
+    fn within_is_accepted_in_a_field_rule() {
+        let (map, problems) = one("", "fields = [{ name = \"side\", within = \"conns\", required = true }]");
+        assert!(map.contains_key("s") && problems.is_empty(), "{problems:?}");
     }
 }

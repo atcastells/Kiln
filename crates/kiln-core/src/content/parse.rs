@@ -15,7 +15,7 @@ const MAX_DEPTH: usize = 64;
 type R<T> = Result<T, ParseError>;
 
 pub fn parse(text: &str) -> Result<Value, ParseError> {
-    let mut parser = Parser { s: text, pos: 0, depth: 0 };
+    let mut parser = Parser { s: text, pos: if text.starts_with('\u{feff}') { 3 } else { 0 }, depth: 0 };
     let value = parser.value()?;
     parser.skip()?;
     if parser.pos < text.len() {
@@ -142,7 +142,11 @@ impl Parser<'_> {
         let mut fields = Vec::new();
         while !self.eat(')')? {
             self.skip()?;
+            let key_at = self.pos;
             let key = self.ident().ok_or_else(|| self.err("se esperaba un nombre de campo"))?;
+            if fields.iter().any(|(k, _)| *k == key) {
+                return Err(self.err_at(key_at, &format!("campo `{key}` repetido")));
+            }
             if !self.eat(':')? {
                 return Err(self.err("se esperaba ':'"));
             }
@@ -184,6 +188,10 @@ impl Parser<'_> {
         let rest = &self.s[self.pos..];
         let n = rest.find(|c: char| !(c.is_ascii_alphanumeric() || "+-._".contains(c))).unwrap_or(rest.len());
         let tok = rest[..n].replace('_', "");
+        let digits = tok.strip_prefix(['+', '-']).unwrap_or(&tok);
+        if !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()) && tok.parse::<i64>().is_err() {
+            return Err(self.err("entero fuera de rango"));
+        }
         let parsed = tok.parse().map(Value::Int).or_else(|_| match tok.parse::<f64>() {
             Ok(f) if f.is_finite() && tok.contains(|c: char| c.is_ascii_digit()) => Ok(Value::Float(f)),
             _ => Err(()),
@@ -363,5 +371,29 @@ mod tests {
         ] {
             let _ = parse(text);
         }
+    }
+
+    #[test]
+    fn duplicate_field_is_a_syntax_error_at_the_second() {
+        let (line, col, msg) = err("(a: 1,\n  a: 2)");
+        assert_eq!((line, col), (2, 3), "{msg}");
+        assert!(msg.contains('a'), "{msg}");
+    }
+
+    #[test]
+    fn integer_out_of_range_is_a_syntax_error() {
+        let (line, col, msg) = err("(a: 9223372036854775808)");
+        assert_eq!((line, col), (1, 5));
+        assert!(msg.contains("entero fuera de rango"), "{msg}");
+        assert!(parse("(a: 9223372036854775807)").is_ok());
+        assert!(parse("(a: 1.5e3)").is_ok());
+        assert!(parse("(a: 1e3)").is_ok());
+    }
+
+    #[test]
+    fn leading_bom_is_skipped() {
+        assert!(parse("\u{feff}(a: 1)").is_ok());
+        let (line, col, _) = err("\u{feff}(a: 1) x");
+        assert_eq!((line, col), (1, 9));
     }
 }

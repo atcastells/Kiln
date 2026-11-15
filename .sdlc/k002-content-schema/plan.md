@@ -29,24 +29,24 @@ cambiado; la interfaz enseña el panel «Contenido».
 
 | # | Task | Files | Test that proves it | Requirement | Runs on | Depends | Est | Status |
 |---|------|-------|---------------------|-------------|---------|---------|-----|--------|
-| T0 | Worktree desde `origin/main` (tras `git fetch`), rama `k002-content-schema`; línea base: tests, Clippy y salida de `kiln check --project examples` guardada | — | comandos en verde | R10 | main | — | 3m/300k | pending |
-| T1 | Prueba de riesgo: leer con `ron` la fixture de K001 y el fichero de Astra a un árbol de valores sin tipos por juego | scratch (informe) | informe con el código probado | R3 | implementer | T0 | 3m/200k | pending |
-| T2 | Tipos del esquema en la configuración y su validación (clave desconocida = error) | `kiln-core/src/content/schema.rs`, `config.rs` | unitarios | R1, R2, R10 | implementer | T1 | 2m/200k | pending |
-| T3 | Árbol de valores y lector de RON: lista de variantes, y registro con `root` y `default_kind` | `content/value.rs`, `content/parse.rs` | unitarios con los dos ficheros | R3 | implementer | T1 | 3m/250k | pending |
-| T4 | Índice de elementos e IDs duplicados | `content/mod.rs` | unitarios | R5 | implementer | T2, T3 | 2m/150k | pending |
-| T5 | Referencias por esquema: desconocida, tipo equivocado, campos distintos | `content/refs.rs` | un test por regla, esquema inventado | R2, R5 | implementer | T4 | 2m/200k | pending |
-| T6 | Referencias externas: asset en el catálogo (con `greybox`) y escena existente | `content/refs.rs` | unitarios | R2, R5 | implementer | T5 | 2m/150k | pending |
-| T7 | Manifiesto v2: tipos, carga y comparación de IDs, escena y metadatos de nodo | `content/manifest.rs` | unitarios | R5 | implementer | T4 | 3m/200k | pending |
-| T8 | Marcadores: sublistas contra nodos hijos | `content/markers.rs` | unitarios | R4 | implementer | T7 | 2m/200k | pending |
-| T8b | Reglas de campo: obligatorio, tipo, rango, lista cerrada y tabla de compatibilidad | `content/fields.rs`, `content/schema.rs` | un test por regla | R12 | implementer | T4 | 3m/250k | pending |
-| T9 | `content::run` en `open_with`, `Catalog.content`, y retirada de `astra/` | `content/mod.rs`, `lib.rs`, `catalog.rs`, borrar `astra/` | integración sobre la fixture | R1, R7 | implementer | T6, T8, T8b | 3m/250k | pending |
-| T10 | Fixture migrada a `examples/content` y test de paridad con K001 | `examples/content/**`, test en `content/mod.rs` | paridad caso a caso | R7 | implementer | T9 | 2m/200k | pending |
-| T11 | Script de Godot genérico y `kiln content-manifest [--set]` | `kiln-cli/godot/content_manifest.gd`, `kiln-cli/src/content.rs`, `main.rs` | test `#[ignore]` con Godot | R6 | implementer | T9 | 4m/250k | pending |
-| T12 | API: los conjuntos de contenido en el catálogo servido | `kiln-cli/src/serve.rs` | test de la respuesta | R8 | implementer | T9 | 2m/150k | pending |
-| T13 | Interfaz: panel «Contenido» | `kiln-cli/ui/index.html` | comprobación manual con captura | R8 | implementer | T12 | 4m/250k | pending |
-| T14 | README: «Validar contenido» | `README.md` | comandos ejecutados | R11 | main | T11 | 2m/800k | pending |
-| T15 | Astra: esquema en `kiln.toml`, borrar la vista y su test, adaptar `scripts/kiln_check.sh` | repo de Astra | el script, en verde y en rojo (escena y conector) | R9 | implementer | T11 | 3m/200k | pending |
-| T16 | Verificación: batería, Godot, fixture, Astra, y dos flujos vecinos (`kiln check` y `kiln serve` sobre `examples`) | — | informe del verifier | todos | verifier | T13, T15 | 8m/1.5M | pending |
+| T0 | Worktree desde `origin/main` (tras `git fetch`), rama `k002-content-schema`; línea base: tests, Clippy y salida de `kiln check --project examples` guardada | — | comandos en verde | R10 | main | — | 3m/300k | done |
+| T1 | Prueba de riesgo: leer con `ron` la fixture de K001 y el fichero de Astra a un árbol de valores sin tipos por juego | scratch (informe) | informe con el código probado | R3 | implementer | T0 | 3m/200k | done |
+| T2 | Tipos del esquema en la configuración y su validación (clave desconocida = error) | `kiln-core/src/content/schema.rs`, `config.rs` | unitarios | R1, R2, R10 | implementer | T1 | 2m/200k | done |
+| T3 | Árbol de valores y lector de RON: lista de variantes, y registro con `root` y `default_kind` | `content/value.rs`, `content/parse.rs` | unitarios con los dos ficheros | R3 | implementer | T1 | 3m/250k | done |
+| T4 | Índice de elementos e IDs duplicados | `content/mod.rs` | unitarios | R5 | implementer | T2, T3 | 2m/150k | done |
+| T5 | Referencias por esquema: desconocida, tipo equivocado, campos distintos | `content/refs.rs` | un test por regla, esquema inventado | R2, R5 | implementer | T4 | 2m/200k | done |
+| T6 | Referencias externas: asset en el catálogo (con `greybox`) y escena existente | `content/refs.rs` | unitarios | R2, R5 | implementer | T5 | 2m/150k | done |
+| T7 | Manifiesto v2: tipos, carga y comparación de IDs, escena y metadatos de nodo | `content/manifest.rs` | unitarios | R5 | implementer | T4 | 3m/200k | done |
+| T8 | Marcadores: sublistas contra nodos hijos | `content/markers.rs` | unitarios | R4 | implementer | T7 | 2m/200k | done |
+| T8b | Reglas de campo: obligatorio, tipo, rango, lista cerrada y `within` para ítems de lista; tabla de compatibilidad aplazada: ningún contenido usa todavía clases de conector | `content/fields.rs`, `content/schema.rs` | un test por regla | R12 | implementer | T4 | 3m/250k | done |
+| T9 | `content::run` en `open_with`, `Catalog.content`, y retirada de `astra/` | `content/mod.rs`, `lib.rs`, `catalog.rs`, borrar `astra/` | integración sobre la fixture | R1, R7 | implementer | T6, T8, T8b | 3m/250k | done |
+| T10 | Fixture migrada a `examples/content` y test de paridad con K001 | `examples/content/**`, test en `content/mod.rs` | paridad caso a caso | R7 | implementer | T9 | 2m/200k | done |
+| T11 | Script de Godot genérico y `kiln content-manifest [--set]` | `kiln-cli/godot/content_manifest.gd`, `kiln-cli/src/content.rs`, `main.rs` | test `#[ignore]` con Godot | R6 | implementer | T9 | 4m/250k | done |
+| T12 | API: los conjuntos de contenido en el catálogo servido | `kiln-cli/src/serve.rs` | test de la respuesta | R8 | implementer | T9 | 2m/150k | done |
+| T13 | Interfaz: panel «Contenido» | `kiln-cli/ui/index.html` | comprobación manual con captura | R8 | implementer | T12 | 4m/250k | done |
+| T14 | README: «Validar contenido» | `README.md` | comandos ejecutados | R11 | main | T11 | 2m/800k | done |
+| T15 | Astra: esquema en `kiln.toml`, borrar la vista y su test, adaptar `scripts/kiln_check.sh` | repo de Astra | el script, en verde y en rojo (escena y conector) | R9 | implementer | T11 | 3m/200k | done |
+| T16 | Verificación: batería, Godot, fixture, Astra, y dos flujos vecinos (`kiln check` y `kiln serve` sobre `examples`) | — | informe del verifier | todos | verifier | T13, T15 | 8m/1.5M | done |
 
 ## Schedule
 

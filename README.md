@@ -463,6 +463,22 @@ de la lista es `content_marker_extra`.
 | `type` | `string`, `int`, `float`, `bool`, `ident` (palabra sin comillas), `list`, `tuple` o `struct`. Un `int` vale como `float`. |
 | `one_of` | Lista cerrada de valores admitidos, para texto o `ident`. No puede estar vacía. |
 | `min`, `max` | Rango admitido, para números. `min` no puede ser mayor que `max`. |
+| `within` | Opcional. Nombre de un campo lista del elemento: la regla se aplica al campo `name` de cada ítem (una estructura) de esa lista, con el mismo significado de `required`, `type`, `min`/`max` y `one_of`. El hallazgo nombra la lista y el ítem (su campo `name` o, si no lo tiene, su posición). Una lista ausente no tiene ítems; un campo que no es lista o un ítem que no es estructura es un `content_field_type`. |
+
+Por ejemplo, para exigir que cada conector tenga un `side` conocido:
+
+```toml
+fields = [
+    { name = "side", within = "connectors", required = true, type = "ident", one_of = ["North", "East", "South", "West"] },
+    { name = "offset", within = "connectors", type = "int", min = 0 },
+]
+```
+
+Con `side: Up` en el conector `east`, el hallazgo es `content_field_value` y
+dice «`connectors[east].side` vale «Up»...».
+
+`definitions` y `manifest` son rutas del proyecto: una ruta absoluta o con
+un componente `..` es un problema `content_schema` del conjunto.
 
 ### Un segundo ejemplo: una biblioteca en un solo fichero
 
@@ -589,7 +605,11 @@ Admite: listas `[a, b]`, tuplas `(a, b)`, estructuras con nombre
 `Tipo(campo: valor)` o sin él `(campo: valor)`, cadenas con las escapadas
 `\"`, `\\`, `\n` y `\t`, enteros y decimales (con `_` y signo), `true` y
 `false`, palabras sin comillas (`East`), comas finales y comentarios `//` y
-`/* */`. El anidamiento máximo es 64.
+`/* */`. El anidamiento máximo es 64. Se ignora una marca BOM UTF-8 al
+principio del fichero.
+
+Son errores de lectura un campo repetido dentro de una misma estructura
+(en el segundo) y un entero fuera del rango de `i64`.
 
 No admite: mapas `{ }`, `Some(...)` (`None` se lee como una palabra sin
 comillas), estructuras con nombre y valores posicionales `Tipo(1, 2)`,
@@ -630,6 +650,12 @@ elemento, y `<conjunto>` si es de todo el conjunto).
 
 El test que exporta con Godot de verdad se ejecuta a mano (necesita
 Godot 4 en el `PATH`): `cargo test -p kiln-cli -- --ignored content`.
+
+### Pendiente
+
+Las tablas de compatibilidad entre conectores no están implementadas:
+ningún contenido usa todavía clases de conector. Hoy solo se comprueba que
+el `side` de cada conector esté en una lista cerrada (`within` + `one_of`).
 
 ## Lo que viene
 

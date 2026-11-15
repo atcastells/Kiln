@@ -49,7 +49,7 @@ distribuciones.
 
 | # | Requirement | Traces to | Acceptance criterion |
 |---|-------------|-----------|----------------------|
-| R12 | Reglas de campo por tipo: obligatorio, tipo de dato (entero, texto, lista, par), rango numérico, valor dentro de una lista cerrada, y compatibilidad entre conectores declarada como tabla | entrada de diseño | un test por regla con un esquema inventado; en Astra, un módulo sin `capacity` o con un conector de clase desconocida da un hallazgo |
+| R12 | Reglas de campo por tipo: obligatorio, tipo de dato (entero, texto, lista, par), rango numérico, valor dentro de una lista cerrada, y compatibilidad entre conectores declarada como tabla (aplazada: ningún contenido usa todavía clases de conector) | entrada de diseño | un test por regla con un esquema inventado; en Astra, un `kind` desconocido o un `side` de conector desconocido da un hallazgo |
 
 ## Design
 
