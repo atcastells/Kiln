@@ -28,6 +28,12 @@ body { background: var(--bg); color: var(--fg); font: 14px var(--font); display:
 form { display: flex; gap: 6px; flex: 1 1 320px; min-width: 0; } form input { flex: 1; }
 .k-spec .hd i, .k-asset .hd i { background: var(--accent); } .k-ask .hd i { background: var(--fg); } .k-src .hd i { background: var(--ok); } .k-check .hd i { background: var(--bad); }
 .log { font: 12px var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; border-top: 1px solid var(--line); padding: 5px 0; }
+#searchBox { position: relative; }
+#hits { position: absolute; top: calc(100% + 4px); left: 0; z-index: 20; min-width: 100%; width: max-content; max-width: 420px; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.12); }
+#hits button { display: block; width: 100%; text-align: left; border: 0; border-radius: 0; background: none; padding: 6px 10px; font-size: 13px; cursor: pointer; }
+#hits button:hover, #hits button:focus { background: var(--line); }
+#hits .s { color: var(--muted); font-size: 12px; }
+.nest a { cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
 header { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; }
 h1 { font-size: 18px; margin: 0; }
 .tag { font: 500 11px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 2px 6px; }
@@ -108,7 +114,7 @@ textarea { font: inherit; width: 100%; min-height: 180px; padding: 8px 10px; bor
 <header>
   <h1>Kiln</h1><span class="tag" id="proj">cargando…</span>
   <div class="stats" id="stats"></div>
-  <input id="search" placeholder="Buscar pieza o material" aria-label="Buscar pieza o material">
+  <div id="searchBox"><input id="search" placeholder="Buscar pieza, material o asset" aria-label="Buscar pieza, material o asset" autocomplete="off"><div id="hits" hidden></div></div>
   <form id="askForm"><input id="ask" placeholder="Pedir un asset: crear un ascensor" aria-label="Pedir un asset"><button type="submit">Desglosar</button></form>
   <nav class="tabs"><button type="button" data-mode="context">Contexto</button><button type="button" data-mode="tree">Árbol</button><button type="button" data-mode="catalog">Catálogo</button></nav>
   <button id="back" type="button" hidden>Volver</button>
@@ -242,6 +248,11 @@ function pathTo(key) {
 }
 function crumbs() {
   const el = document.getElementById("crumbs");
+  if (cat && specView && specTrail.length > 1) {
+    el.innerHTML = specTrail.map(k => `<a data-s="${esc(k)}">${esc(specName(k))}</a>`).join("<span>›</span>");
+    el.querySelectorAll("a").forEach(a => a.onclick = () => pick("spec:" + a.dataset.s));
+    return;
+  }
   if (!cat || !cat.tree || mode !== "tree" || specView) { el.innerHTML = ""; return; }
   el.innerHTML = pathTo(treeAt || cat.tree.root).map(k => `<a data-k="${esc(k)}">${esc(cat.tree.nodes[k].name)}</a>`).join("<span>›</span>");
   el.querySelectorAll("a").forEach(a => a.onclick = () => { treeAt = a.dataset.k; sel = treeAt; render(); showTreeNode(cat.tree.nodes[treeAt]); });
@@ -342,17 +353,60 @@ function renderSpec(sp) {
 function pickSpec(sp, id) {
   sel = id; renderSpec(sp);
   const id0 = sp.asset.id;
-  if (id === "asset" || id === "ask") { side.innerHTML = `<div class="kind">Asset</div><h2>${esc(sp.asset.name)}</h2><dl><dt>id</dt><dd>${esc(id0)}</dd><dt>petición</dt><dd>${esc(sp.asset.asked)}</dd><dt>dónde</dt><dd>${esc(sp.asset.where)}</dd><dt>estados</dt><dd>${esc(sp.asset.states.join(", "))}</dd><dt>presupuesto</dt><dd>${sp.asset.budget_tris ?? "—"} tri</dd><dt>ficha</dt><dd>${esc(sp.file)}</dd></dl>${sp.asset.notes ? `<p>${esc(sp.asset.notes)}</p>` : ""}` + buildActions(sp) + findingsOf("asset:" + id0); wireBuild(sp); return; }
+  if (id === "asset" || id === "ask") { side.innerHTML = `<div class="kind">Asset</div><h2>${esc(sp.asset.name)}</h2><dl><dt>id</dt><dd>${esc(id0)}</dd><dt>petición</dt><dd>${esc(sp.asset.asked)}</dd><dt>dónde</dt><dd>${esc(sp.asset.where)}</dd><dt>estados</dt><dd>${esc(sp.asset.states.join(", "))}</dd><dt>presupuesto</dt><dd>${sp.asset.budget_tris ?? "—"} tri</dd><dt>ficha</dt><dd>${esc(sp.file)}</dd></dl>${sp.asset.notes ? `<p>${esc(sp.asset.notes)}</p>` : ""}` + nestInfo(sp) + buildActions(sp) + findingsOf("asset:" + id0); wireBuild(sp);
+    side.querySelectorAll(".nest a[data-s]").forEach(a => a.onclick = () => pick("spec:" + a.dataset.s)); return; }
   if (id === "build") return showBuild(sp);
   if (id === "check") { const f = cat.findings.filter(x => x.subject === "asset:" + id0 || x.subject.startsWith(`part:${id0}/`)); side.innerHTML = `<div class="kind">Validación</div><h2>${esc(sp.asset.name)}</h2>` + (f.map(x => `<div class="finding">${pill(x.severity)} <b>${esc(x.subject.split("/").pop())}</b>: ${esc(x.message)}</div>`).join("") || "<p>Todo en orden.</p>"); return; }
   const part = sp.parts.find(p => id === `part:${id0}/${p.id}` || id === "src:" + p.id);
   if (part) { const from = part.source.from && cat.pieces.find(c => c.key === part.source.from);
-    side.innerHTML = `<div class="kind">Pieza</div><h2>${esc(part.what)}</h2><dl><dt>id</dt><dd>${esc(part.id)}</dd><dt>medida</dt><dd>${part.size_m ? fmt(part.size_m) : "—"}</dd><dt>cuántas</dt><dd>${part.count ?? 1}</dd><dt>material</dt><dd>${esc(part.material ?? "el suyo")}</dd><dt>se mueve</dt><dd>${esc(part.moves ?? "no")}</dd><dt>fuente</dt><dd>${esc(part.source.kind)} ${esc(part.source.from ?? part.source.query ?? "")}</dd><dt>dónde</dt><dd>${(part.at || []).map(a => "(" + a.map(v => v.toFixed(2)).join(", ") + ")").join(" ") || "sin colocar"}</dd>${part.source.why ? `<dt>por qué</dt><dd>${esc(part.source.why)}</dd>` : ""}${from ? `<dt>en el catálogo</dt><dd>${fmt(from.size_m)} · ${from.tris ?? "?"} tri · ${esc(from.licenses.join(", "))}</dd>` : ""}</dl>` + (from?.preview ? `<div class="view3d" id="v3d"></div>` : "") + siteSearch(part) + findingsOf(`part:${id0}/${part.id}`); if (from?.preview) view3d(from.preview); wireSearch(sp, part); return; }
+    side.innerHTML = `<div class="kind">Pieza</div><h2>${esc(part.what)}</h2><dl><dt>id</dt><dd>${esc(part.id)}</dd><dt>medida</dt><dd>${part.size_m ? fmt(part.size_m) : "—"}</dd><dt>cuántas</dt><dd>${part.count ?? 1}</dd><dt>material</dt><dd>${esc(part.material ?? "el suyo")}</dd><dt>se mueve</dt><dd>${esc(part.moves ?? "no")}</dd><dt>fuente</dt><dd>${esc(part.source.kind)} ${esc(part.source.from ?? part.source.query ?? "")}</dd><dt>dónde</dt><dd>${(part.at || []).map(a => "(" + a.map(v => v.toFixed(2)).join(", ") + ")").join(" ") || "sin colocar"}</dd>${part.source.why ? `<dt>por qué</dt><dd>${esc(part.source.why)}</dd>` : ""}${from ? `<dt>en el catálogo</dt><dd>${fmt(from.size_m)} · ${from.tris ?? "?"} tri · ${esc(from.licenses.join(", "))}</dd>` : ""}</dl>` + (from?.preview ? `<div class="view3d" id="v3d"></div>` : "") + siteSearch(part) + enterAsset(part) + findingsOf(`part:${id0}/${part.id}`); if (from?.preview) view3d(from.preview); wireSearch(sp, part);
+    document.getElementById("enterAsset")?.addEventListener("click", () => pick("spec:" + part.source.from)); return; }
   if (id.startsWith("mat:")) { const m = cat.materials.find(x => x.key === id.slice(4)); if (m) showMat(m); else side.innerHTML = `<div class="kind">Material</div><h2>${esc(id.slice(4))}</h2><p>No está en la paleta. Hay que añadirlo antes de montar (por ejemplo, texturas CC0 de Poly Haven).</p>`; }
 }
 
+// ---- Assets made of assets: the path down, where each one is used ----
+let specTrail = [];
+const specName = id => cat.specs.find(s => s.asset.id === id)?.asset.name || id;
+const madeOf = sp => [...new Set(sp.parts.filter(p => p.source.kind === "asset" && p.source.from).map(p => p.source.from))];
+const usedIn = id => cat.specs.map(s => [s.asset.id, s.parts.filter(p => p.source.kind === "asset" && p.source.from === id).reduce((n, p) => n + Math.max(1, p.count || 1), 0)]).filter(([, n]) => n);
+// up through the first asset that uses it, without going round a loop
+function pathUp(id) { const out = [id]; for (let at = id; ;) { const up = usedIn(at)[0]?.[0]; if (!up || out.includes(up)) return out; out.unshift(up); at = up; } }
+// going down from the open asset keeps the way taken; anything else, the way up
+function trailFor(id) {
+  const i = specTrail.indexOf(id);
+  if (i >= 0) return specTrail.slice(0, i + 1);
+  const open = specView && cat.specs.find(s => s.asset.id === specView);
+  if (open && specTrail.at(-1) === specView && madeOf(open).includes(id)) return [...specTrail, id];
+  return pathUp(id);
+}
+function enterAsset(part) {
+  if (part.source.kind !== "asset") return "";
+  const there = cat.specs.some(s => s.asset.id === part.source.from), b = cat.builds[part.source.from];
+  return `<div class="kind" style="margin-top:12px">Asset</div><p>Es el asset «${esc(specName(part.source.from))}»${part.source.variant ? `, en su variante «${esc(part.source.variant)}»` : ""}: llega montado y con sus materiales.${b ? ` Mide ${fmt(b.size_m)} y tiene ${b.tris.toLocaleString("es")} tri.` : " Aún no está montado."}</p>`
+    + (there ? `<div class="actions"><button type="button" id="enterAsset">Entrar en su ficha</button></div>` : "");
+}
+function nestInfo(sp) {
+  const down = madeOf(sp), up = usedIn(sp.asset.id), stale = cat.builds[sp.asset.id]?.stale || [];
+  if (!down.length && !up.length) return "";
+  const link = id => `<a data-s="${esc(id)}">${esc(specName(id))}</a>`;
+  return `<div class="nest">`
+    + (stale.length ? `<div class="finding"><span class="pill warn">por rehacer</span> ${stale.map(link).join(", ")} ${stale.length > 1 ? "cambiaron" : "cambió"} después del último montaje.</div>` : "")
+    + (down.length ? `<div class="kind" style="margin-top:12px">Hecho de</div><p>${down.map(link).join(", ")}</p>` : "")
+    + `<div class="kind" style="margin-top:12px">Dónde se usa</div>`
+    + (up.length ? `<p>${up.map(([s, n]) => link(s) + (n > 1 ? ` ×${n}` : "")).join(", ")}</p><p class="note">Si lo cambias, quedan por rehacer los assets que lo usan y los que están encima de ellos.</p>` : `<p class="note">Ningún otro asset lo usa.</p>`)
+    + `</div>`;
+}
+function showHits() {
+  const box = document.getElementById("hits");
+  const found = !cat || !query ? [] : cat.specs.filter(s => matches(s.asset.name) || matches(s.asset.id)).slice(0, 8);
+  box.hidden = !found.length;
+  box.innerHTML = found.map(s => { const path = pathUp(s.asset.id);
+    return `<button type="button" data-s="${esc(s.asset.id)}"><b>${esc(s.asset.name)}</b><div class="s">${path.length > 1 ? esc(path.map(specName).join(" › ")) : "asset · " + esc(s.asset.id)}</div></button>`; }).join("");
+  box.querySelectorAll("button").forEach(b => b.onclick = () => { box.hidden = true; specView = null; pick("spec:" + b.dataset.s); });
+}
+
 function pick(id) {
-  if (id.startsWith("spec:")) { specView = id.slice(5); sel = "asset"; render(); return pickSpec(cat.specs.find(x => x.asset.id === specView), "asset"); }
+  if (id.startsWith("spec:")) { specTrail = trailFor(id.slice(5)); specView = id.slice(5); sel = "asset"; render(); return pickSpec(cat.specs.find(x => x.asset.id === specView), "asset"); }
   if (id.startsWith("kit:")) { const k = id.slice(4); openKit = openKit === k && sel === id ? null : k; }
   sel = id; render();
   if (id === "project") return showProject();
@@ -675,7 +729,10 @@ stage.addEventListener("pointerdown", e => { if (e.target.closest(".node")) retu
   stage.addEventListener("pointermove", mv); stage.addEventListener("pointerup", up); });
 stage.addEventListener("wheel", e => { e.preventDefault(); const r = stage.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top;
   const z = Math.min(1.6, Math.max(0.3, view.z * (e.deltaY < 0 ? 1.1 : 0.9))); view.x = mx - (mx - view.x) * z / view.z; view.y = my - (my - view.y) * z / view.z; view.z = z; apply(); }, { passive: false });
-document.getElementById("search").addEventListener("input", e => { query = e.target.value.trim().toLowerCase(); if (cat) render(); });
+document.getElementById("search").addEventListener("input", e => { query = e.target.value.trim().toLowerCase(); if (cat) render(); showHits(); });
+document.getElementById("search").addEventListener("focus", showHits);
+document.getElementById("search").addEventListener("keydown", e => { if (e.key === "Escape") document.getElementById("hits").hidden = true; if (e.key === "Enter") document.querySelector("#hits button")?.click(); });
+document.addEventListener("click", e => { if (!e.target.closest("#searchBox")) document.getElementById("hits").hidden = true; });
 document.getElementById("reload").addEventListener("click", load);
 document.getElementById("back").addEventListener("click", home);
 document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => { mode = b.dataset.mode; home(); }));
