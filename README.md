@@ -356,6 +356,79 @@ at = [[2.2, 0.2, 0]]
 
 El ejemplo está en `examples/specs/cargo_quay.toml`.
 
+## Integración ASTRA: validar contenido (K001)
+
+Opcional. Kiln comprueba las definiciones de contenido de ASTRA, escritas en
+RON, contra su catálogo y contra las escenas de Godot. Kiln prepara y valida
+contenido: no es el motor de ASTRA, no habla con su runtime ni con sus
+guardados. Un `kiln.toml` sin esta sección funciona igual que antes.
+
+```toml
+[tools]
+godot_project = "godot"
+
+[integrations.astra]
+enabled = true
+definitions = ["data/astra/**/*.ron"]               # globs desde la raíz
+godot_manifest = "kiln/astra_scene_manifest.json"   # opcional
+greybox = false   # true: un asset que falta en el catálogo es aviso, no error
+```
+
+El esquema RON es **provisional y no canónico**: cambiará con el de
+producción de ASTRA. Cada fichero es una lista de definiciones con IDs
+estáticos de contenido, que no son los `PersistentId` del runtime:
+
+```ron
+[
+    Sector(id: "sector:warehouse", scene: "res://astra/warehouse.tscn"),
+    Sector(id: "sector:yard", scene: "res://astra/yard.tscn"),
+    Door(id: "door:warehouse_yard", connects: ("sector:warehouse", "sector:yard")),
+    Object(id: "object:crate", asset: "harbor/crate"),   // clave de pieza del catálogo
+    Installation(id: "installation:loading_bay", sector: "sector:warehouse", objects: ["object:crate"]),
+]
+```
+
+En Godot, los nodos de las escenas llevan su ID en los metadatos:
+`astra_id`, y las puertas además `astra_connects` (dos IDs). Para
+actualizar el manifiesto después de tocar una escena:
+
+```bash
+kiln astra-manifest --project examples/astra   # Godot sin ventana lee las escenas de los sectores
+kiln check --project examples/astra            # valida RON, catálogo, escenas y manifiesto
+```
+
+`[tools] godot_project` es obligatorio con la integración: sin él, cada
+sector da `astra_scene_missing`. `astra-manifest` necesita además Godot 4
+(`[tools] godot`).
+
+`astra-manifest` lee las escenas sin instanciarlas, así que no se ejecutan
+los scripts de los nodos, pero Godot sí carga los recursos que la escena
+enlaza, y con ellos sus scripts. Como `kiln godot`, úsalo solo en proyectos
+de confianza. Escribe el JSON de `godot_manifest` (dentro del proyecto), que
+se versiona con el proyecto. El JSON es un fichero técnico generado: la fuente del
+contenido sigue siendo el RON.
+
+Los hallazgos salen en `kiln check` y en `kiln serve` como los demás, con
+`<fichero>#<id>`. Si hay algún error, la salida es distinta de cero.
+
+| code | Cuándo |
+|------|--------|
+| `astra_ron_syntax` | El RON no se lee o no encaja con el esquema (con línea y columna). |
+| `astra_no_definitions` | Aviso: los globs no encuentran ningún fichero. |
+| `astra_duplicate_id` | Un ID repetido. |
+| `astra_unknown_ref` | Una puerta o una instalación nombra un ID que no existe. |
+| `astra_wrong_kind` | La referencia existe pero es de otro tipo. |
+| `astra_door_endpoint` | Una puerta conecta un sector consigo mismo. |
+| `astra_asset_missing` | El asset no es una pieza del catálogo (aviso con `greybox = true`). |
+| `astra_scene_missing` | La escena `res://` del sector no existe en el proyecto Godot. |
+| `astra_manifest_missing` | Aviso: falta el manifiesto; hay que ejecutar `kiln astra-manifest`. |
+| `astra_manifest_syntax` | El JSON del manifiesto no se lee. |
+| `astra_manifest_mismatch` | El manifiesto y el RON no coinciden: IDs, escena de un sector o conexiones de una puerta. |
+
+La fixture está en `examples/astra/`. El test que exporta con Godot de
+verdad se ejecuta a mano:
+`cargo test -p kiln-cli -- --ignored astra`.
+
 ## Lo que viene
 
 - El primer asset de punta a punta y la app de escritorio (Tauri).
