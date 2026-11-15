@@ -29,6 +29,10 @@ pub struct Config {
     /// Which model each agent runs on, and how far the review loop goes.
     #[serde(default)]
     pub agents: AgentsSection,
+    /// Content sets (`[content.<set>]`), kept raw so a broken set does not
+    /// stop the config from loading; see `content_sets`.
+    #[serde(default)]
+    pub content: Option<toml::Value>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

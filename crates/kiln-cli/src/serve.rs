@@ -206,18 +206,7 @@ fn handle(stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result<()>
             "text/html; charset=utf-8",
             PAGE.as_bytes().to_vec(),
         ),
-        ("GET", "/api/catalog") => match crate::load(&ctx.project, ctx.config.as_deref()) {
-            Ok(cat) => (
-                "200 OK",
-                "application/json",
-                serde_json::to_vec(&cat).unwrap_or_default(),
-            ),
-            Err(e) => (
-                "500 Internal Server Error",
-                "application/json",
-                serde_json::to_vec(&serde_json::json!({ "error": e })).unwrap_or_default(),
-            ),
-        },
+        ("GET", "/api/catalog") => catalog_response(ctx),
         // Only the page itself may post here: a custom header forces a CORS
         // preflight this server never answers, so another site cannot.
         ("POST", _) if !from_page => (
@@ -491,6 +480,7 @@ fn handle(stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result<()>
     respond(stream, status, kind, &body)
 }
 
+<<<<<<< HEAD
 fn job_of(jobs: &Jobs, path: &str) -> Option<agent::Job> {
     let id = path.strip_prefix("/api/jobs/")?.parse::<u64>().ok()?;
     jobs.lock().unwrap().get((id.max(1) - 1) as usize).cloned()
@@ -521,6 +511,22 @@ fn turn_of(body: &[u8]) -> Result<agent::Turn, String> {
     }
     let history = kiln_core::chat::clean(r.history);
     Ok(agent::Turn { step: r.step, message: message.into(), history, draft: r.draft })
+=======
+/// The project catalog as JSON, read again on every request.
+fn catalog_response(ctx: &Ctx) -> (&'static str, &'static str, Vec<u8>) {
+    match crate::load(&ctx.project, ctx.config.as_deref()) {
+        Ok(cat) => (
+            "200 OK",
+            "application/json",
+            serde_json::to_vec(&cat).unwrap_or_default(),
+        ),
+        Err(e) => (
+            "500 Internal Server Error",
+            "application/json",
+            serde_json::to_vec(&serde_json::json!({ "error": e })).unwrap_or_default(),
+        ),
+    }
+>>>>>>> origin/main
 }
 
 /// The spec file of an asset, absolute.
@@ -579,4 +585,32 @@ fn decode(s: &str) -> Option<String> {
         }
     }
     String::from_utf8(out).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn served(example: &str) -> serde_json::Value {
+        let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples").join(example);
+        let ctx = make_ctx(&dir, None).unwrap();
+        let (status, _, body) = catalog_response(&ctx);
+        assert_eq!(status, "200 OK");
+        serde_json::from_slice(&body).unwrap()
+    }
+
+    #[test]
+    fn catalog_serves_the_content_sets() {
+        let cat = served("content");
+        let sets = cat["content"].as_array().unwrap();
+        assert_eq!(sets.len(), 1);
+        assert_eq!(sets[0]["name"], "world");
+        assert_eq!(sets[0]["kinds"].as_array().unwrap().len(), 4);
+        assert_eq!(sets[0]["elements"].as_array().unwrap().len(), 5);
+    }
+
+    #[test]
+    fn catalog_without_content_serves_an_empty_list() {
+        assert_eq!(served("")["content"].as_array().unwrap().len(), 0);
+    }
 }

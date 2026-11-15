@@ -1,0 +1,4 @@
+[gd_scene format=3]
+
+[node name="Yard" type="Node3D"]
+metadata/astra_id = "sector:yard"

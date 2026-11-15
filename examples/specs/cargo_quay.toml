@@ -1,0 +1,33 @@
+# A spec made of other specs: the quay where the boats unload, with two
+# hoists (examples/specs/hoist.toml) on a deck of planks. Each hoist is a
+# closed box: it comes assembled, with its own materials, and its colour
+# variant is chosen here. `kiln build --asset cargo_quay` assembles the
+# hoist first when it has not been assembled or changed.
+[asset]
+id = "cargo_quay"
+name = "Muelle de carga"
+asked = "crear el muelle de carga"
+where = "en el muelle, donde atracan los botes"
+budget_tris = 12000
+status = "layout"
+
+[[parts]]
+id = "deck"
+what = "tablero de tablas del muelle"
+size_m = [8.0, 0.2, 3.0]
+material = "planks"
+source = { kind = "variant", from = "harbor/door", why = "hoja de tablas tumbada y alargada a 8 m" }
+at = [[0, 0, 0]]
+
+[[parts]]
+id = "hoist"
+what = "grúa de carga nueva"
+source = { kind = "asset", from = "hoist" }
+at = [[-2.2, 0.2, 0]]
+
+[[parts]]
+id = "old_hoist"
+what = "grúa de carga curtida por el salitre"
+source = { kind = "asset", from = "hoist", variant = "weathered" }
+at = [[2.2, 0.2, 0]]
+turn = [[0, 180, 0]]

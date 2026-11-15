@@ -41,8 +41,11 @@ def dress(o, item):
     """Gives every material slot of the copy its `part/zone` material."""
     if not o.data.materials:
         o.data.materials.append(None)
+    nested = item["kind"] == "asset"
     for i, slot in enumerate(o.data.materials):
-        zone = zone_of(slot)
+        # a built asset is a closed box: its zones keep their whole name
+        # inside it (`post/Wood`) and wear what they wore there
+        zone = (slot.get("kiln_name") if nested and slot is not None else None) or zone_of(slot)
         name = item["part"] + "/" + zone
         if name not in ZONES:
             paint = (
@@ -183,6 +186,11 @@ def main():
         bpy.data.objects.remove(src)
         if mesh.users == 0:
             bpy.data.meshes.remove(mesh)
+    # the materials of the models as imported, now replaced by the worn ones
+    for me in [me for me in bpy.data.meshes if me.users == 0]:
+        bpy.data.meshes.remove(me)
+    for m in [m for m in bpy.data.materials if m.users == 0]:
+        bpy.data.materials.remove(m)
     os.makedirs(os.path.dirname(plan["glb"]), exist_ok=True)
     os.makedirs(os.path.dirname(plan["blend"]), exist_ok=True)
     bpy.ops.wm.save_as_mainfile(filepath=plan["blend"])

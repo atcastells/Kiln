@@ -1,0 +1,47 @@
+{
+  "scenes": [
+    {
+      "nodes": [
+        {
+          "children": [
+            {
+              "meta": {
+                "astra_connects": [
+                  "sector:warehouse",
+                  "sector:yard"
+                ],
+                "astra_id": "door:warehouse_yard"
+              },
+              "name": "DoorToYard"
+            }
+          ],
+          "id": "sector:warehouse",
+          "meta": {}
+        },
+        {
+          "children": [],
+          "id": "door:warehouse_yard",
+          "meta": {
+            "astra_connects": [
+              "sector:warehouse",
+              "sector:yard"
+            ]
+          }
+        }
+      ],
+      "scene": "res://astra/warehouse.tscn"
+    },
+    {
+      "nodes": [
+        {
+          "children": [],
+          "id": "sector:yard",
+          "meta": {}
+        }
+      ],
+      "scene": "res://astra/yard.tscn"
+    }
+  ],
+  "set": "world",
+  "version": 2
+}

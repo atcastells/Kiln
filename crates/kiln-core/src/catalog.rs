@@ -7,7 +7,7 @@ use serde_json::Value;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Default, Serialize)]
 pub struct Catalog {
     pub project: String,
     pub root: String,
@@ -20,7 +20,32 @@ pub struct Catalog {
     pub tree: Option<crate::tree::Tree>,
     /// What Blender reported for each asset built, by asset id.
     pub builds: BTreeMap<String, crate::build::Report>,
+    /// What each content set (`[content.<set>]`) holds, for the web UI.
+    pub content: Vec<ContentSetSummary>,
     pub findings: Vec<Finding>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ContentSetSummary {
+    pub name: String,
+    pub kinds: Vec<KindCount>,
+    pub elements: Vec<ElementRef>,
+    pub errors: usize,
+    pub warnings: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct KindCount {
+    pub name: String,
+    pub count: usize,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ElementRef {
+    pub kind: String,
+    pub id: String,
+    pub file: String,
+    pub line: usize,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -110,6 +135,7 @@ pub fn index(root: &Path, config: &Config) -> Catalog {
         specs: Vec::new(),
         tree: None,
         builds: BTreeMap::new(),
+        content: Vec::new(),
         findings: Vec::new(),
     };
     for kits in config.kit_roots() {

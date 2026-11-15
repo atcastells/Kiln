@@ -21,7 +21,37 @@ pub fn config(project: &Path, config: Option<&Path>) -> Result<Config, String> {
 }
 
 /// Assembles the asset `id` in Blender; returns what happened, line by line.
+/// The assets it is made of go first, from the bottom up, when they have not
+/// been assembled or are to be assembled again.
 pub fn build_asset(
+    project: &Path,
+    config_file: Option<&Path>,
+    id: &str,
+    mut say: impl FnMut(String),
+) -> Result<PathBuf, String> {
+    let cfg = config(project, config_file)?;
+    let cat = crate::load(project, config_file)?;
+    let order = kiln_core::spec::order(&cat.specs, id)?;
+    let mut rebuilt: Vec<&str> = Vec::new();
+    for c in &order[..order.len() - 1] {
+        let spec = cat.specs.iter().find(|s| &s.asset.id == c);
+        let fresh = build::child_glb(project, &cfg, c, None).is_some()
+            && cat.builds.get(c).is_some_and(|r| r.stale.is_empty())
+            && !spec.is_some_and(|s| {
+                kiln_core::spec::made_of(s)
+                    .iter()
+                    .any(|g| rebuilt.contains(g))
+            });
+        if !fresh {
+            say(format!("Antes, «{c}», que forma parte de «{id}»"));
+            build_one(project, config_file, c, &mut say)?;
+            rebuilt.push(c);
+        }
+    }
+    build_one(project, config_file, id, say)
+}
+
+fn build_one(
     project: &Path,
     config_file: Option<&Path>,
     id: &str,
@@ -64,9 +94,19 @@ pub fn build_asset(
     if let Some(l) = text.lines().find(|l| l.starts_with("kiln: built")) {
         say(l.trim_start_matches("kiln: ").to_string());
     }
-    link_godot(project, &cfg, Path::new(&plan.glb), Path::new(&plan.materials), &mut say);
+    link_godot(
+        project,
+        &cfg,
+        Path::new(&plan.glb),
+        Path::new(&plan.materials),
+        &mut say,
+    );
     // the variants are the same assembly: bring them up to date with it
-    for v in spec.variants.iter().filter(|v| kiln_core::spec::plain_id(&v.id)) {
+    for v in spec
+        .variants
+        .iter()
+        .filter(|v| kiln_core::spec::plain_id(&v.id))
+    {
         paint_asset(project, config_file, id, Some(&v.id), &mut say)?;
     }
     Ok(PathBuf::from(plan.glb))

@@ -1,0 +1,7 @@
+; Godot project of the ASTRA fixture: two sector scenes and a door.
+
+config_version=5
+
+[application]
+
+config/name="Kiln ASTRA fixture"

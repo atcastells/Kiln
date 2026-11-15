@@ -95,11 +95,15 @@ pub struct Part {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Source {
-    /// reuse | variant | search | retouch
+    /// reuse | variant | search | retouch | asset
     pub kind: String,
-    /// The catalog key of the piece it reuses or varies (`kit/piece`).
+    /// The catalog key of the piece it reuses or varies (`kit/piece`), or,
+    /// for `asset`, the id of the spec it is made of.
     #[serde(default)]
     pub from: Option<String>,
+    /// For `asset`: the colour variant of that spec it wears.
+    #[serde(default)]
+    pub variant: Option<String>,
     /// The search words, for `search`.
     #[serde(default)]
     pub query: Option<String>,
@@ -107,7 +111,7 @@ pub struct Source {
     pub why: Option<String>,
 }
 
-pub const KINDS: [&str; 4] = ["reuse", "variant", "search", "retouch"];
+pub const KINDS: [&str; 5] = ["reuse", "variant", "search", "retouch", "asset"];
 
 pub fn parse(text: &str) -> Result<Spec, String> {
     toml::from_str(text).map_err(|e| e.to_string())
@@ -152,6 +156,144 @@ pub fn load_all(
         }
     }
     out
+}
+
+/// The ids of the specs a spec is made of, once each, in the order of its parts.
+pub fn made_of(s: &Spec) -> Vec<&str> {
+    let mut out: Vec<&str> = Vec::new();
+    for p in s.parts.iter().filter(|p| p.source.kind == "asset") {
+        if let Some(f) = p.source.from.as_deref()
+            && !out.contains(&f)
+        {
+            out.push(f);
+        }
+    }
+    out
+}
+
+/// The specs to assemble so that `id` can be assembled: the ones it is made
+/// of, all the way down, before the ones that use them, and `id` last.
+pub fn order(specs: &[Spec], id: &str) -> Result<Vec<String>, String> {
+    fn visit(
+        specs: &[Spec],
+        id: &str,
+        path: &mut Vec<String>,
+        out: &mut Vec<String>,
+    ) -> Result<(), String> {
+        if out.iter().any(|o| o == id) {
+            return Ok(());
+        }
+        if let Some(i) = path.iter().position(|p| p == id) {
+            let mut lp = path[i..].to_vec();
+            lp.push(id.into());
+            return Err(format!("«{id}» se contiene a sí mismo: {}", lp.join(" › ")));
+        }
+        let s = specs
+            .iter()
+            .find(|s| s.asset.id == id)
+            .ok_or(format!("no hay ficha con id «{id}»"))?;
+        path.push(id.into());
+        for c in made_of(s) {
+            visit(specs, c, path, out)?;
+        }
+        path.pop();
+        out.push(id.into());
+        Ok(())
+    }
+    let mut out = Vec::new();
+    visit(specs, id, &mut Vec::new(), &mut out)?;
+    Ok(out)
+}
+
+/// The specs that use `id` as a part, with how many copies each.
+pub fn used_in(specs: &[Spec], id: &str) -> Vec<(String, u32)> {
+    specs
+        .iter()
+        .filter_map(|s| {
+            let n: u32 = s
+                .parts
+                .iter()
+                .filter(|p| p.source.kind == "asset" && p.source.from.as_deref() == Some(id))
+                .map(|p| p.count.unwrap_or(1).max(1))
+                .sum();
+            (n > 0).then(|| (s.asset.id.clone(), n))
+        })
+        .collect()
+}
+
+/// The checks between specs, once they are all read: a part made of a spec
+/// that does not exist or of a variant it lacks, and a spec that ends up
+/// inside itself.
+pub fn nesting(specs: &[Spec], cat: &mut Catalog) {
+    for s in specs {
+        for p in s.parts.iter().filter(|p| p.source.kind == "asset") {
+            let Some(from) = p.source.from.as_deref() else {
+                continue;
+            };
+            let subject = format!("part:{}/{}", s.asset.id, p.id);
+            let mut push = |code: &str, message: String| {
+                cat.findings.push(Finding {
+                    severity: Severity::Error,
+                    subject: subject.clone(),
+                    code: code.into(),
+                    message,
+                })
+            };
+            match specs.iter().find(|c| c.asset.id == from) {
+                None => push("from_missing", format!("no hay ficha con id «{from}»")),
+                Some(c) => {
+                    if let Some(v) = &p.source.variant
+                        && !c.variants.iter().any(|x| &x.id == v)
+                    {
+                        push(
+                            "variant_missing",
+                            format!("«{from}» no tiene la variante «{v}»"),
+                        );
+                    }
+                }
+            }
+        }
+        if let Some(b) = s.asset.budget_tris
+            && !made_of(s).is_empty()
+        {
+            let mut pieces = 0u64;
+            let mut total = 0u64;
+            for p in &s.parts {
+                let n = p.count.unwrap_or(1).max(1) as u64;
+                let from = p.source.from.as_deref().unwrap_or("");
+                if p.source.kind == "asset" {
+                    total += cat.builds.get(from).map_or(0, |r| r.tris) * n;
+                } else if p.source.kind != "search"
+                    && let Some(c) = cat.pieces.iter().find(|c| c.key == from)
+                {
+                    pieces += c.tris.unwrap_or(0) * n;
+                }
+            }
+            total += pieces;
+            // over budget with the pieces alone is already said by `check`
+            if total > b && pieces <= b {
+                cat.findings.push(Finding {
+                    severity: Severity::Warn,
+                    subject: format!("asset:{}", s.asset.id),
+                    code: "budget".into(),
+                    message: format!(
+                        "las piezas y los assets montados que usa suman {total} triángulos, por encima de {b}"
+                    ),
+                });
+            }
+        }
+        if let Err(e) = order(specs, &s.asset.id)
+            && e.contains(" se contiene ")
+            && e.starts_with(&format!("«{}»", s.asset.id))
+        {
+            cat.findings.push(Finding {
+                severity: Severity::Error,
+                subject: format!("asset:{}", s.asset.id),
+                code: "nesting_loop".into(),
+                message: e,
+            });
+        }
+    }
 }
 
 /// The checks of a spec against the catalog.
@@ -216,6 +358,14 @@ pub fn check(s: &Spec, rules: &crate::config::Rules, cat: &mut Catalog) {
                 "from_missing",
                 "reutilizar o variar pide `from` con una pieza del catálogo".into(),
             ),
+            // checked against the other specs once they are all read: `nesting`
+            ("asset", Some(_)) => {}
+            ("asset", None) => push(
+                Severity::Error,
+                subject.clone(),
+                "from_missing",
+                "una pieza hecha de otro asset pide `from` con el id de su ficha".into(),
+            ),
             ("search", _) if p.source.query.is_none() => push(
                 Severity::Warn,
                 subject.clone(),
@@ -231,13 +381,25 @@ pub fn check(s: &Spec, rules: &crate::config::Rules, cat: &mut Catalog) {
                 "material_missing",
                 format!("el material «{m}» no está en la paleta"),
             ),
-            None if p.source.kind != "reuse" && p.materials.is_empty() => push(
+            Some(_) if p.source.kind == "asset" => {}
+            None if !matches!(&p.source.kind[..], "reuse" | "asset") && p.materials.is_empty() => {
+                push(
+                    Severity::Warn,
+                    subject.clone(),
+                    "material_unset",
+                    "pieza sin material de la paleta".into(),
+                )
+            }
+            _ => {}
+        }
+        if p.source.kind == "asset" && (p.material.is_some() || !p.materials.is_empty()) {
+            push(
                 Severity::Warn,
                 subject.clone(),
-                "material_unset",
-                "pieza sin material de la paleta".into(),
-            ),
-            _ => {}
+                "closed_box",
+                "un asset llega con sus materiales: para cambiarlos elige una de sus variantes"
+                    .into(),
+            );
         }
         for m in p.materials.values() {
             if !cat.materials.iter().any(|x| &x.key == m) {
@@ -426,6 +588,7 @@ materials = { "beam/wood" = "pine", "ghost/wood" = "oak" }
             specs: vec![],
             tree: None,
             builds: Default::default(),
+            content: vec![],
             findings: vec![],
         };
         check(&parse(ZONES).unwrap(), &Default::default(), &mut cat);
@@ -612,5 +775,86 @@ mod source_tests {
         let t = super::clear_materials(&t, "block").unwrap();
         assert!(super::parse(&t).unwrap().parts[0].materials.is_empty());
         assert!(super::clear_materials(BASE, "nope").is_err());
+    }
+}
+
+#[cfg(test)]
+mod nesting_tests {
+    use super::*;
+
+    fn spec(id: &str, parts: &[(&str, &str, Option<&str>)], variants: &[&str]) -> Spec {
+        let mut t = format!("[asset]\nid = \"{id}\"\nname = \"{id}\"\n");
+        for (pid, from, var) in parts {
+            t += &format!(
+                "[[parts]]\nid = \"{pid}\"\nwhat = \"{pid}\"\ncount = 2\n[parts.source]\nkind = \"asset\"\nfrom = \"{from}\"\n"
+            );
+            if let Some(v) = var {
+                t += &format!("variant = \"{v}\"\n");
+            }
+        }
+        for v in variants {
+            t += &format!("[[variants]]\nid = \"{v}\"\n");
+        }
+        parse(&t).unwrap()
+    }
+
+    #[test]
+    fn assets_go_from_the_bottom_up() {
+        let specs = vec![
+            spec(
+                "ship",
+                &[("stern", "stern", None), ("bow", "bow", None)],
+                &[],
+            ),
+            spec("stern", &[("engine", "engine", None)], &[]),
+            spec("bow", &[("engine", "engine", Some("scorched"))], &[]),
+            spec("engine", &[], &["scorched"]),
+        ];
+        assert_eq!(
+            order(&specs, "ship").unwrap(),
+            ["engine", "stern", "bow", "ship"]
+        );
+        assert_eq!(made_of(&specs[0]), ["stern", "bow"]);
+        assert_eq!(
+            used_in(&specs, "engine"),
+            [("stern".to_string(), 2), ("bow".to_string(), 2)]
+        );
+        let mut cat = Catalog::default();
+        nesting(&specs, &mut cat);
+        assert!(cat.findings.is_empty(), "{:?}", cat.findings);
+    }
+
+    #[test]
+    fn flags_missing_specs_variants_and_loops() {
+        let specs = vec![
+            spec("a", &[("b", "b", None), ("ghost", "ghost", None)], &[]),
+            spec("b", &[("c", "c", Some("old"))], &[]),
+            spec("c", &[("a", "a", None)], &[]),
+        ];
+        let e = order(&specs, "a").unwrap_err();
+        assert!(e.contains("a › b › c › a"), "{e}");
+        let mut cat = Catalog::default();
+        nesting(&specs, &mut cat);
+        let codes: Vec<(&str, &str)> = cat
+            .findings
+            .iter()
+            .map(|f| (f.subject.as_str(), f.code.as_str()))
+            .collect();
+        assert!(codes.contains(&("part:a/ghost", "from_missing")));
+        assert!(codes.contains(&("part:b/c", "variant_missing")));
+        // the loop is said once for each spec on it
+        for s in ["asset:a", "asset:b", "asset:c"] {
+            assert!(codes.contains(&(s, "nesting_loop")), "{s}: {codes:?}");
+        }
+    }
+
+    #[test]
+    fn an_asset_part_is_a_closed_box() {
+        let text = "[asset]\nid = \"a\"\nname = \"A\"\n[[parts]]\nid = \"e\"\nwhat = \"motor\"\nmaterial = \"iron\"\n[parts.source]\nkind = \"asset\"\nfrom = \"engine\"\n";
+        let mut cat = Catalog::default();
+        check(&parse(text).unwrap(), &Default::default(), &mut cat);
+        let codes: Vec<&str> = cat.findings.iter().map(|f| f.code.as_str()).collect();
+        assert!(codes.contains(&"closed_box"), "{codes:?}");
+        assert!(!codes.contains(&"material_unset") && !codes.contains(&"source_kind"));
     }
 }

@@ -1,0 +1,9 @@
+// Definitions to exercise the content validator.
+// Static content ids: not the runtime's PersistentId.
+[
+    Sector(id: "sector:warehouse", scene: "res://astra/warehouse.tscn"),
+    Sector(id: "sector:yard", scene: "res://astra/yard.tscn"),
+    Door(id: "door:warehouse_yard", connects: ("sector:warehouse", "sector:yard")),
+    Object(id: "object:crate", asset: "harbor/crate"),
+    Installation(id: "installation:loading_bay", sector: "sector:warehouse", objects: ["object:crate"]),
+]
