@@ -7,8 +7,10 @@
 //!   kiln paint  --project DIR [--config FILE] --asset ID [--variant ID]   wear its materials again, no assembling
 //!   kiln godot  --project DIR [--config FILE]                Godot measures its own pieces
 //!   kiln review --project DIR [--config FILE] --asset ID     build, render, review and fix, up to 3 rounds
+//!   kiln astra-manifest --project DIR [--config FILE]        Godot lists the ASTRA ids of the sector scenes
 
 mod agent;
+mod astra;
 mod fetch;
 mod production;
 mod review;
@@ -57,7 +59,7 @@ fn parse() -> Result<Args, String> {
     Ok(a)
 }
 
-const USAGE: &str = "uso: kiln <index|check|serve|build|paint|review|godot> --project DIR [--config FILE] [--out FILE] [--port N] [--asset ID] [--variant ID]";
+const USAGE: &str = "uso: kiln <index|check|serve|build|paint|review|godot|astra-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--asset ID] [--variant ID]";
 
 pub fn load(
     project: &std::path::Path,
@@ -159,6 +161,10 @@ fn main() -> ExitCode {
             }
             "godot" => {
                 production::measure(&args.project, args.config.as_deref(), |l| eprintln!("{l}"))
+                    .map(|_| ExitCode::SUCCESS)
+            }
+            "astra-manifest" => {
+                astra::export(&args.project, args.config.as_deref(), |l| eprintln!("{l}"))
                     .map(|_| ExitCode::SUCCESS)
             }
             _ => Err(USAGE.into()),

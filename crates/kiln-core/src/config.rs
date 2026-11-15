@@ -29,6 +29,28 @@ pub struct Config {
     /// Which model each agent runs on, and how far the review loop goes.
     #[serde(default)]
     pub agents: AgentsSection,
+    /// Optional integrations with other tools (`[integrations.*]`).
+    #[serde(default)]
+    pub integrations: IntegrationsSection,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct IntegrationsSection {
+    #[serde(default)]
+    pub astra: Option<AstraSection>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct AstraSection {
+    #[serde(default)]
+    pub enabled: bool,
+    /// Globs, relative to the project root, of the RON definition files.
+    #[serde(default)]
+    pub definitions: Vec<String>,
+    #[serde(default)]
+    pub godot_manifest: Option<String>,
+    #[serde(default)]
+    pub greybox: bool,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -345,6 +367,11 @@ impl Config {
         out
     }
 
+    /// The Astra integration, only when its section exists and is enabled.
+    pub fn astra(&self) -> Option<&AstraSection> {
+        self.integrations.astra.as_ref().filter(|a| a.enabled)
+    }
+
     pub fn load(project: &Path) -> Result<Config, String> {
         let path = project.join(FILE);
         let text = std::fs::read_to_string(&path)
@@ -360,5 +387,40 @@ impl Config {
 
     pub fn parse(text: &str) -> Result<Config, String> {
         toml::from_str(text).map_err(|e| e.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const BASE: &str = "[project]\nname = \"demo\"\n";
+
+    #[test]
+    fn astra_absent_is_none() {
+        let c = Config::parse(BASE).unwrap();
+        assert!(c.integrations.astra.is_none());
+        assert!(c.astra().is_none());
+    }
+
+    #[test]
+    fn astra_enabled_reads_fields() {
+        let text = format!(
+            "{BASE}[integrations.astra]\nenabled = true\ndefinitions = [\"defs/*.ron\"]\ngodot_manifest = \"godot/manifest.json\"\n"
+        );
+        let c = Config::parse(&text).unwrap();
+        let a = c.astra().expect("enabled section");
+        assert!(a.enabled);
+        assert_eq!(a.definitions, vec!["defs/*.ron".to_string()]);
+        assert_eq!(a.godot_manifest.as_deref(), Some("godot/manifest.json"));
+        assert!(!a.greybox);
+    }
+
+    #[test]
+    fn astra_without_enabled_is_none() {
+        let text = format!("{BASE}[integrations.astra]\ndefinitions = [\"defs/*.ron\"]\n");
+        let c = Config::parse(&text).unwrap();
+        assert!(c.integrations.astra.is_some());
+        assert!(c.astra().is_none());
     }
 }

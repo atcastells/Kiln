@@ -2,6 +2,7 @@
 //! the catalog of what the project already has (pieces, materials) with the
 //! findings of the checks. No engine is needed to read it.
 
+pub mod astra;
 pub mod bindings;
 pub mod build;
 pub mod catalog;
@@ -39,6 +40,7 @@ pub fn open_with(project: &Path, config: Config) -> Result<Catalog, String> {
     }
     bindings::apply(&bindings::load(project, &config)?, &mut catalog);
     check::run(&config, &mut catalog);
+    astra::run(project, &config, &mut catalog);
     if let Some(dir) = &config.assets.specs {
         catalog.specs = spec::load_all(project, dir, &config.rules, &mut catalog);
         catalog

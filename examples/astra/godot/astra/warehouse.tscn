@@ -1,0 +1,8 @@
+[gd_scene format=3]
+
+[node name="Warehouse" type="Node3D"]
+metadata/astra_id = "sector:warehouse"
+
+[node name="DoorToYard" type="Node3D" parent="."]
+metadata/astra_id = "door:warehouse_yard"
+metadata/astra_connects = ["sector:warehouse", "sector:yard"]

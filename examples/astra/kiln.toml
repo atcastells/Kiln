@@ -1,0 +1,22 @@
+# Minimal ASTRA fixture for Kiln's optional content validator (K001).
+# Provisional and non-canonical: the RON schema will change with ASTRA.
+#   kiln check --project examples/astra
+#   kiln astra-manifest --project examples/astra   # needs Godot 4
+[project]
+name = "ASTRA fixture"
+engine = "godot"
+
+[assets]
+kits = ["kits"]
+
+[rules]
+licenses = ["CC0"]
+
+[tools]
+godot_project = "godot"
+
+[integrations.astra]
+enabled = true
+definitions = ["data/astra/**/*.ron"]
+godot_manifest = "kiln/astra_scene_manifest.json"
+greybox = false
