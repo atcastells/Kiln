@@ -1,6 +1,6 @@
 // Hash routes: `#/view/arg1/arg2?key=value`. parse and format are pure;
 // createRouter binds them to a window (injectable for tests).
-export const VIEWS = ["home", "context", "tree", "content", "catalog", "spec", "build", "review", "job"];
+export const VIEWS = ["home", "context", "tree", "content", "catalog", "spec", "build", "review", "job", "materials", "jobs"];
 const HOME = "home";
 
 const dec = s => decodeURIComponent(s.replace(/\+/g, " "));

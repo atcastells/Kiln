@@ -42,6 +42,8 @@ export function createApi({ fetch: f = (...a) => globalThis.fetch(...a), base = 
   }
 
   return {
+    // Forget the cached copy (and its ETag) of a path: the next read is a full one.
+    forget(path) { cache.delete(path); },
     getJSON(path) {
       let p = inflight.get(path);
       if (!p) {
@@ -66,3 +68,4 @@ export function createApi({ fetch: f = (...a) => globalThis.fetch(...a), base = 
 const shared = createApi();
 export const getJSON = shared.getJSON;
 export const post = shared.post;
+export const forget = shared.forget;

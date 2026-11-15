@@ -71,6 +71,12 @@ export class Page {
     for (let i = 1; i <= count; i++) { await this.mouse("mousePressed", x, y, i); await this.mouse("mouseReleased", x, y, i); }
   }
   async key(ch) {
+    const named = { Enter: 13, Escape: 27 };
+    if (named[ch]) {
+      const ev = { key: ch, code: ch, windowsVirtualKeyCode: named[ch] };
+      await this.send("Input.dispatchKeyEvent", { type: ch === "Enter" ? "keyDown" : "rawKeyDown", ...ev, ...(ch === "Enter" ? { text: "\r" } : {}) });
+      return this.send("Input.dispatchKeyEvent", { type: "keyUp", ...ev });
+    }
     if (ch === "Backspace") {
       await this.send("Input.dispatchKeyEvent", { type: "keyDown", key: "Backspace", code: "Backspace", windowsVirtualKeyCode: 8 });
       return this.send("Input.dispatchKeyEvent", { type: "keyUp", key: "Backspace", code: "Backspace", windowsVirtualKeyCode: 8 });

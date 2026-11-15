@@ -67,18 +67,176 @@ async function walk(chrome, name, port) {
 }
 
 // The new UI at /app: its module graph loads from the binary and it shows the project name.
+const APP_PROBE = `(() => {
+  const p = window.__app = { ready: null, paint: null };
+  const look = () => { if (p.ready == null && document.querySelector('#main [data-view="home"][data-ready]')) { p.ready = performance.now(); requestAnimationFrame(() => requestAnimationFrame(() => { p.paint = performance.now(); })); } };
+  new MutationObserver(look).observe(document, { subtree: true, childList: true, attributes: true });
+})()`;
+const SHOTS = process.env.KILN_APP_SHOTS || null;
+const appShot = async (d, file) => {
+  await d.page.screenshot(path.join(OUT, "screenshots", file), fs);
+  if (SHOTS) { fs.mkdirSync(SHOTS, { recursive: true }); await d.page.screenshot(path.join(SHOTS, file), fs); }
+};
+const plural = n => n.toLocaleString("es");
+
+// The DOM part of the virtual list, the toasts and the dialog, driven inside the page.
+const COMPONENTS = `(async () => {
+  const out = {};
+  const { createList } = await import('/ui/app/ui/list.js');
+  const { createToasts } = await import('/ui/app/ui/feedback.js');
+  const { askText } = await import('/ui/app/ui/dialog.js');
+  const host = document.createElement('div'); host.style.cssText = 'position:fixed;left:0;top:0;width:700px;height:400px;z-index:500;background:var(--bg)'; document.body.appendChild(host);
+  const rows = Array.from({ length: 5000 }, (_, i) => ({ k: 'piece' + String(i).padStart(4, '0'), n: (i * 7919) % 5000 }));
+  let picked = null;
+  const list = createList(host, { columns: [{ key: 'k', label: 'Nombre', mono: true }, { key: 'n', label: 'Triángulos', align: 'r' }], rows, rowId: r => r.k, label: 'prueba', onSelect: r => { picked = r.k; } });
+  const grid = host.querySelector('.vgrid'), body = host.querySelector('.vb');
+  const nodes = () => host.querySelectorAll('.vrow').length;
+  out.rows0 = nodes(); out.count0 = host.querySelector('.vcount').textContent;
+  body.scrollTop = 34 * 2500; body.dispatchEvent(new Event('scroll')); out.rowsScrolled = nodes();
+  out.firstAfterScroll = host.querySelector('.vrow')?.textContent;
+  host.querySelector('.hbtn[data-key=n]').click();
+  out.sortAria = host.querySelector('[role=columnheader][data-key=n]').getAttribute('aria-sort');
+  out.firstSorted = host.querySelector('.vrow .vc.r')?.textContent;
+  list.setFilter(r => r.k.endsWith('99')); out.filtered = list.count(); out.countFiltered = host.querySelector('.vcount').textContent; out.rowsFiltered = nodes();
+  list.setFilter(null);
+  grid.focus();
+  const key = k => grid.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true, cancelable: true }));
+  key('ArrowDown'); key('ArrowDown'); out.active = grid.getAttribute('aria-activedescendant');
+  key('Enter'); out.picked = picked;
+  key('End'); out.endRowRendered = !!host.querySelector('.vrow:last-child') && host.querySelector('.vrow.act') !== null; out.rowsAtEnd = nodes();
+  key('Home'); out.afterHome = grid.getAttribute('aria-activedescendant');
+  list.destroy(); host.remove();
+
+  const wrap = document.getElementById('toastwrap'); wrap.querySelectorAll('.toast').forEach(t => t.remove());
+  const toasts = createToasts(wrap, { setTimer: (f) => setTimeout(f, 60) });
+  toasts.error('Falló', 'detalle'); toasts.ok('Hecho');
+  out.alertToast = wrap.querySelectorAll('[data-region=alert] .toast.error').length;
+  out.statusToast = wrap.querySelectorAll('[data-region=status] .toast.ok').length;
+  await new Promise(r => setTimeout(r, 250));
+  out.errorStays = wrap.querySelectorAll('[data-region=alert] .toast').length;
+  out.okGone = wrap.querySelectorAll('[data-region=status] .toast').length;
+  wrap.querySelector('[data-toast-close]').click(); out.errorClosed = wrap.querySelectorAll('.toast').length;
+  out.regions = [wrap.querySelector('[data-region=status]').getAttribute('aria-live'), wrap.querySelector('[data-region=alert]').getAttribute('role')];
+
+  const opener = document.createElement('button'); opener.textContent = 'abrir'; document.body.appendChild(opener); opener.focus();
+  window.__dlg = askText(document, { title: 'Nombre', label: 'Nombre', validate: v => v ? '' : 'Escribe un nombre.' }).then(v => { window.__dlgResult = v; });
+  out.dialogOpen = !!document.querySelector('dialog[open]'); out.dialogFocus = document.activeElement?.tagName;
+  return out;
+})()`;
+
+async function walkComponents(d, name) {
+  const mark = d.errors.length;
+  const r = await d.page.eval(COMPONENTS);
+  check(name, "list: 5,000 rows render fewer than 80 row nodes", r.rows0 > 0 && r.rows0 < 80 && r.rowsScrolled < 80 && r.rowsAtEnd < 80, JSON.stringify({ a: r.rows0, b: r.rowsScrolled, c: r.rowsAtEnd }));
+  check(name, "list: scrolling renders the window at the new position", r.firstAfterScroll?.startsWith("piece2494") || r.firstAfterScroll?.startsWith("piece249"), r.firstAfterScroll);
+  check(name, "list: counter shows the total", /5\D?000/.test(r.count0), r.count0);
+  check(name, "list: header click sorts and sets aria-sort", r.sortAria === "ascending" && r.firstSorted === "0", `${r.sortAria} ${r.firstSorted}`);
+  check(name, "list: filter narrows rows and counter", r.filtered === 50 && /50 de/.test(r.countFiltered) && r.rowsFiltered > 0 && r.rowsFiltered < 50, JSON.stringify([r.filtered, r.countFiltered, r.rowsFiltered]));
+  check(name, "list: arrows move the active row, Enter selects, Home/End jump", /-r2$/.test(r.active) && r.picked && r.endRowRendered && /-r0$/.test(r.afterHome), JSON.stringify([r.active, r.picked, r.afterHome]));
+  check(name, "toasts: errors in role=alert and stay, success auto-dismisses, close works", r.alertToast === 1 && r.statusToast === 1 && r.errorStays === 1 && r.okGone === 0 && r.errorClosed === 0 && r.regions[0] === "polite" && r.regions[1] === "alert", JSON.stringify(r));
+  check(name, "dialog: opens modal with focus inside", r.dialogOpen && r.dialogFocus === "INPUT");
+  await d.page.key("Enter"); await sleep(80);
+  const err = await d.page.eval(`document.querySelector('dialog .err')?.textContent`);
+  check(name, "dialog: Enter with invalid input shows the error and stays open", err === "Escribe un nombre." && await d.page.eval(`!!document.querySelector('dialog[open]')`), err);
+  await d.page.key("Escape"); await sleep(120);
+  const back = await d.page.eval(`({ open: !!document.querySelector('dialog'), result: window.__dlgResult, focus: document.activeElement?.textContent })`);
+  check(name, "dialog: Esc cancels (null) and focus returns to the opener", !back.open && back.result === null && back.focus === "abrir", JSON.stringify(back));
+  await d.page.eval(`document.querySelectorAll('button').forEach(b => b.textContent === 'abrir' && b.remove())`);
+  check(name, "components: no JS errors", d.errors.length === mark, d.errors.slice(mark).join(" | "));
+}
+
 async function walkApp(chrome, name, port) {
+  console.log(`\n== ${name}/app (port ${port})`);
   const d = await Driver.open(chrome.port, `${name}/app`);
   try {
     const cat = await api(port, "/api/catalog");
+    await d.page.send("Page.addScriptToEvaluateOnNewDocument", { source: APP_PROBE });
     await d.goto(`http://127.0.0.1:${port}/app`);
-    const shown = await d.waitFor(`() => (document.getElementById("kiln-project")?.textContent ?? "") !== "..."`);
+    const ready = await d.waitFor(`() => document.querySelector('#main [data-view="home"][data-ready]')`);
     await d.settle({ quiet: 300 });
-    check(name, "app: /app loads and shows the project name", shown && (await d.page.eval(`document.getElementById("kiln-project").textContent`)) === cat.project);
-    check(name, "app: no JS errors", d.errors.length === 0, d.errors.join(" | "));
+    check(name, "app: home drawn", ready, "the /app home never appeared");
+    check(name, "app: project name in the top bar", (await d.page.eval(`document.getElementById("kiln-project").textContent`)) === cat.project);
+    check(name, "app: shell has top bar, nav, main, search, Comandos, Releer", await d.page.eval(`!!(document.querySelector('header.topbar') && document.querySelector('nav[aria-label=Principal]') && document.querySelector('main#main') && document.querySelector('input[aria-label^=Buscar]') && [...document.querySelectorAll('button')].some(b => b.textContent.startsWith('Comandos')) && [...document.querySelectorAll('button')].some(b => b.textContent === 'Releer'))`));
+
+    const nav = await d.page.eval(`Object.fromEntries([...document.querySelectorAll('nav a[data-nav]')].map(a => [a.dataset.nav, a.querySelector('.cnt').textContent]))`);
+    const elements = cat.content.reduce((n, s) => n + s.elements.length, 0);
+    check(name, "nav: entries present (Contenido only with content sets)", ["home", "context", "tree", "catalog", "materials", "jobs"].every(v => v in nav) && ("content" in nav) === (cat.content.length > 0), Object.keys(nav).join(","));
+    check(name, "nav: counters match the catalog", nav.catalog === String(cat.pieces.length) && nav.materials === String(cat.materials.length) && nav.tree === String(Object.keys(cat.tree.nodes).length) && (!cat.content.length || nav.content === String(elements)), JSON.stringify(nav));
+    const dots = await d.page.eval(`Object.fromEntries([...document.querySelectorAll('nav a[data-nav]')].map(a => [a.dataset.nav, a.querySelector('.dot').className]))`);
+    const worst = pred => { const f = cat.findings.filter(pred); return f.some(x => x.severity === "error") ? "error" : f.some(x => x.severity === "warn") ? "warn" : f.length ? "info" : "none"; };
+    const pieceKeys = new Set(cat.pieces.map(p => p.key)), kitNames = new Set(cat.kits.map(k => k.name));
+    check(name, "nav: catalog dot is the worst severity of its findings", dots.catalog.endsWith(worst(f => pieceKeys.has(f.subject) || kitNames.has(f.subject))), `${dots.catalog}`);
+
+    const tiles = await d.page.eval(`Object.fromEntries([...document.querySelectorAll('.tile')].map(t => [t.querySelector('.l').textContent, t.querySelector('.v').textContent]))`);
+    check(name, "home: shows counts from the catalog", tiles.Kits === plural(cat.kits.length) && tiles.Piezas === plural(cat.pieces.length) && tiles.Materiales === plural(cat.materials.length) && (!cat.content.length || tiles.Elementos === plural(elements)), JSON.stringify(tiles));
+    if (cat.content.length) {
+      const rowsText = await d.page.eval(`[...document.querySelectorAll('.set-row')].map(r => r.textContent)`);
+      check(name, "home: shows each content set with its status", cat.content.every(s => rowsText.some(t => t.includes(s.name) && /validado|error|aviso/.test(t))), rowsText.join(" | "));
+    }
+    const sev = ["error", "warn", "info"].filter(s => cat.findings.some(f => f.severity === s));
+    const groups = await d.page.eval(`[...document.querySelectorAll('.issues .gh .t')].map(e => e.textContent)`);
+    const hasFail = cat.findings.some(f => f.severity !== "info");
+    if (hasFail) {
+      check(name, "home: findings grouped by severity with their totals", groups.length === sev.length && sev.every((s, i) => groups[i].startsWith(String(cat.findings.filter(f => f.severity === s).length))), groups.join(" | "));
+    } else check(name, "home: no errors or warnings shows the calm state", await d.page.eval(`!!document.querySelector('.calm')`));
+    const next = await d.page.eval(`document.querySelector('[data-next]')?.dataset.next`);
+    const expectNext = cat.findings.some(f => f.severity === "error") ? "errors" : cat.findings.some(f => f.severity === "warn") ? "warnings" : (!cat.kits.length && !cat.content.length) ? "no-kits" : "ok";
+    check(name, "home: next-step card follows the rules", next === expectNext, `${next} vs ${expectNext}`);
+    check(name, "home: no JS errors", d.errors.length === 0, d.errors.join(" | "));
+    await appShot(d, `${name}-app-home.png`);
+
+    // 900 px: nothing overflows horizontally
+    await d.page.send("Emulation.setDeviceMetricsOverride", { width: 900, height: 800, deviceScaleFactor: 1, mobile: false });
+    await sleep(250);
+    const over = await d.page.eval(`({ sw: document.documentElement.scrollWidth, iw: innerWidth, main: document.getElementById('main').scrollWidth - document.getElementById('main').clientWidth })`);
+    check(name, "app: usable at 900 px (no horizontal overflow)", over.sw <= over.iw && over.main <= 1, JSON.stringify(over));
+    await appShot(d, `${name}-app-home-w900.png`);
+    await d.page.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+
+    // a finding links to its element; reload keeps the route
+    const first = await d.page.eval(`document.querySelector('.issue')?.getAttribute('href') ?? null`);
+    if (first) {
+      await d.clickAndSettle(`() => document.querySelector('.issue')`);
+      const hash = await d.page.eval("location.hash");
+      check(name, "home: clicking a finding navigates (hash changes to its route)", hash === first && hash !== "" && hash !== "#/home", `${hash} vs ${first}`);
+      check(name, "app: the nav marks the current view", await d.page.eval(`!!document.querySelector('nav a[aria-current=page]')`));
+      await d.page.eval("location.reload()");
+      const back = await d.waitFor(`() => document.querySelector('#main [data-view]') && location.hash === ${JSON.stringify(first)}`);
+      await d.settle({ quiet: 300 });
+      check(name, "app: reload keeps the route", back && (await d.page.eval("location.hash")) === first);
+      const place = await d.page.eval(`document.querySelector('[data-view=placeholder] a[href="/"]')?.textContent ?? null`);
+      check(name, "app: a view not built yet says so and links to the old UI", place !== null, "no placeholder");
+    }
+    await d.goto(`http://127.0.0.1:${port}/app#/home`);
+    await d.waitFor(`() => document.querySelector('#main [data-view="home"][data-ready]')`);
+    await d.settle({ quiet: 300 });
+    const mark = d.errors.length;
+    await d.clickAndSettle(`() => document.getElementById('btnReleer')`);
+    check(name, "app: Releer answers with a toast and gives the button back", await d.page.eval(`!!document.querySelector('.toast.ok') && !document.getElementById('btnReleer').disabled`));
+    check(name, "app: Releer no JS errors", d.errors.length === mark, d.errors.slice(mark).join(" | "));
+    if (name === "examples") await walkComponents(d, name);
+    check(name, "app: ran without JS errors", d.errors.length === 0, d.errors.join(" | "));
   } catch (e) {
     check(name, "app: ran to the end", false, e.stack?.split("\n").slice(0, 3).join(" "));
   } finally { await d.close(); }
+}
+
+async function measureAppOnce(chrome, port) {
+  const d = await Driver.open(chrome.port, "measure-app");
+  try {
+    await d.page.send("Page.addScriptToEvaluateOnNewDocument", { source: APP_PROBE });
+    await d.goto(`http://127.0.0.1:${port}/app`);
+    await d.waitFor(`() => window.__app?.paint != null`, 60000);
+    await d.settle({ quiet: 300 });
+    const t = await d.page.eval("({ ready: __app.ready, paint: __app.paint })");
+    return { app_home_dom_ms: t.ready, app_home_paint_ms: t.paint, app_home_nodes: await d.domCount(), app_js_errors: d.errors.length };
+  } finally { await d.close(); }
+}
+
+async function measureApp(chrome, port) {
+  const runs = [];
+  for (let i = 0; i < RUNS; i++) runs.push(await measureAppOnce(chrome, port));
+  return Object.fromEntries(Object.keys(runs[0]).map(k => [k, median(runs.map(r => r[k]))]));
 }
 
 const matches = (q, text) => String(text).toLowerCase().includes(q);
@@ -308,7 +466,7 @@ let perf = null;
 try {
   for (const [name, port] of Object.entries(targets)) await walk(chrome, name, port);
   for (const [name, port] of Object.entries(targets)) if (name !== "wizard") await walkApp(chrome, name, port);
-  if (targets.synthetic) perf = await measure(chrome, targets.synthetic);
+  if (targets.synthetic) { perf = await measure(chrome, targets.synthetic); Object.assign(perf.median, await measureApp(chrome, targets.synthetic)); }
 } finally { chrome.kill(); }
 
 // ---- report and baseline

@@ -23,6 +23,15 @@ const UI_FILES: &[(&str, &str)] = &[
     ("app/api.js", include_str!("../ui/app/api.js")),
     ("app/router.js", include_str!("../ui/app/router.js")),
     ("app/derive.js", include_str!("../ui/app/derive.js")),
+    ("app/styles.css", include_str!("../ui/app/styles.css")),
+    ("app/shell.js", include_str!("../ui/app/shell.js")),
+    ("app/nav.js", include_str!("../ui/app/nav.js")),
+    ("app/ui/list.js", include_str!("../ui/app/ui/list.js")),
+    ("app/ui/feedback.js", include_str!("../ui/app/ui/feedback.js")),
+    ("app/ui/dialog.js", include_str!("../ui/app/ui/dialog.js")),
+    ("app/views/registry.js", include_str!("../ui/app/views/registry.js")),
+    ("app/views/home.js", include_str!("../ui/app/views/home.js")),
+    ("app/views/placeholder.js", include_str!("../ui/app/views/placeholder.js")),
 ];
 
 /// `kiln serve --ui-dir`: read the UI modules from here, not from the binary.
@@ -593,7 +602,7 @@ fn jobs_list(jobs: &Jobs) -> serde_json::Value {
     let list: Vec<_> = all
         .iter()
         .filter(|j| j.status == "running" || recent.contains(&j.id))
-        .map(|j| serde_json::json!({ "id": j.id, "label": j.asked, "state": j.status }))
+        .map(|j| serde_json::json!({ "id": j.id, "label": j.asked, "state": j.status, "kind": j.kind, "started": j.started }))
         .collect();
     serde_json::json!({ "jobs": list })
 }
@@ -968,7 +977,7 @@ mod tests {
     // ---- jobs list (T10)
 
     fn job(id: u64, status: &str) -> agent::Job {
-        agent::Job { id, asked: format!("tarea {id}"), status: status.into(), log: vec!["linea".into()], spec: None, reply: None, offer: None }
+        agent::Job { id, asked: format!("tarea {id}"), status: status.into(), log: vec!["linea".into()], spec: None, reply: None, offer: None, kind: "montar".into(), started: 1_700_000_000 + id }
     }
 
     #[test]
@@ -984,6 +993,8 @@ mod tests {
         assert_eq!(ids, vec![2, 5, 6, 7, 8, 9]);
         assert_eq!(list[0]["state"], "running");
         assert_eq!(list[0]["label"], "tarea 2");
+        assert_eq!(list[0]["kind"], "montar");
+        assert_eq!(list[0]["started"], 1_700_000_002u64);
         assert!(list[0].get("log").is_none());
         assert_eq!(jobs_list(&Default::default())["jobs"].as_array().unwrap().len(), 0);
     }

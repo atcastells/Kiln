@@ -4,13 +4,35 @@
 <meta charset="utf-8">
 <title>Kiln</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="stylesheet" href="/ui/app/styles.css">
 </head>
 <body>
-<main>
-  <h1>Kiln</h1>
-  <p>Proyecto: <strong id="kiln-project">...</strong></p>
-  <p id="kiln-error" role="alert" hidden></p>
-</main>
+<button class="btn skip" type="button" id="skip">Saltar al contenido</button>
+<div class="app">
+  <header class="topbar">
+    <div class="brand"><span class="mark" aria-hidden="true"></span><strong>Kiln</strong><span class="tag" id="kiln-project">...</span></div>
+    <div class="search" role="search">
+      <input id="gq" class="field" type="text" role="combobox" aria-expanded="false" aria-controls="gres" aria-autocomplete="list"
+             placeholder="Buscar en el proyecto" aria-label="Buscar en el proyecto" autocomplete="off">
+      <kbd aria-hidden="true">/</kbd>
+      <div id="gres" class="sres" role="listbox" aria-label="Resultados de la búsqueda" hidden></div>
+    </div>
+    <button class="btn ghost cmdbtn" type="button" id="btnCmd" aria-label="Abrir la paleta de comandos">Comandos <kbd id="kk">Ctrl K</kbd></button>
+    <div class="grow"></div>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+    <button class="btn" type="button" id="btnReleer">Releer</button>
+    <button class="btn" type="button" id="btnPanel" aria-controls="detail" aria-expanded="false">Detalle</button>
+  </header>
+  <div class="shell" id="shell">
+    <nav class="side" id="nav" aria-label="Principal"></nav>
+    <main class="work" id="main" tabindex="-1" aria-busy="true"></main>
+    <aside id="detail" aria-label="Detalle del elemento seleccionado"></aside>
+  </div>
+</div>
+<div class="toastwrap" id="toastwrap">
+  <div data-region="status" role="status" aria-live="polite"></div>
+  <div data-region="alert" role="alert"></div>
+</div>
 <script type="module" src="/ui/app/main.js"></script>
 </body>
 </html>
