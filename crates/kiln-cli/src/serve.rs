@@ -83,18 +83,27 @@ fn ui_file(rel: &str, dir: Option<&Path>) -> Option<(&'static str, Vec<u8>)> {
     Some((kind, body))
 }
 
-/// `/ui/<path>` and the entry of the new UI (`/app`); `None` for any other
-/// path, so the caller keeps routing.
+/// `/ui/<path>` and the entry of the new UI (`/`; `/app` keeps answering with
+/// the same page so old links work); `None` for any other path, so the caller
+/// keeps routing.
 fn route_ui(path: &str, dir: Option<&Path>) -> Option<Reply> {
     let path = path.split(['?', '#']).next().unwrap_or("");
     let rel = match path {
-        "/app" | "/app/" => "app/index.html",
+        "/" | "/index.html" | "/app" | "/app/" => "app/index.html",
         p => p.strip_prefix("/ui/")?,
     };
     Some(match ui_file(rel, dir) {
         Some((kind, body)) => ("200 OK", kind, body),
         None => ("404 Not Found", "text/plain", b"no existe".to_vec()),
     })
+}
+
+/// The previous UI, served at `/classic` for one more release, with a banner
+/// that says so and links to the new one.
+const CLASSIC_BANNER: &str = r#"<div role="note" style="background:#f7ecd2;color:#4a3000;border:1px solid #d9b866;border-radius:6px;padding:6px 12px;font:13px system-ui,sans-serif">Interfaz anterior: se retirará en la próxima entrega. <a href="/" style="color:#7a3a0a">Ir a la interfaz nueva</a></div>"#;
+
+fn classic_page() -> Vec<u8> {
+    PAGE.replacen("<body>", &format!("<body>{CLASSIC_BANNER}"), 1).into_bytes()
 }
 
 fn route_ui_served(path: &str) -> Option<Reply> {
@@ -210,7 +219,7 @@ fn handle_new(stream: TcpStream, project: &Path, slot: &Slot, jobs: &Jobs) -> st
     let req = read_request(&stream)?;
     let json = |v: serde_json::Value| serde_json::to_vec(&v).unwrap_or_default();
     let (status, kind, body) = match (req.method.as_str(), req.path.as_str()) {
-        ("GET", "/" | "/index.html") => ("200 OK", "text/html; charset=utf-8", PAGE.as_bytes().to_vec()),
+        ("GET", "/classic") => ("200 OK", "text/html; charset=utf-8", classic_page()),
         ("GET", p) if route_ui_served(p).is_some() => route_ui_served(p).unwrap(),
         ("GET", "/api/jobs") => ("200 OK", "application/json", json(jobs_list(jobs))),
         ("GET", "/api/new") => ("200 OK", "application/json", json(serde_json::json!({
@@ -318,11 +327,7 @@ fn handle(stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result<()>
         )
     };
     let (status, kind, body) = match (req.method.as_str(), req.path.as_str()) {
-        ("GET", "/" | "/index.html") => (
-            "200 OK",
-            "text/html; charset=utf-8",
-            PAGE.as_bytes().to_vec(),
-        ),
+        ("GET", "/classic") => ("200 OK", "text/html; charset=utf-8", classic_page()),
         ("GET", p) if route_ui_served(p).is_some() => route_ui_served(p).unwrap(),
         ("GET", "/api/jobs") => json(jobs_list(jobs)),
         // Only the page itself may post here: a custom header forces a CORS
@@ -884,8 +889,26 @@ mod tests {
         ] {
             assert_eq!(route_ui(p, None).unwrap().0, "404 Not Found", "{p}");
         }
-        assert!(route_ui("/", None).is_none());
         assert!(route_ui("/api/catalog", None).is_none());
+        assert!(route_ui("/classic", None).is_none());
+    }
+
+    #[test]
+    fn root_and_app_serve_the_new_ui_and_classic_the_old_one_with_a_banner() {
+        let new = route_ui("/ui/app/index.html", None).unwrap().2;
+        for p in ["/", "/index.html", "/app", "/app/", "/?x=1"] {
+            let (status, kind, body) = route_ui(p, None).unwrap();
+            assert_eq!(status, "200 OK", "{p}");
+            assert!(kind.starts_with("text/html"), "{p}");
+            assert_eq!(body, new, "{p} must be the new UI");
+        }
+        let classic = String::from_utf8(classic_page()).unwrap();
+        assert!(classic.contains("Interfaz anterior: se retirará en la próxima entrega"));
+        assert!(classic.contains(r#"href="/""#));
+        assert!(classic.contains("<h1>Kiln</h1>"), "the old page is still there");
+        assert_ne!(classic.as_bytes(), new.as_slice());
+        assert!(classic.find("Interfaz anterior").unwrap() < classic.find("<h1>Kiln</h1>").unwrap());
+        assert!(!String::from_utf8(new).unwrap().contains("Interfaz anterior: se retirará"));
     }
 
     fn scratch(name: &str) -> PathBuf {

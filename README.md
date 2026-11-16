@@ -682,6 +682,56 @@ Las tablas de compatibilidad entre conectores no están implementadas:
 ningún contenido usa todavía clases de conector. Hoy solo se comprueba que
 el `side` de cada conector esté en una lista cerrada (`within` + `one_of`).
 
+## Interfaz
+
+La página que abre `kiln serve` es una aplicación de módulos ES sin paso de construcción: no hay Node, ni bundler, ni dependencias que instalar para usarla. Todo está en `crates/kiln-cli/ui/app/` y el binario lo lleva dentro.
+
+**Cómo está organizada**
+
+- `main.js` arranca: crea el almacén, el cliente de la API, el router y el marco, y lo monta.
+- `store.js` es el almacén: un mapa de claves (`catalog`, `context`, `route`, `selection`, `jobs`…) con suscripción por clave. Las vistas leen de él y no se hablan entre sí.
+- `api.js` es el cliente: lecturas con `If-None-Match` (el servidor contesta 304 si nada cambió), peticiones idénticas en vuelo compartidas, errores en castellano.
+- `router.js` convierte `#/vista/arg1/arg2?clave=valor` en una ruta y al revés. Funciones puras, con pruebas.
+- `shell.js` es el marco: barra superior, navegación, zona principal, panel de detalle, buscador, paleta de comandos y avisos.
+- `views/*.js` son las vistas (inicio, contexto, árbol, contenido, catálogo, materiales, ficha, montaje, trabajos, asistente). Cada una exporta `mount(contenedor, ctx)` y devuelve su función de limpieza. `ui/` tiene los componentes (lista virtual, avisos, diálogo, paleta).
+- `html.js` es la plantilla `html` que escapa todo lo que interpola; los números en texto salen con puntos de millar (`5.000`), aunque tengan cuatro cifras.
+- Los módulos se sirven bajo `/ui/<ruta>` desde `UI_FILES`, la lista de `crates/kiln-cli/src/serve.rs`.
+
+**Añadir una vista** (tres pasos)
+
+1. Crea `ui/app/views/<nombre>.js` con `export function mount(el, ctx) { ...; return () => limpieza; }`.
+2. Regístrala en `views/registry.js` (`<nombre>: () => import("./<nombre>.js")`) y añade el nombre a `VIEWS` en `router.js`; si va en el menú, una entrada en `navModel` de `nav.js`.
+3. Añade el fichero a `UI_FILES` en `serve.rs` (una línea con `include_str!`), y una comprobación en `tests/app_views*.mjs`.
+
+**Desarrollar sin recompilar**: `kiln serve --project DIR --ui-dir crates/kiln-cli/ui` lee los módulos del disco en cada petición; basta con recargar la página.
+
+**Rutas**: `/` es la interfaz (`/app` sigue sirviendo la misma página para que los enlaces antiguos funcionen). `/classic` es la interfaz anterior, con un aviso de que se retirará en la próxima entrega; la interfaz nueva enlaza a ella desde el menú ("Interfaz anterior").
+
+**Teclado**: `Ctrl K` (`Cmd K` en Mac) abre la paleta (vistas, acciones, piezas, kits y materiales; incluye "Pedir un asset…"); `/` va al buscador; en las listas, flechas, `Inicio`/`Fin` y `Intro` para elegir; `Esc` cierra la paleta, el diálogo o el panel de detalle y devuelve el foco a donde estaba. Hay un enlace "Saltar al contenido" y, a 900 px, el panel de detalle se superpone y se cierra con `Esc`.
+
+**Pruebas**
+
+- `scripts/ui_test.sh` corre las pruebas unitarias (`node --test`, incluida la del contraste de color AA de los dos temas) y un recorrido en Chrome sin ventana por `examples`, `examples/content`, un proyecto sintético y una carpeta vacía (el asistente), contra `/` y contra `/classic`. Incluye el recorrido solo con teclado, la revisión de roles y etiquetas y las pruebas a 900 px. Necesita Node 22 y Chrome (`CHROME=ruta` para otro). Termina con `OK: ui walkthrough passed`.
+- `scripts/ui_fixture.sh DIR` genera el proyecto sintético (5.000 piezas, 2.000 hallazgos) para probar a mano.
+- `scripts/ui_test.sh --update-baseline` guarda en `crates/kiln-cli/ui/tests/baseline.json` las comprobaciones y las medidas; después, una comprobación que estaba en verde y deja de estarlo es una regresión.
+- **Presupuesto** (falla el script): primera vista menos de 300 ms, filtro del catálogo menos de 50 ms, menos de 80 nodos de fila con 5.000 piezas. Los tiempos admiten una tolerancia del 25 % (`TOLERANCE` en `walkthrough.mjs`) porque Chrome sin ventana en una máquina ocupada es ruidoso; los nodos no tienen tolerancia.
+
+**Medidas** (proyecto sintético, mediana de 3 ejecuciones, Chrome sin ventana). "Anterior, primera medida" es la línea base de la interfaz antigua tal como se guardó al empezar; "anterior, ahora" es la misma interfaz medida hoy, cuando el servidor ya guarda el catálogo en memoria.
+
+| medida | anterior, primera medida | anterior, ahora | nueva |
+|---|---:|---:|---:|
+| primera vista (pintada), ms | 379 | 69 | 64 |
+| cambiar a Catálogo, ms | 111 | 108 | 40 |
+| pulsación en el filtro del catálogo, ms | 74 | 65 | 1,2 |
+| pulsación en el buscador global, ms | 74 | 65 | 123 (incluye 120 de espera) |
+| nodos DOM, vista Catálogo | 8.158 | 8.160 | 413 (menos de 80 filas) |
+| nodos DOM, vista Inicio | 123 | 125 | 183 |
+| `/api/catalog` la primera vez, ms | 330 | 21 | 21 |
+| `/api/catalog` con caché (304), ms | 330 | 21 | 19 |
+| memoria de JS tras recorrer las vistas, MB | 3,7 | 3,7 | 4,8 |
+
+La mejora está en lo que crece con el proyecto: el catálogo pinta solo las filas visibles, así que el filtro y el cambio de vista dejan de depender de las 5.000 piezas. Inicio tiene más nodos y la memoria es algo mayor porque la interfaz nueva dibuja más información.
+
 ## Lo que viene
 
 - El primer asset de punta a punta y la app de escritorio (Tauri).

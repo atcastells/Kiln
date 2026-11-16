@@ -9,6 +9,7 @@ import { Driver, find } from "./driver.mjs";
 import { S } from "./selectors.mjs";
 import { walkAppViews, measureAppViews } from "./app_views.mjs";
 import { walkNewViews, walkAppWizard } from "./app_views2.mjs";
+import { walkAppA11y } from "./app_a11y.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const arg = n => { const i = process.argv.indexOf(n); return i < 0 ? null : process.argv[i + 1]; };
@@ -30,7 +31,7 @@ const median = a => { const s = [...a].sort((x, y) => x - y); return s.length % 
 
 async function openProject(chrome, name, port) {
   const d = await Driver.open(chrome.port, name);
-  await d.goto(`http://127.0.0.1:${port}/`);
+  await d.goto(`http://127.0.0.1:${port}/classic`); // the previous UI, kept one more release
   return d;
 }
 const shot = (d, name, view) => d.page.screenshot(path.join(OUT, "screenshots", `${name}-${view}.png`), fs);
@@ -68,7 +69,7 @@ async function walk(chrome, name, port) {
   } finally { await d.close(); }
 }
 
-// The new UI at /app: its module graph loads from the binary and it shows the project name.
+// The new UI at / (and /app, kept so old links work): its module graph loads from the binary and it shows the project name.
 const APP_PROBE = `(() => {
   const p = window.__app = { ready: null, paint: null };
   const look = () => { if (p.ready == null && document.querySelector('#main [data-view="home"][data-ready]')) { p.ready = performance.now(); requestAnimationFrame(() => requestAnimationFrame(() => { p.paint = performance.now(); })); } };
@@ -148,22 +149,22 @@ async function walkComponents(d, name) {
 }
 
 async function walkApp(chrome, name, port) {
-  console.log(`\n== ${name}/app (port ${port})`);
-  const d = await Driver.open(chrome.port, `${name}/app`);
+  console.log(`\n== ${name}/ new UI (port ${port})`);
+  const d = await Driver.open(chrome.port, `${name}/new`);
   try {
     const cat = await api(port, "/api/catalog");
     await d.page.send("Page.addScriptToEvaluateOnNewDocument", { source: APP_PROBE });
-    await d.goto(`http://127.0.0.1:${port}/app`);
+    await d.goto(`http://127.0.0.1:${port}/`);
     const ready = await d.waitFor(`() => document.querySelector('#main [data-view="home"][data-ready]')`);
     await d.settle({ quiet: 300 });
-    check(name, "app: home drawn", ready, "the /app home never appeared");
+    check(name, "app: home drawn", ready, "the new home never appeared");
     check(name, "app: project name in the top bar", (await d.page.eval(`document.getElementById("kiln-project").textContent`)) === cat.project);
     check(name, "app: shell has top bar, nav, main, search, Comandos, Releer", await d.page.eval(`!!(document.querySelector('header.topbar') && document.querySelector('nav[aria-label=Principal]') && document.querySelector('main#main') && document.querySelector('input[aria-label^=Buscar]') && [...document.querySelectorAll('button')].some(b => b.textContent.startsWith('Comandos')) && [...document.querySelectorAll('button')].some(b => b.textContent === 'Releer'))`));
 
     const nav = await d.page.eval(`Object.fromEntries([...document.querySelectorAll('nav a[data-nav]')].map(a => [a.dataset.nav, a.querySelector('.cnt').textContent]))`);
     const elements = cat.content.reduce((n, s) => n + s.elements.length, 0);
     check(name, "nav: entries present (Contenido only with content sets)", ["home", "context", "tree", "catalog", "materials", "jobs"].every(v => v in nav) && ("content" in nav) === (cat.content.length > 0), Object.keys(nav).join(","));
-    check(name, "nav: counters match the catalog", nav.catalog === String(cat.pieces.length) && nav.materials === String(cat.materials.length) && nav.tree === String(Object.keys(cat.tree.nodes).length) && (!cat.content.length || nav.content === String(elements)), JSON.stringify(nav));
+    check(name, "nav: counters match the catalog", nav.catalog === plural(cat.pieces.length) && nav.materials === plural(cat.materials.length) && nav.tree === plural(Object.keys(cat.tree.nodes).length) && (!cat.content.length || nav.content === plural(elements)), JSON.stringify(nav));
     const dots = await d.page.eval(`Object.fromEntries([...document.querySelectorAll('nav a[data-nav]')].map(a => [a.dataset.nav, a.querySelector('.dot').className]))`);
     const worst = pred => { const f = cat.findings.filter(pred); return f.some(x => x.severity === "error") ? "error" : f.some(x => x.severity === "warn") ? "warn" : f.length ? "info" : "none"; };
     const pieceKeys = new Set(cat.pieces.map(p => p.key)), kitNames = new Set(cat.kits.map(k => k.name));
@@ -179,13 +180,19 @@ async function walkApp(chrome, name, port) {
     const groups = await d.page.eval(`[...document.querySelectorAll('.issues .gh .t')].map(e => e.textContent)`);
     const hasFail = cat.findings.some(f => f.severity !== "info");
     if (hasFail) {
-      check(name, "home: findings grouped by severity with their totals", groups.length === sev.length && sev.every((s, i) => groups[i].startsWith(String(cat.findings.filter(f => f.severity === s).length))), groups.join(" | "));
+      check(name, "home: findings grouped by severity with their totals", groups.length === sev.length && sev.every((s, i) => groups[i].startsWith(plural(cat.findings.filter(f => f.severity === s).length))), groups.join(" | "));
     } else check(name, "home: no errors or warnings shows the calm state", await d.page.eval(`!!document.querySelector('.calm')`));
     const next = await d.page.eval(`document.querySelector('[data-next]')?.dataset.next`);
     const expectNext = cat.findings.some(f => f.severity === "error") ? "errors" : cat.findings.some(f => f.severity === "warn") ? "warnings" : (!cat.kits.length && !cat.content.length) ? "no-kits" : "ok";
     check(name, "home: next-step card follows the rules", next === expectNext, `${next} vs ${expectNext}`);
     check(name, "home: no JS errors", d.errors.length === 0, d.errors.join(" | "));
     await appShot(d, `${name}-app-home.png`);
+    const classicLink = await d.page.eval(`document.querySelector('nav a[href="/classic"]')?.textContent.trim()`);
+    check(name, "routes: the new UI links to the previous one (Interfaz anterior -> /classic)", classicLink === "Interfaz anterior", String(classicLink));
+    const routes = await d.page.eval(`(async () => { const get = async p => { const r = await fetch(p); return { status: r.status, text: await r.text() }; };
+      const [root, app, classic] = await Promise.all([get('/'), get('/app'), get('/classic')]);
+      return { same: root.text === app.text, rootIsNew: root.text.includes('/ui/app/main.js'), classicOld: !classic.text.includes('/ui/app/main.js') && classic.text.includes('Interfaz anterior: se retirará en la próxima entrega') && classic.text.includes('href="/"'), statuses: [root.status, app.status, classic.status] }; })()`);
+    check(name, "routes: / serves the new UI, /app the same page, /classic the old one with its banner", routes.same && routes.rootIsNew && routes.classicOld && routes.statuses.every(s => s === 200), JSON.stringify(routes));
 
     // 900 px: nothing overflows horizontally
     await d.page.send("Emulation.setDeviceMetricsOverride", { width: 900, height: 800, deviceScaleFactor: 1, mobile: false });
@@ -207,7 +214,7 @@ async function walkApp(chrome, name, port) {
       await d.settle({ quiet: 300 });
       check(name, "app: reload keeps the route", back && (await d.page.eval("location.hash")) === first);
     }
-    await d.goto(`http://127.0.0.1:${port}/app#/home`);
+    await d.goto(`http://127.0.0.1:${port}/#/home`);
     await d.waitFor(`() => document.querySelector('#main [data-view="home"][data-ready]')`);
     await d.settle({ quiet: 300 });
     const mark = d.errors.length;
@@ -216,6 +223,7 @@ async function walkApp(chrome, name, port) {
     check(name, "app: Releer no JS errors", d.errors.length === mark, d.errors.slice(mark).join(" | "));
     await walkAppViews({ d, name, port, cat, check, note, shot: appShot });
     await walkNewViews({ d, name, port, cat, check, note, shot: appShot });
+    await walkAppA11y({ d, name, port, cat, check, note, shot: async (dd, file) => appShot(dd, file) });
     if (name === "examples") await walkComponents(d, name);
     check(name, "app: ran without JS errors", d.errors.length === 0, d.errors.join(" | "));
   } catch (e) {
@@ -227,7 +235,7 @@ async function measureAppOnce(chrome, port) {
   const d = await Driver.open(chrome.port, "measure-app");
   try {
     await d.page.send("Page.addScriptToEvaluateOnNewDocument", { source: APP_PROBE });
-    await d.goto(`http://127.0.0.1:${port}/app`);
+    await d.goto(`http://127.0.0.1:${port}/`);
     await d.waitFor(`() => window.__app?.paint != null`, 60000);
     await d.settle({ quiet: 300 });
     const t = await d.page.eval("({ ready: __app.ready, paint: __app.paint })");
@@ -454,7 +462,10 @@ async function measure(chrome, port) {
   for (let i = 0; i < RUNS; i++) { runs.push(await measureOnce(chrome, port, kit)); console.log(`  run ${i + 1} done`); }
   const api_ms = [], bytes = [];
   for (let i = 0; i < RUNS; i++) { const t = performance.now(); const r = await fetch(`http://127.0.0.1:${port}/api/catalog`); const b = (await r.arrayBuffer()).byteLength; api_ms.push(performance.now() - t); bytes.push(b); }
-  const out = { api_catalog_ms: median(api_ms), api_catalog_kb: median(bytes) / 1024, pieces: cat.pieces.length, findings: cat.findings.length };
+  // the same request with the validator the page sends on every later read: the server answers 304
+  const etag = (await fetch(`http://127.0.0.1:${port}/api/catalog`)).headers.get("etag"), cached_ms = [];
+  for (let i = 0; i < RUNS; i++) { const t = performance.now(); const r = await fetch(`http://127.0.0.1:${port}/api/catalog`, { headers: etag ? { "If-None-Match": etag } : {} }); await r.arrayBuffer(); cached_ms.push(performance.now() - t); }
+  const out = { api_catalog_ms: median(api_ms), api_catalog_cached_ms: median(cached_ms), api_catalog_kb: median(bytes) / 1024, pieces: cat.pieces.length, findings: cat.findings.length };
   for (const k of Object.keys(runs[0])) out[k] = median(runs.map(r => r[k]).filter(v => v != null));
   return { median: out, runs };
 }
@@ -471,6 +482,45 @@ try {
   if (targets.wizard) await walkAppWizard({ Driver, chrome, name: "wizard", port: targets.wizard, check, shot: (d, n) => shot(d, "wizard", n) });
   if (targets.synthetic) { perf = await measure(chrome, targets.synthetic); Object.assign(perf.median, await measureApp(chrome, targets.synthetic)); Object.assign(perf.median, await measureAppViews({ chrome, port: targets.synthetic, Driver, cat: await api(targets.synthetic, '/api/catalog') })); }
 } finally { chrome.kill(); }
+
+// ---- R15 performance budget of the new UI: a failing condition from now on
+// The limits come from the spec (R15). Headless Chrome on a busy machine is
+// noisy, so a metric fails only above LIMIT x TOLERANCE; between the limit and
+// that, it is reported as a note. DOM node counts are deterministic: no tolerance.
+const TOLERANCE = 1.25;
+const BUDGET = [
+  ["app_home_paint_ms", 300, "first view (home, painted)", true],
+  ["app_catalog_first_ms", 300, "first view straight on the catalog", true],
+  ["app_catalog_filter_ms", 50, "catalog filter keystroke", true],
+  ["app_catalog_rows", 80, "row nodes in the catalog (5,000 pieces)", false],
+];
+if (perf) for (const [key, limit, label, noisy] of BUDGET) {
+  const v = perf.median[key], max = noisy ? limit * TOLERANCE : limit;
+  check("synthetic", `budget: ${label} < ${limit}${noisy ? ` (x${TOLERANCE} tolerance)` : ""}`, v != null && v < max, `${key} = ${v == null ? "missing" : v.toFixed(1)}`);
+  if (noisy && v != null && v >= limit && v < max) note("synthetic", `budget: ${key} = ${v.toFixed(0)} is over ${limit} but inside the tolerance`);
+}
+
+// ---- before / after: the previous UI (/classic) against the new one (/), same run, same project
+if (perf) {
+  const m = perf.median, f1 = v => v == null ? "-" : Math.abs(v) >= 100 ? v.toFixed(0) : v.toFixed(1);
+  const rows = [
+    ["first view (painted), ms", m.fmp_paint_ms, m.app_home_paint_ms],
+    ["switch to catalog, ms", m.switch_catalog_ms, m.app_catalog_switch_ms],
+    ["filter keystroke in catalog, ms", m.keystroke_ms, m.app_catalog_filter_ms],
+    ["global search keystroke, ms", m.keystroke_ms, m.app_search_ms],
+    ["DOM nodes, catalog view", m.dom_catalog, m.app_catalog_nodes],
+    ["DOM nodes, home view", m.dom_default, m.app_home_nodes],
+    ["/api/catalog first, ms", m.api_catalog_ms, m.api_catalog_ms],
+    ["/api/catalog cached (304), ms", m.api_catalog_ms, m.api_catalog_cached_ms],
+    ["JS heap after the views, MB", m.heap_after_views_mb, m.app_heap_mb],
+  ];
+  // the previous UI as first recorded (before the server cached the catalog), kept in the baseline as `reference`
+  const ref = (fs.existsSync(BASELINE) ? JSON.parse(fs.readFileSync(BASELINE, "utf8")) : {}); const R = ref.reference ?? ref.metrics ?? {};
+  const refOf = { 0: R.fmp_paint_ms, 1: R.switch_catalog_ms, 2: R.keystroke_ms, 3: R.keystroke_ms, 4: R.dom_catalog, 5: R.dom_default, 6: R.api_catalog_ms, 7: R.api_catalog_ms, 8: R.heap_after_views_mb };
+  const lines = ["| measure | previous UI, first recorded | previous UI, this run | new UI, this run |", "|---|---:|---:|---:|", ...rows.map((r, i) => `| ${r[0]} | ${f1(refOf[i])} | ${f1(r[1])} | ${f1(r[2])} |`)];
+  console.log("\n== before / after (synthetic project: " + m.pieces + " pieces, " + m.findings + " findings)\n" + lines.join("\n"));
+  fs.writeFileSync(path.join(OUT, "comparison.md"), lines.join("\n") + "\n");
+}
 
 // ---- report and baseline
 const failed = results.filter(r => !r.ok);
@@ -496,7 +546,8 @@ fs.writeFileSync(path.join(OUT, "walkthrough.json"), JSON.stringify({ results, n
 if (UPDATE && failed.length) console.log("\nbaseline NOT written: fix the failing checks first");
 else if (UPDATE) {
   const checks = Object.fromEntries(results.map(r => [r.id, r.ok]));
-  fs.writeFileSync(BASELINE, JSON.stringify({ chrome: chrome.version, checks, metrics: perf?.median ?? {}, notes }, null, 2) + "\n");
+  const prev = fs.existsSync(BASELINE) ? JSON.parse(fs.readFileSync(BASELINE, "utf8")) : {};
+  fs.writeFileSync(BASELINE, JSON.stringify({ chrome: chrome.version, checks, metrics: perf?.median ?? {}, reference: prev.reference ?? prev.metrics ?? {}, notes }, null, 2) + "\n");
   console.log(`\nbaseline written: ${BASELINE}`);
 }
 console.log(`\n${results.length - failed.length} checks passed, ${failed.length} failed, ${notes.length} notes`);

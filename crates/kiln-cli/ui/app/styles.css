@@ -168,7 +168,7 @@ nav.side .hint { margin-top: auto; margin-bottom: 40px; padding: var(--s3); font
 /* ---- 6. Estados vacios -------------------------------------------------- */
 .empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--s3); padding: var(--s6) var(--s5); border: 1px dashed var(--line); border-radius: var(--r2); background: var(--panel2); }
 .empty svg { width: 32px; height: 32px; color: var(--muted); }
-.empty h3 { font-size: 16px; }
+.empty h2, .empty h3 { font-size: 16px; }
 .empty p { color: var(--muted); font-size: 13px; max-width: 460px; }
 .empty ol { text-align: left; font-size: 13px; counter-reset: s; display: flex; flex-direction: column; gap: var(--s2); }
 .empty ol li { counter-increment: s; padding-left: 28px; position: relative; }
@@ -256,7 +256,7 @@ dialog::backdrop { background: rgb(10 14 9 / .55); }
 #dlgPal { margin: 12vh auto auto; }
 .pal { width: 600px; max-width: 100%; }
 .pal .field { width: 100%; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; font-size: 16px; padding: var(--s4); background: transparent; }
-.pal .field:focus-visible { outline: none; }
+.pal .field:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
 .pal .list { max-height: 50vh; overflow: auto; padding: var(--s2); }
 .pal .opt { padding: 8px var(--s3); }
 .pal .foot { display: flex; gap: var(--s4); padding: var(--s2) var(--s4); border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
@@ -385,3 +385,5 @@ body { font-variant-numeric: tabular-nums; }
 .askform .row .field { flex: 1; min-width: 220px; }
 @media (max-width: 1100px) { .ctxgrid { grid-template-columns: 180px minmax(0, 1fr); } .ctxgrid .talk { grid-column: 1 / -1; position: static; } .split2 { grid-template-columns: 1fr; } .wzgrid { grid-template-columns: minmax(0, 620px); } .talk { position: static; } }
 .pad dl { display: grid; grid-template-columns: auto 1fr; gap: 6px var(--s4); font-size: 13px; } .pad dt { color: var(--muted); } .pad dd { font: 12.5px var(--mono); overflow-wrap: anywhere; }
+
+nav.side .hint .classic { display: inline-block; margin-top: var(--s2); white-space: nowrap; color: var(--muted); }

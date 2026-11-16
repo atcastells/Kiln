@@ -1,4 +1,4 @@
-// Walkthrough of the data views of /app (Catálogo, Materiales, Contenido,
+// Walkthrough of the data views of the new UI (/) (Catálogo, Materiales, Contenido,
 // Árbol), the global search and the command palette; and their measurements.
 import { sleep } from "./cdp.mjs";
 import { S } from "./selectors.mjs";
@@ -13,7 +13,7 @@ const text = (d, sel) => d.page.eval(`document.querySelector(${q(sel)})?.innerTe
 const count = (d, sel) => d.page.eval(`document.querySelectorAll(${q(sel)}).length`);
 
 async function go(d, port, hash, view) {
-  await d.goto(`http://127.0.0.1:${port}/app${hash}`);
+  await d.goto(`http://127.0.0.1:${port}/${hash}`);
   await d.waitFor(`() => document.querySelector('#main [data-view=${q(view)}][data-ready]')`);
   await d.settle({ quiet: 250 });
 }
@@ -288,7 +288,7 @@ export async function measureAppViews({ chrome, port, Driver, cat }) {
     const d = await Driver.open(chrome.port, "measure-app-first");
     try {
       await d.page.send("Page.addScriptToEvaluateOnNewDocument", { source: FIRST });
-      await d.goto(`http://127.0.0.1:${port}/app#/catalog`);
+      await d.goto(`http://127.0.0.1:${port}/#/catalog`);
       await d.waitFor(`() => window.__first?.t != null`, 60000);
       await d.settle({ quiet: 300 });
       m.app_catalog_first_ms = await d.page.eval("__first.t");
@@ -296,7 +296,7 @@ export async function measureAppViews({ chrome, port, Driver, cat }) {
   }
   const d = await Driver.open(chrome.port, "measure-app-views");
   try {
-    await d.goto(`http://127.0.0.1:${port}/app#/home`);
+    await d.goto(`http://127.0.0.1:${port}/#/home`);
     await d.waitFor(`() => document.querySelector('#main [data-view="home"][data-ready]')`, 60000);
     await d.settle({ quiet: 300 });
     m.app_home_nodes = await d.domCount();
@@ -307,6 +307,8 @@ export async function measureAppViews({ chrome, port, Driver, cat }) {
       m[`app_${view}_nodes`] = await d.domCount();
       m[`app_${view}_rows`] = await count(d, ".vrow, #tOutline .trow");
       if (view === "catalog") {
+        await d.waitFor(`() => document.getElementById('cQ')`);
+        await d.settle({ quiet: 200 });
         await d.page.eval(`document.getElementById('cQ').focus()`);
         await d.type("piece0");
         await d.settle();
@@ -326,6 +328,7 @@ export async function measureAppViews({ chrome, port, Driver, cat }) {
         await d.clearSearch(); await d.settle();
       }
     }
+    m.app_heap_mb = await d.heapMB();
     m.app_views_js_errors = d.errors.length;
   } finally { await d.close(); }
   return m;

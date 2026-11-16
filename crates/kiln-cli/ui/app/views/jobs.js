@@ -82,13 +82,13 @@ export function mount(el, ctx) {
   }
   function paintDetail() {
     const box = el.querySelector("#jDetail");
-    if (!id) { box.innerHTML = html`<div class="empty"><h3>${(store.get("jobs") ?? []).length ? "Elige un trabajo" : "No hay trabajos"}</h3><p>${(store.get("jobs") ?? []).length ? "Aquí ves su registro mientras corre y lo que hacer cuando termina." : "Cuando pidas un asset, montes o revises, el trabajo aparece aquí y puedes seguirlo, incluso si recargas la página."}</p></div>`.toString(); return; }
-    if (missing) { box.innerHTML = html`<div class="empty"><h3>Ese trabajo ya no existe</h3><p>El servidor se reinició o el trabajo es muy antiguo. Mira la lista de la izquierda.</p></div>`.toString(); return; }
+    if (!id) { box.innerHTML = html`<div class="empty"><h2>${(store.get("jobs") ?? []).length ? "Elige un trabajo" : "No hay trabajos"}</h2><p>${(store.get("jobs") ?? []).length ? "Aquí ves su registro mientras corre y lo que hacer cuando termina." : "Cuando pidas un asset, montes o revises, el trabajo aparece aquí y puedes seguirlo, incluso si recargas la página."}</p></div>`.toString(); return; }
+    if (missing) { box.innerHTML = html`<div class="empty"><h2>Ese trabajo ya no existe</h2><p>El servidor se reinició o el trabajo es muy antiguo. Mira la lista de la izquierda.</p></div>`.toString(); return; }
     if (!job) { box.innerHTML = html`<p class="muted">Cargando el trabajo…</p>`.toString(); return; }
     const log = job.log ?? [];
     if (!box.querySelector("#jLog")) {
       box.innerHTML = html`<div class="jhead"><h2 id="jTitle"></h2><span class="sev" id="jState"></span></div>
-        <div class="logwrap"><div class="log" id="jLog" role="log" aria-live="off" tabindex="0" aria-label="Registro del trabajo"></div><button class="btn sm tail" type="button" id="jTail" hidden>Ir al final</button></div><div id="jNext"></div>`.toString();
+        <div class="logwrap"><div class="log" id="jLog" role="log" aria-live="polite" tabindex="0" aria-label="Registro del trabajo"></div><button class="btn sm tail" type="button" id="jTail" hidden>Ir al final</button></div><div id="jNext"></div>`.toString();
       box.querySelector("#jLog").addEventListener("scroll", () => { stick = atBottom(box.querySelector("#jLog")); if (stick) box.querySelector("#jTail").hidden = true; });
       box.querySelector("#jTail").addEventListener("click", () => { const l = box.querySelector("#jLog"); l.scrollTop = l.scrollHeight; stick = true; box.querySelector("#jTail").hidden = true; });
     }

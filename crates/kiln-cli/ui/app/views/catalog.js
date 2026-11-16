@@ -126,12 +126,12 @@ export function mount(el, ctx) {
 
   // ---- table
   const columns = showKit => [
-    { key: "name", label: "Nombre", width: "minmax(130px,1.6fr)", mono: true, value: sortValue.name, render: r => highlight(r.p.name, state.q) },
-    ...(showKit ? [{ key: "kit", label: "Kit", width: "minmax(64px,.7fr)", value: sortValue.kit, render: r => highlight(r.p.kit, state.q) }] : []),
-    { key: "slots", label: "Material", width: "minmax(92px,.8fr)", value: sortValue.slots, render: r => r.slots || "—" },
-    { key: "tris", label: "Triángulos", width: "112px", align: "r", value: sortValue.tris, render: r => (r.p.tris == null ? "—" : fmtN(r.p.tris)) },
-    { key: "size", label: "Medida", width: "120px", value: sortValue.size, render: r => (r.p.size_m ? r.p.size_m.map(n => n.toFixed(2)).join(" × ") : "sin medir") },
-    { key: "sev", label: "Estado", width: "88px", value: sortValue.sev, render: r => (r.sev ? html`<span class="sev ${r.sev}"><span class="dot ${r.sev}" aria-hidden="true"></span>${SEV_LABEL[r.sev]}</span>` : html`<span class="muted">—</span>`) },
+    { key: "name", label: "Nombre", width: "minmax(100px,1.2fr)", mono: true, value: sortValue.name, render: r => highlight(r.p.name, state.q) },
+    ...(showKit ? [{ key: "kit", label: "Kit", width: "minmax(56px,.6fr)", value: sortValue.kit, render: r => highlight(r.p.kit, state.q) }] : []),
+    { key: "slots", label: "Material", width: "minmax(80px,.7fr)", value: sortValue.slots, render: r => r.slots || "—" },
+    { key: "tris", label: "Triángulos", width: "108px", align: "r", value: sortValue.tris, render: r => (r.p.tris == null ? "—" : fmtN(r.p.tris)) },
+    { key: "size", label: "Medida", width: "140px", value: sortValue.size, render: r => (r.p.size_m ? r.p.size_m.map(n => n.toFixed(2)).join(" × ") : "sin medir") },
+    { key: "sev", label: "Estado", width: "84px", value: sortValue.sev, render: r => (r.sev ? html`<span class="sev ${r.sev}"><span class="dot ${r.sev}" aria-hidden="true"></span>${SEV_LABEL[r.sev]}</span>` : html`<span class="muted">—</span>`) },
   ];
   const predicate = () => catalogFilter(state);
   function buildList() {

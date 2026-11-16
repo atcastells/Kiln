@@ -1,4 +1,4 @@
-// Walkthrough of the second batch of views of /app: Contexto, Fichas, Montaje,
+// Walkthrough of the second batch of views of the new UI (/): Contexto, Fichas, Montaje,
 // Trabajos (with a followed job across a reload), the 3D viewer and the wizard.
 import { sleep } from "./cdp.mjs";
 
@@ -6,7 +6,7 @@ const q = JSON.stringify;
 const text = (d, sel) => d.page.eval(`document.querySelector(${q(sel)})?.innerText ?? ''`);
 const count = (d, sel) => d.page.eval(`document.querySelectorAll(${q(sel)}).length`);
 async function go(d, port, hash, view) {
-  await d.goto(`http://127.0.0.1:${port}/app${hash}`);
+  await d.goto(`http://127.0.0.1:${port}/${hash}`);
   const ok = await d.waitFor(`() => document.querySelector('#main [data-view=${q(view)}][data-ready]')`);
   await d.settle({ quiet: 250 });
   return ok;
@@ -108,7 +108,7 @@ export async function walkNewViews({ d, name, port, cat, check, note, shot }) {
     await d.page.eval("sessionStorage.removeItem('kmock')");
     const mockId = (await d.page.send("Page.addScriptToEvaluateOnNewDocument", { source: MOCK })).identifier;
     try {
-      await d.goto(`http://127.0.0.1:${port}/app?mock=1#/jobs/99`); // a new document, so the mock script runs
+      await d.goto(`http://127.0.0.1:${port}/?mock=1#/jobs/99`); // a new document, so the mock script runs
       check(name, "jobs: following a job shows its state and log", await d.waitFor(`() => document.querySelector('#jLog') && /en marcha/.test(document.querySelector('#jState')?.textContent ?? '')`));
       await sleep(1500);
       check(name, "jobs: the status bar pill links to Trabajos while it runs", await d.page.eval(`!!document.querySelector('#status a[href^="#/jobs"]')`));
@@ -133,13 +133,13 @@ export async function walkNewViews({ d, name, port, cat, check, note, shot }) {
 }
 
 export async function walkAppWizard({ Driver, chrome, name, port, check, shot }) {
-  console.log(`\n== ${name}/app (port ${port})`);
-  const d = await Driver.open(chrome.port, `${name}/app`);
+  console.log(`\n== ${name}/ (port ${port})`);
+  const d = await Driver.open(chrome.port, `${name}/`);
   try {
-    await d.goto(`http://127.0.0.1:${port}/app`);
+    await d.goto(`http://127.0.0.1:${port}/`);
     const ok = await d.waitFor(`() => document.querySelector('#main [data-view="wizard"][data-ready]')`);
     await d.settle({ quiet: 300 });
-    check(name, "app wizard: /app opens the wizard on a folder without kiln.toml", ok);
+    check(name, "app wizard: / opens the wizard on a folder without kiln.toml", ok);
     check(name, "app wizard: five steps, the first one current", (await count(d, ".steps li")) === 5 && /1 · proyecto/i.test(await text(d, ".steps li[aria-current=step]")));
     check(name, "app wizard: name field and the talk panel are there", (await count(d, "#wzName")) === 1 && (await count(d, "#wzTalk .msgs")) === 1 && (await count(d, "#tText")) === 1);
     check(name, "app wizard: the navigation is out of the way", !(await d.visible("nav.side")));

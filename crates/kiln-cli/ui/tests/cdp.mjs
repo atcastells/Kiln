@@ -70,6 +70,11 @@ export class Page {
     await this.mouse("mouseMoved", x, y);
     for (let i = 1; i <= count; i++) { await this.mouse("mousePressed", x, y, i); await this.mouse("mouseReleased", x, y, i); }
   }
+  async tab(shift = false) {
+    const ev = { key: "Tab", code: "Tab", windowsVirtualKeyCode: 9, modifiers: shift ? 8 : 0 };
+    await this.send("Input.dispatchKeyEvent", { type: "keyDown", ...ev });
+    return this.send("Input.dispatchKeyEvent", { type: "keyUp", ...ev });
+  }
   async key(ch) {
     const named = { Enter: 13, Escape: 27, ArrowDown: 40, ArrowUp: 38, ArrowLeft: 37, ArrowRight: 39 };
     if (named[ch]) {

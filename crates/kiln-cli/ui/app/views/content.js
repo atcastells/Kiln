@@ -59,7 +59,7 @@ export function mount(el, ctx) {
   }
   function showSet() {
     const fs = d.content.bySet.get(set.name) ?? [];
-    store.set("selection", { kind: "Conjunto de contenido", title: set.name, body: html`<section><h3 class="sec">Datos</h3>${dl([["Elementos", set.elements.length], ["Tipos", set.kinds.map(k => `${k.name} · ${k.count}`).join(", ")]])}</section>${findingsBlock(fs.filter(f => f.severity !== "info"), "Lo que hay que mirar")}` });
+    store.set("selection", { kind: "Conjunto de contenido", title: set.name, body: html`<section><h3 class="sec">Datos</h3>${dl([["Elementos", set.elements.length], ["Tipos", set.kinds.map(k => `${k.name} · ${fmtN(k.count)}`).join(", ")]])}</section>${findingsBlock(fs.filter(f => f.severity !== "info"), "Lo que hay que mirar")}` });
   }
 
   function paintCount() {

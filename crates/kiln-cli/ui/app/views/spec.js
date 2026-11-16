@@ -31,7 +31,7 @@ export function mount(el, ctx) {
       el.innerHTML = html`<div class="page" data-view="spec" data-ready="1"><div class="pagehead"><div><h1>Fichas</h1><div class="sub">${plural(cat.specs.length, "asset con ficha", "assets con ficha")}</div></div></div>
         ${id ? html`<div class="callout" role="alert"><b>No hay ficha «${id}»</b><p>Elige una de la lista o pídela.</p></div>` : ""}${askForm}
         ${cat.specs.length ? html`<div class="card"><table class="tbl"><thead><tr><th>Asset</th><th>Estado</th><th class="r">Piezas</th><th>Hallazgos</th><th>Montaje</th></tr></thead><tbody>${cat.specs.map(s => html`<tr><td><a href="${format({ view: "spec", args: [s.asset.id] })}">${s.asset.name}</a></td><td>${s.asset.status}</td><td class="r">${fmtN(s.parts.length)}</td><td>${sevBadge(worstOfList(specFindings(cat, s.asset.id)))}</td><td>${cat.builds[s.asset.id] ? html`<a href="${format({ view: "build", args: [s.asset.id] })}">Ver</a>` : html`<span class="muted">sin montar</span>`}</td></tr>`)}</tbody></table></div>`
-          : html`<div class="empty"><h3>Todavía no hay fichas</h3><p>Pide un asset y el agente escribe su ficha: sus piezas, de dónde sale cada una y sus materiales.</p></div>`}</div>`.toString();
+          : html`<div class="empty"><h2>Todavía no hay fichas</h2><p>Pide un asset y el agente escribe su ficha: sus piezas, de dónde sale cada una y sus materiales.</p></div>`}</div>`.toString();
       return;
     }
     const a = sp.asset, fs = specFindings(cat, a.id), down = madeOf(sp), up = usedIn(cat, a.id), stale = cat.builds[a.id]?.stale ?? [];

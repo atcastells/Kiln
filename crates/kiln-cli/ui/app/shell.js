@@ -88,6 +88,7 @@ export function createShell({ doc = document, store, api, router, registry }) {
       main.innerHTML = "";
       unmountView = mod.mount(main, ctx) ?? null;
       main.setAttribute("aria-busy", "false");
+      keepFocus();
       doc.title = `${store.get("catalog")?.project ?? "Kiln"} · Kiln`;
     } catch (e) {
       main.innerHTML = html`<div class="callout" role="alert"><h3>No se pudo abrir esta vista</h3><p>${e.message}</p></div>`.toString();
@@ -98,12 +99,13 @@ export function createShell({ doc = document, store, api, router, registry }) {
   function drawNav() {
     const cat = store.get("catalog"), derived = store.get("derived");
     shellEl.classList.toggle("in-wizard", !!store.get("wizard"));
+    for (const el of [$("gq").parentElement, $("btnReleer"), $("btnPanel")]) el.hidden = !!store.get("wizard");
     if (!cat || !derived || store.get("wizard")) { navEl.innerHTML = ""; return; }
     const current = store.get("route")?.view === "job" ? "jobs" : store.get("route")?.view;
     const groups = navModel({ catalog: cat, derived, context: store.get("context"), jobs: store.get("jobs") ?? [] });
     navEl.innerHTML = groups.map(g => html`${g.title ? html`<h2>${g.title}</h2>` : ""}${g.items.map(i => html`
       <a href="#/${i.view}" data-nav="${i.view}"${i.view === current ? html` aria-current="page"` : ""}><span class="dot ${i.sev ?? "none"}" aria-hidden="true"></span><span>${i.label}${i.sev ? html`<span class="sr"> (${SEV_TEXT[i.sev]})</span>` : ""}</span><span class="cnt">${i.count}</span></a>`)}`).join("")
-      + html`<div class="hint"><kbd>Ctrl K</kbd> comandos<br><kbd>/</kbd> buscar</div>`;
+      + html`<div class="hint"><kbd>Ctrl K</kbd> comandos<br><kbd>/</kbd> buscar<br><a class="classic" href="/classic">Interfaz anterior</a></div>`;
   }
   function drawStatus() {
     const job = store.get("job");
@@ -111,8 +113,11 @@ export function createShell({ doc = document, store, api, router, registry }) {
       ? html`<a href="#/jobs/${job.id}"><span class="dot busy" aria-hidden="true"></span><span>ocupado: ${job.label}</span></a>`
       : html`<span class="idle"><span class="dot ok" aria-hidden="true"></span><span class="t">Sin trabajos en curso</span></span>`).toString();
   }
+  let panelOpener = null, panelWasOpen = false;
   function drawPanel() {
     const open = !!store.get("panel"), sel = store.get("selection");
+    if (open && !panelWasOpen && !detailEl.contains(doc.activeElement)) panelOpener = doc.activeElement;
+    panelWasOpen = open;
     shellEl.classList.toggle("with-detail", open);
     $("btnPanel").setAttribute("aria-expanded", String(open));
     detailEl.innerHTML = !open ? "" : sel
@@ -128,28 +133,43 @@ export function createShell({ doc = document, store, api, router, registry }) {
     if (!cat || !derived) return [];
     return navModel({ catalog: cat, derived, context: store.get("context"), jobs: store.get("jobs") ?? [] }).flatMap(g => g.items).map(i => ({ view: i.view, label: i.label, hint: i.count }));
   };
+  function askAsset() {
+    router.navigate({ view: "spec", args: [], query: {} });
+    let tries = 0;
+    const focus = () => { const el = doc.getElementById("sAskText"); if (el) el.focus(); else if (++tries < 20) setTimeout(focus, 50); };
+    setTimeout(focus, 50);
+  }
   const actions = () => [
     { label: "Releer el proyecto", keywords: "recargar actualizar", run: () => $("btnReleer").click() },
     ...(store.get("selectionActions") ?? []).map(a => ({ group: "Acciones para la selección", ...a })),
     { label: store.get("panel") ? "Cerrar el panel de detalle" : "Abrir el panel de detalle", keywords: "detalle", run: () => store.set("panel", !store.get("panel")) },
-    { label: "Abrir la interfaz anterior", keywords: "antigua clásica", run: () => { location.href = "/"; } },
+    { label: "Pedir un asset…", keywords: "crear nuevo ficha desglosar", run: askAsset },
+    { label: "Abrir la interfaz anterior", keywords: "antigua clásica", run: () => { location.href = "/classic"; } },
   ];
   let paletteOpen = false;
+  // Focus is never left on <body>: after a view change or a closed dialog it goes to the main area.
+  const keepFocus = () => { if (!doc.activeElement || doc.activeElement === doc.body) main.focus({ preventScroll: true }); };
   const commands = async () => {
     if (paletteOpen) return;
     paletteOpen = true;
     try { await openPalette({ doc, views: views(), actions: actions(), getIndex: () => indexFor(store.get("catalog"), store.get("context")), go: r => router.navigate(r) }); }
-    finally { paletteOpen = false; }
+    finally { paletteOpen = false; setTimeout(keepFocus, 0); }
   };
   $("btnCmd").addEventListener("click", commands);
   doc.addEventListener("keydown", e => {
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(doc.activeElement?.tagName ?? "");
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); commands(); }
+    else if (e.key === "Escape" && store.get("panel") && !doc.querySelector("dialog[open]") && gq.getAttribute("aria-expanded") !== "true") { e.preventDefault(); closePanel(); }
     else if (e.key === "/" && !typing && !e.ctrlKey && !e.metaKey && !paletteOpen) { e.preventDefault(); gq.focus(); }
   });
   $("skip").addEventListener("click", () => main.focus());
   $("btnPanel").addEventListener("click", () => store.set("panel", !store.get("panel")));
-  detailEl.addEventListener("click", e => { if (e.target.closest("#closePanel")) { store.set("panel", false); $("btnPanel").focus(); } });
+  function closePanel() {
+    const back = panelOpener;
+    store.set("panel", false);
+    (back?.isConnected && !detailEl.contains(back) ? back : $("btnPanel")).focus();
+  }
+  detailEl.addEventListener("click", e => { if (e.target.closest("#closePanel")) closePanel(); });
   $("btnReleer").addEventListener("click", async e => {
     try {
       await busy(e.currentTarget, "Releyendo el proyecto desde el disco…", reload);

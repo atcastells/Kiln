@@ -7,7 +7,7 @@ import { routeOfSubject } from "../derive.js";
 import { isRunning } from "../nav.js";
 
 const href = r => format(r);
-const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
+const plural = (n, one, many) => `${fmtN(n)} ${n === 1 ? one : many}`;
 const SEV = {
   error: { dot: "error", one: "error", many: "errores", title: "errores" },
   warn: { dot: "warn", one: "aviso", many: "avisos", title: "avisos" },
@@ -77,7 +77,7 @@ function contentSets(cat, d) {
       const st = e ? html`<span class="sev error"><span class="dot error"></span>${plural(e, "error", "errores")}</span>`
         : w ? html`<span class="sev warn"><span class="dot warn"></span>${plural(w, "aviso", "avisos")}</span>`
         : html`<span class="sev ok"><span class="dot ok"></span>validado</span>`;
-      return html`<li><a class="set-row" href="${href({ view: "content", args: [s.name] })}"><span><b>${s.name}</b> <span class="muted">· ${plural(s.elements.length, "elemento", "elementos")}, ${s.kinds.map(k => `${k.count} ${k.name}`).join(", ")}</span></span>${st}</a></li>`;
+      return html`<li><a class="set-row" href="${href({ view: "content", args: [s.name] })}"><span><b>${s.name}</b> <span class="muted">· ${plural(s.elements.length, "elemento", "elementos")}, ${s.kinds.map(k => `${fmtN(k.count)} ${k.name}`).join(", ")}</span></span>${st}</a></li>`;
     })}</ul></div></section>`;
 }
 
@@ -109,7 +109,7 @@ function jobsCard(jobs) {
       const [dot, label] = jobState[j.state] ?? ["info", j.state];
       return html`<li><a href="${href({ view: "jobs", args: [String(j.id)] })}"><span class="dot ${dot}" aria-hidden="true"></span><span>${j.label}</span><span class="when">${label}${j.started ? ` · ${clock(j.started)}` : ""}</span></a></li>`;
     })}</ul>`;
-  return html`<section aria-labelledby="h-jobs"><h2 class="sec" id="h-jobs">Trabajos <span class="n">${running.length ? `${running.length} en curso` : ""}</span></h2><div class="card">${body}</div></section>`;
+  return html`<section aria-labelledby="h-jobs"><h2 class="sec" id="h-jobs">Trabajos <span class="n">${running.length ? `${fmtN(running.length)} en curso` : ""}</span></h2><div class="card">${body}</div></section>`;
 }
 
 function emptyProject() {

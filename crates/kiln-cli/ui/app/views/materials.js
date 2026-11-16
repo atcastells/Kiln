@@ -75,7 +75,7 @@ export function mount(el, ctx) {
     rows = materialRows(cat, d); usage = materialUsage(cat);
     if (!rows.length) {
       el.innerHTML = html`<div class="page" data-view="materials" data-ready="1"><div class="pagehead"><div><h1>Materiales</h1><div class="sub">Paleta del proyecto</div></div></div>
-        <div class="empty"><h3>Todavía no hay materiales</h3><p>Los materiales salen de las tablas y las carpetas de texturas que declara kiln.toml en [materials].</p></div></div>`.toString();
+        <div class="empty"><h2>Todavía no hay materiales</h2><p>Los materiales salen de las tablas y las carpetas de texturas que declara kiln.toml en [materials].</p></div></div>`.toString();
       return;
     }
     el.innerHTML = html`<div class="page fill" data-view="materials" data-ready="1">
