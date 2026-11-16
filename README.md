@@ -112,6 +112,12 @@ Blender sin ventana con `crates/kiln-cli/blender/assemble.py`:
   triángulos y lo que queda por terminar a mano. Cada objeto lleva en sus
   extras su pieza, si se mueve y en qué estados sale, para Godot.
 
+Hasta K005, `turn` solo giraba las cajas: las piezas con modelo (y las que
+son otro asset) salían sin girar. Los montajes hechos antes con `turn` en
+esas piezas hay que rehacerlos (`kiln build`). El test que monta con Blender
+de verdad se ejecuta a mano (necesita Blender en el `PATH`):
+`cargo test -p kiln-cli -- --ignored turn`.
+
 El mismo script sirve en un Blender abierto (por MCP) con `KILN_PLAN`.
 Sin ficha colocada, Kiln pone las piezas en fila para que se puedan ver.
 

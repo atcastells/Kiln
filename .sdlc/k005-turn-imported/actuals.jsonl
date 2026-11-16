@@ -1,0 +1,1 @@
+{"task":"T5","runs_on":"verifier","model":"claude-sonnet-5-5","est_min":5,"est_ktok":1300,"min":6.7,"ktok":352,"dev_min_pct":34,"dev_tok_pct":-73,"flag":true,"cause":"","date":"2026-11-16","agent_id":"a7eaee0a0bf9bb138"}

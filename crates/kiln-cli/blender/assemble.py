@@ -149,6 +149,8 @@ def build(item, cache):
             tuple(t / s if s > 1e-6 else 1.0 for t, s in zip(target, dims))
         )
     rx, ry, rz = (math.radians(a) for a in item["turn"])
+    # an imported glTF comes in quaternion mode, which ignores rotation_euler
+    o.rotation_mode = "XYZ"
     o.rotation_euler = Euler((rx, -rz, ry), "XYZ")
     # `at` is the centre of the base of the copy as it stands, once turned
     o.location = Vector()
