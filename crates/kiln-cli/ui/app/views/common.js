@@ -1,9 +1,10 @@
+import { fmtN } from "../format.js";
 // Pieces shared by the data views (catalog, materials, content, tree): text
 // helpers, the panel blocks and the quiet URL update. Pure unless noted.
 import { html, raw } from "../html.js";
 import { format } from "../router.js";
 
-export const plural = (n, one, many) => `${n.toLocaleString("es")} ${n === 1 ? one : many}`;
+export const plural = (n, one, many) => `${fmtN(n)} ${n === 1 ? one : many}`;
 export const SEV_LABEL = { error: "Error", warn: "Aviso", info: "Nota" };
 export const SEV_RANK = { info: 1, warn: 2, error: 3 };
 export const SEV_WORDS = { error: ["error", "errores"], warn: ["aviso", "avisos"], info: ["nota", "notas"] };
@@ -78,3 +79,4 @@ export async function postJSON(api, path, body) {
 
 export const jobLink = (ctx, job, label) => ({ label, run: () => ctx.navigate({ view: "jobs", args: [String(job)] }) });
 export { html, raw };
+export { fmtN };

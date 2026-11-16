@@ -1,3 +1,4 @@
+import { fmtN } from "../format.js";
 // The top-bar search (debounced, grouped results) and the command palette
 // (Ctrl/Cmd+K, on the dialog component). The matching is pure and tested in Node.
 import { html } from "../html.js";
@@ -84,10 +85,10 @@ export function createSearch({ doc, input, panel, getIndex, go, onQuery = () => 
     const groups = searchIndex(getIndex(), q, 5);
     opts = flattenGroups(groups);
     let i = 0;
-    panel.innerHTML = (groups.length ? groups.map(g => html`<div role="group" aria-label="${g.title}"><h3 role="presentation">${g.title} <span class="n">${g.total.toLocaleString("es")}</span></h3>${g.items.map(it => {
+    panel.innerHTML = (groups.length ? groups.map(g => html`<div role="group" aria-label="${g.title}"><h3 role="presentation">${g.title} <span class="n">${fmtN(g.total)}</span></h3>${g.items.map(it => {
       const n = i++;
       return html`<div class="opt" role="option" id="sr-${n}" data-i="${n}" aria-selected="false"><span class="t${g.type === "piece" ? " mono" : ""}">${highlight(it.label, q)}</span><span class="h">${it.hint}</span></div>`;
-    })}${g.more ? (() => { const n = i++; return html`<div class="opt all" role="option" id="sr-${n}" data-i="${n}" aria-selected="false"><span class="t">Ver todos (${g.total.toLocaleString("es")})</span><span class="h">en ${g.title}</span></div>`; })() : ""}</div>`).join("")
+    })}${g.more ? (() => { const n = i++; return html`<div class="opt all" role="option" id="sr-${n}" data-i="${n}" aria-selected="false"><span class="t">Ver todos (${fmtN(g.total)})</span><span class="h">en ${g.title}</span></div>`; })() : ""}</div>`).join("")
       : html`<div class="sfoot" role="status">Nada coincide con «${q}». Prueba con otra palabra.</div>`.toString()) + (groups.length ? html`<div class="sfoot">↑ ↓ para moverte, Enter para abrir, Esc para cerrar</div>`.toString() : "");
     panel.hidden = false;
     input.setAttribute("aria-expanded", "true");

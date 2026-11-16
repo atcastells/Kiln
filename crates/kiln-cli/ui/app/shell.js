@@ -33,6 +33,16 @@ export function createShell({ doc = document, store, api, router, registry }) {
     store.set("context", context);
     setCatalog(cat);
   }
+  // A folder without kiln.toml, or a project whose start is not settled: the wizard.
+  const NEW = { view: "new", args: [], query: {} };
+  async function leaveWizard() {
+    store.set("wizard", null);
+    api.forget("/api/new");
+    await loadProject();
+    refreshJobs();
+    router.navigate({ view: "home" });
+    store.set("route", router.current());
+  }
   async function reload() {
     api.forget("/api/catalog");
     api.forget("/api/context");
@@ -58,7 +68,7 @@ export function createShell({ doc = document, store, api, router, registry }) {
     store, api, router, toasts, busy,
     get route() { return store.get("route"); },
     navigate: r => router.navigate(r),
-    reload, refreshJobs,
+    reload, refreshJobs, leaveWizard,
     askText: o => askText(doc, o),
     confirm: o => confirmDialog(doc, o),
     detail: {
@@ -87,7 +97,8 @@ export function createShell({ doc = document, store, api, router, registry }) {
   // ---- navigation, status, panel
   function drawNav() {
     const cat = store.get("catalog"), derived = store.get("derived");
-    if (!cat || !derived) { navEl.innerHTML = ""; return; }
+    shellEl.classList.toggle("in-wizard", !!store.get("wizard"));
+    if (!cat || !derived || store.get("wizard")) { navEl.innerHTML = ""; return; }
     const current = store.get("route")?.view === "job" ? "jobs" : store.get("route")?.view;
     const groups = navModel({ catalog: cat, derived, context: store.get("context"), jobs: store.get("jobs") ?? [] });
     navEl.innerHTML = groups.map(g => html`${g.title ? html`<h2>${g.title}</h2>` : ""}${g.items.map(i => html`
@@ -149,14 +160,22 @@ export function createShell({ doc = document, store, api, router, registry }) {
   return {
     ctx,
     async start() {
-      store.subscribe(["catalog", "derived", "context", "jobs", "route"], drawNav);
+      store.subscribe(["catalog", "derived", "context", "jobs", "route", "wizard"], drawNav);
       store.subscribe("job", drawStatus);
       store.subscribe(["panel", "selection"], drawPanel);
       store.subscribe("catalog", () => { $("kiln-project").textContent = store.get("catalog").project; });
       store.subscribe("route", mountRoute);
       drawStatus(); drawPanel();
-      store.set("route", router.current());
-      router.onChange(r => store.set("route", r));
+      let wz = null;
+      try { api.forget("/api/new"); const n = await api.getJSON("/api/new"); wz = n.step ? n : null; } catch { /* not a server with the wizard endpoint */ }
+      store.set("wizard", wz);
+      store.set("route", wz ? NEW : router.current());
+      router.onChange(r => store.set("route", store.get("wizard") ? NEW : r));
+      if (wz) {
+        refreshJobs();
+        if (wz.step > 1) { try { await loadProject(); } catch { /* the wizard shows what it can */ } }
+        return;
+      }
       doc.addEventListener("visibilitychange", () => { if (!doc.hidden) refreshJobs(); });
       try {
         await loadProject();

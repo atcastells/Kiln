@@ -1,3 +1,4 @@
+import { fmtN } from "../format.js";
 // Árbol: the hierarchy of the game as a collapsible outline with a breadcrumb.
 // Only the expanded branches are in the DOM; severity per node is rolled up
 // once per catalog (no edges, no per-node scans). Route: #/tree[/node-key]
@@ -174,7 +175,7 @@ export function mount(el, ctx) {
     if (!flat.some(r => r.key === state.active)) state.active = flat.some(r => r.key === state.sel) ? state.sel : model.root;
     const box = el.querySelector("#tOutline");
     box.innerHTML = flat.map(rowHtml).join("");
-    el.querySelector("#tCount").textContent = `${plural(flat.length, "nodo visible", "nodos visibles")} de ${Object.keys(model.T).length.toLocaleString("es")}`;
+    el.querySelector("#tCount").textContent = `${plural(flat.length, "nodo visible", "nodos visibles")} de ${fmtN(Object.keys(model.T).length)}`;
     if (focus) box.querySelector(`[data-key="${CSS.escape(state.active)}"]`)?.focus();
   }
   function select(key, { open = true, reveal = false } = {}) {

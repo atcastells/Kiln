@@ -1,3 +1,4 @@
+import { fmtN } from "../format.js";
 // A virtualised list/table: fixed row height, only the visible window (plus
 // a small overscan) is in the DOM. The helpers up here are pure and tested in
 // Node; `createList` below is the DOM part.
@@ -51,7 +52,7 @@ export function moveActive(index, key, total, page = 10) {
 }
 
 export const nextSort = (sort, key) => (sort?.key === key ? (sort.dir === 1 ? { key, dir: -1 } : null) : { key, dir: 1 });
-export const counterText = (shown, total) => (shown === total ? `${total.toLocaleString("es")} filas` : `${shown.toLocaleString("es")} de ${total.toLocaleString("es")}`);
+export const counterText = (shown, total) => (shown === total ? `${fmtN(total)} filas` : `${fmtN(shown)} de ${fmtN(total)}`);
 
 let seq = 0;
 

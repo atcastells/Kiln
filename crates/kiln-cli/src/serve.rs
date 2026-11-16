@@ -39,6 +39,14 @@ const UI_FILES: &[(&str, &str)] = &[
     ("app/views/materials.js", include_str!("../ui/app/views/materials.js")),
     ("app/views/content.js", include_str!("../ui/app/views/content.js")),
     ("app/views/tree.js", include_str!("../ui/app/views/tree.js")),
+    ("app/format.js", include_str!("../ui/app/format.js")),
+    ("app/views/context.js", include_str!("../ui/app/views/context.js")),
+    ("app/views/wizard.js", include_str!("../ui/app/views/wizard.js")),
+    ("app/views/talk.js", include_str!("../ui/app/views/talk.js")),
+    ("app/views/spec.js", include_str!("../ui/app/views/spec.js")),
+    ("app/views/build.js", include_str!("../ui/app/views/build.js")),
+    ("app/views/jobs.js", include_str!("../ui/app/views/jobs.js")),
+    ("app/views/view3d.js", include_str!("../ui/app/views/view3d.js")),
 ];
 
 /// `kiln serve --ui-dir`: read the UI modules from here, not from the binary.

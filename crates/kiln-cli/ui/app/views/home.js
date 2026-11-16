@@ -1,3 +1,4 @@
+import { fmtN } from "../format.js";
 // Inicio: what the project has, what fails (by severity), the next step and
 // the jobs. Everything comes from the store; nothing is fetched here.
 import { html, raw } from "../html.js";
@@ -63,7 +64,7 @@ function tiles(cat, ctx) {
   if (sets.length) list.push({ v: elements, l: "Elementos", d: `${plural(sets.length, "conjunto", "conjuntos")} · ${plural(kinds, "tipo", "tipos")}`, r: { view: "content" } });
   list.push({ v: layers, l: "Capas de contexto", d: plural(claims, "afirmación", "afirmaciones"), r: { view: "context" } });
   return html`<div class="tiles" style="--n:${list.length}">${list.map(t => html`
-    <a class="tile${t.v ? "" : " zero"}" href="${href({ view: t.r.view })}"><div class="v">${t.v.toLocaleString("es")}</div><div class="l">${t.l}</div><div class="d">${t.d}</div></a>`)}</div>`;
+    <a class="tile${t.v ? "" : " zero"}" href="${href({ view: t.r.view })}"><div class="v">${fmtN(t.v)}</div><div class="l">${t.l}</div><div class="d">${t.d}</div></a>`)}</div>`;
 }
 
 function contentSets(cat, d) {

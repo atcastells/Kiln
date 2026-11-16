@@ -1,3 +1,4 @@
+import { fmtN } from "../format.js";
 // Materiales: every material of the project in a virtual table (no cut),
 // with filter, sort in the URL and a panel with where it is used.
 // Route: #/materials[/key]?q=&sort=
@@ -60,12 +61,12 @@ export function mount(el, ctx) {
     { key: "name", label: "Nombre", width: "minmax(0,1.3fr)", value: r => r.m.name, render: r => highlight(r.m.name, state.q) },
     { key: "source", label: "Origen", width: "90px", value: r => r.m.source, render: r => sourceText(r.m.source) },
     { key: "file", label: "Fichero", width: "minmax(0,1.6fr)", mono: true, value: r => r.m.file, render: r => r.m.file },
-    { key: "uses", label: "Usos", width: "70px", align: "r", value: r => r.uses, render: r => r.uses.toLocaleString("es") },
+    { key: "uses", label: "Usos", width: "70px", align: "r", value: r => r.uses, render: r => fmtN(r.uses) },
     { key: "sev", label: "Estado", width: "110px", value: r => 3 - (SEV_RANK[r.sev] ?? 0), render: r => (r.sev ? html`<span class="sev ${r.sev}"><span class="dot ${r.sev}" aria-hidden="true"></span>${SEV_LABEL[r.sev]}</span>` : html`<span class="muted">—</span>`) },
   ];
   const paintCount = () => {
     const n = list.count();
-    el.querySelector("#mCount").innerHTML = html`<b>${n.toLocaleString("es")}</b> ${n === 1 ? "material" : "materiales"}${n !== rows.length ? ` de ${rows.length.toLocaleString("es")}` : ""}`.toString();
+    el.querySelector("#mCount").innerHTML = html`<b>${fmtN(n)}</b> ${n === 1 ? "material" : "materiales"}${n !== rows.length ? ` de ${fmtN(rows.length)}` : ""}`.toString();
   };
 
   function draw() {

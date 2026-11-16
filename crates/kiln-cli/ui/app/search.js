@@ -1,3 +1,4 @@
+import { fmtN } from "./format.js";
 // The global search over the derived project data. Pure: the index is built
 // once per catalog, a query walks it once and keeps only the best few per group.
 import { norm } from "./views/common.js";
@@ -59,7 +60,7 @@ export function flattenGroups(groups) {
   const out = [];
   for (const g of groups) {
     for (const it of g.items) out.push({ kind: "item", group: g.title, label: it.label, hint: it.hint, route: it.route });
-    if (g.more) out.push({ kind: "all", group: g.title, label: `Ver todos (${g.total.toLocaleString("es")})`, route: g.all });
+    if (g.more) out.push({ kind: "all", group: g.title, label: `Ver todos (${fmtN(g.total)})`, route: g.all });
   }
   return out;
 }

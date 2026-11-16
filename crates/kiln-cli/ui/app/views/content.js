@@ -1,3 +1,4 @@
+import { fmtN } from "../format.js";
 // Contenido: sets of game content -> kinds -> elements, with the findings of
 // each element on its row, the findings of the set itself, and a filter.
 // Route: #/content[/set][/file#id]?q=&kind=&sort=
@@ -63,15 +64,15 @@ export function mount(el, ctx) {
 
   function paintCount() {
     const n = list.count();
-    el.querySelector("#eCount").innerHTML = html`<b>${n.toLocaleString("es")}</b> ${n === 1 ? "elemento" : "elementos"}${n !== rows.length ? ` de ${rows.length.toLocaleString("es")}` : ""}`.toString();
+    el.querySelector("#eCount").innerHTML = html`<b>${fmtN(n)}</b> ${n === 1 ? "elemento" : "elementos"}${n !== rows.length ? ` de ${fmtN(rows.length)}` : ""}`.toString();
   }
   function paintChips() {
-    el.querySelector("#eChips").innerHTML = set.kinds.map(k => html`<button class="chip" type="button" data-kind="${k.name}" aria-pressed="${String(state.kind === k.name)}">${k.name} <b>${k.count.toLocaleString("es")}</b></button>`).join("");
+    el.querySelector("#eChips").innerHTML = set.kinds.map(k => html`<button class="chip" type="button" data-kind="${k.name}" aria-pressed="${String(state.kind === k.name)}">${k.name} <b>${fmtN(k.count)}</b></button>`).join("");
   }
   function paintSets() {
     el.querySelector("#eSets").innerHTML = html`<h2>Conjuntos</h2>${cat.content.map(s => {
       const sev = worstOfList(d.content.bySet.get(s.name));
-      return html`<a href="#/content/${encodeURIComponent(s.name)}" data-set="${s.name}" title="${s.name}"${s.name === state.set ? html` aria-current="true"` : ""}><span class="dot ${sev ?? "none"}" aria-hidden="true"></span><span>${s.name}${sev ? html`<span class="sr"> (${SEV_SR[sev]})</span>` : ""}</span><span class="cnt">${s.elements.length.toLocaleString("es")}</span></a>`;
+      return html`<a href="#/content/${encodeURIComponent(s.name)}" data-set="${s.name}" title="${s.name}"${s.name === state.set ? html` aria-current="true"` : ""}><span class="dot ${sev ?? "none"}" aria-hidden="true"></span><span>${s.name}${sev ? html`<span class="sr"> (${SEV_SR[sev]})</span>` : ""}</span><span class="cnt">${fmtN(s.elements.length)}</span></a>`;
     })}`.toString();
   }
   function paintHead() {

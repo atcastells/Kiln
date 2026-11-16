@@ -1,9 +1,11 @@
+import { fmtN } from "../format.js";
 // Catálogo: kits, a virtual table of pieces with filter, severity chips and
 // sort kept in the URL, and a detail panel with the actions of a piece.
 // Route: #/catalog[/kit][/piece]?q=&sev=&sort=
 import { html } from "../html.js";
 import { createList, sortRows, filterRows, nextSort } from "../ui/list.js";
 import { pieceRoute } from "../search.js";
+import { openViewerDialog } from "./view3d.js";
 import { SEV_RANK, SEV_LABEL, SEV_SR, plural, norm, fmtSize, highlight, dl, findingsBlock, replaceRoute, parseSort, formatSort, onPlainClick, postJSON, jobLink } from "./common.js";
 
 export const SORT_KEYS = ["name", "kit", "slots", "tris", "size", "sev"];
@@ -69,9 +71,10 @@ export function mount(el, ctx) {
       <section><h3 class="sec">Datos</h3>${dl([
         ["Kit", html`<a href="#/catalog/${encodeURIComponent(p.kit)}">${p.kit}</a>`],
         ["Fichero", p.file || "falta"], ["Formato", p.format], ["Medida", fmtSize(p.size_m)],
-        ["Base", p.min ? `y = ${p.min[1].toFixed(3)} m` : "—"], ["Triángulos", p.tris?.toLocaleString("es") ?? "—"], ["Texturas", p.images ?? "—"],
+        ["Base", p.min ? `y = ${p.min[1].toFixed(3)} m` : "—"], ["Triángulos", fmtN(p.tris) ?? "—"], ["Texturas", p.images ?? "—"],
         ["Ranuras", slots.join(", ") || "—"], ["Licencia", (p.licenses ?? []).join(", ") || "ninguna"], ["Crédito", p.credit], ["Medida por", p.measured_by || "nadie"], ...man,
       ])}</section>
+      ${p.preview ? html`<section><button class="btn sm" type="button" data-view3d>Ver en 3D</button></section>` : ""}
       ${slots.length ? html`<section><h3 class="sec">Material de cada ranura</h3><div class="slots">${slots.map(s => html`<label class="slotrow"><span class="mono">${s}</span><select class="field" data-slot="${s}">${options(s)}</select></label>`)}</div></section>` : ""}
       ${slots.length <= 1 && p.preview ? html`<section><h3 class="sec">Partir en zonas</h3><label class="slotrow"><span>al montar</span><select class="field" id="pSplit">${SPLITS.map(([v, t]) => html`<option value="${v}"${(p.split || "") === v ? " selected" : ""}>${t}</option>`)}</select></label><p class="muted small">Las zonas salen al montar: part_1, part_2… o color_1, color_2…</p></section>` : ""}
       ${findingsBlock(d.findingsBySubject.get(p.key), "Hallazgos de esta pieza")}`;
@@ -82,8 +85,9 @@ export function mount(el, ctx) {
   }
   const splitable = p => (p.material_slots ?? []).length <= 1 && !!p.preview;
   function pieceActions(p) {
-    if (!splitable(p)) return [];
-    return SPLITS.filter(([v]) => v !== (p.split || "")).map(([v, t]) => ({ label: `Partir ${p.name}: ${t}`, run: () => doSplit(p, v, null) }));
+    const see = p.preview ? [{ label: `Ver ${p.name} en 3D`, run: () => openViewerDialog(doc, { title: p.name, path: p.preview, materials: cat.materials }) }] : [];
+    if (!splitable(p)) return see;
+    return see.concat(SPLITS.filter(([v]) => v !== (p.split || "")).map(([v, t]) => ({ label: `Partir ${p.name}: ${t}`, run: () => doSplit(p, v, null) })));
   }
   function showPiece(p, open = true) {
     state.piece = p.key;
@@ -122,12 +126,12 @@ export function mount(el, ctx) {
 
   // ---- table
   const columns = showKit => [
-    { key: "name", label: "Nombre", width: "minmax(150px,1.6fr)", mono: true, value: sortValue.name, render: r => highlight(r.p.name, state.q) },
-    ...(showKit ? [{ key: "kit", label: "Kit", width: "minmax(0,.7fr)", value: sortValue.kit, render: r => highlight(r.p.kit, state.q) }] : []),
-    { key: "slots", label: "Material", width: "minmax(0,.8fr)", value: sortValue.slots, render: r => r.slots || "—" },
-    { key: "tris", label: "Triángulos", width: "84px", align: "r", value: sortValue.tris, render: r => (r.p.tris == null ? "—" : r.p.tris.toLocaleString("es")) },
-    { key: "size", label: "Medida", width: "128px", value: sortValue.size, render: r => (r.p.size_m ? r.p.size_m.map(n => n.toFixed(2)).join(" × ") : "sin medir") },
-    { key: "sev", label: "Estado", width: "96px", value: sortValue.sev, render: r => (r.sev ? html`<span class="sev ${r.sev}"><span class="dot ${r.sev}" aria-hidden="true"></span>${SEV_LABEL[r.sev]}</span>` : html`<span class="muted">—</span>`) },
+    { key: "name", label: "Nombre", width: "minmax(130px,1.6fr)", mono: true, value: sortValue.name, render: r => highlight(r.p.name, state.q) },
+    ...(showKit ? [{ key: "kit", label: "Kit", width: "minmax(64px,.7fr)", value: sortValue.kit, render: r => highlight(r.p.kit, state.q) }] : []),
+    { key: "slots", label: "Material", width: "minmax(92px,.8fr)", value: sortValue.slots, render: r => r.slots || "—" },
+    { key: "tris", label: "Triángulos", width: "112px", align: "r", value: sortValue.tris, render: r => (r.p.tris == null ? "—" : fmtN(r.p.tris)) },
+    { key: "size", label: "Medida", width: "120px", value: sortValue.size, render: r => (r.p.size_m ? r.p.size_m.map(n => n.toFixed(2)).join(" × ") : "sin medir") },
+    { key: "sev", label: "Estado", width: "88px", value: sortValue.sev, render: r => (r.sev ? html`<span class="sev ${r.sev}"><span class="dot ${r.sev}" aria-hidden="true"></span>${SEV_LABEL[r.sev]}</span>` : html`<span class="muted">—</span>`) },
   ];
   const predicate = () => catalogFilter(state);
   function buildList() {
@@ -146,17 +150,17 @@ export function mount(el, ctx) {
   function paintKits() {
     const k = el.querySelector("#cKits");
     const sevOf = name => kitSev.get(name) ?? null;
-    k.innerHTML = html`<h2>Kits</h2><a href="#/catalog" data-kit="" ${!state.kit ? html`aria-current="true"` : ""}><span class="dot none" aria-hidden="true"></span><span>Todos los kits</span><span class="cnt">${rows.length.toLocaleString("es")}</span></a><hr>${cat.kits.map(kit => html`
-      <a href="#/catalog/${encodeURIComponent(kit.name)}" data-kit="${kit.name}" title="${kit.name}"${state.kit === kit.name ? html` aria-current="true"` : ""}><span class="dot ${sevOf(kit.name) ?? "none"}" aria-hidden="true"></span><span>${kit.name}${sevOf(kit.name) ? html`<span class="sr"> (${SEV_SR[sevOf(kit.name)]})</span>` : ""}</span><span class="cnt">${(d.piecesByKit.get(kit.name)?.length ?? 0).toLocaleString("es")}</span></a>`)}`.toString();
+    k.innerHTML = html`<h2>Kits</h2><a href="#/catalog" data-kit="" ${!state.kit ? html`aria-current="true"` : ""}><span class="dot none" aria-hidden="true"></span><span>Todos los kits</span><span class="cnt">${fmtN(rows.length)}</span></a><hr>${cat.kits.map(kit => html`
+      <a href="#/catalog/${encodeURIComponent(kit.name)}" data-kit="${kit.name}" title="${kit.name}"${state.kit === kit.name ? html` aria-current="true"` : ""}><span class="dot ${sevOf(kit.name) ?? "none"}" aria-hidden="true"></span><span>${kit.name}${sevOf(kit.name) ? html`<span class="sr"> (${SEV_SR[sevOf(kit.name)]})</span>` : ""}</span><span class="cnt">${fmtN(d.piecesByKit.get(kit.name)?.length ?? 0)}</span></a>`)}`.toString();
   }
   function paintChips() {
     const c = sevCounts(state.kit ? rows.filter(r => r.p.kit === state.kit) : rows);
     const names = { error: "Error", warn: "Aviso", info: "Nota", ok: "Sin problemas" };
-    el.querySelector("#cChips").innerHTML = SEVS.map(s => html`<button class="chip" type="button" data-sev="${s}" aria-pressed="${String(state.sev === s)}"><span class="dot ${s}" aria-hidden="true"></span>${names[s]} <b>${c[s].toLocaleString("es")}</b></button>`).join("");
+    el.querySelector("#cChips").innerHTML = SEVS.map(s => html`<button class="chip" type="button" data-sev="${s}" aria-pressed="${String(state.sev === s)}"><span class="dot ${s}" aria-hidden="true"></span>${names[s]} <b>${fmtN(c[s])}</b></button>`).join("");
   }
   function paintCount() {
     const n = list.count(), all = state.kit ? (d.piecesByKit.get(state.kit)?.length ?? 0) : rows.length;
-    el.querySelector("#cCount").innerHTML = html`<b>${n.toLocaleString("es")}</b> ${n === 1 ? "pieza" : "piezas"}${n !== all ? ` de ${all.toLocaleString("es")}` : ""}`.toString();
+    el.querySelector("#cCount").innerHTML = html`<b>${fmtN(n)}</b> ${n === 1 ? "pieza" : "piezas"}${n !== all ? ` de ${fmtN(all)}` : ""}`.toString();
   }
   let kitSev = new Map();
   function refresh({ relist = false } = {}) {
@@ -215,6 +219,10 @@ export function mount(el, ctx) {
     paintKits(); paintChips(); refresh({ relist: true });
     if (state.piece) showPiece(pieceByKey(state.piece), false); else if (state.kit) showKit(state.kit); else { ctx.detail.clear(); store.set("selectionActions", null); }
   }));
+  on(detailEl, "click", e => {
+    const p = state.piece && pieceByKey(state.piece);
+    if (p?.preview && e.target.closest("[data-view3d]")) openViewerDialog(doc, { title: p.name, path: p.preview, materials: cat.materials });
+  });
   on(detailEl, "change", e => {
     const s = e.target.closest("select[data-slot], select#pSplit");
     const p = state.piece && pieceByKey(state.piece);
