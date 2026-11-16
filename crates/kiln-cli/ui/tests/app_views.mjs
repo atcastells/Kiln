@@ -281,7 +281,7 @@ const FIRST = `(() => { const k = window.__first = { t: null };
   new MutationObserver(() => { if (k.t == null && document.querySelector('#main [data-view="catalog"] .vrow')) { k.t = performance.now(); } }).observe(document, { subtree: true, childList: true });
 })()`;
 
-export async function measureAppViews({ chrome, port, Driver, cat }) {
+async function measureAppViewsOnce({ chrome, port, Driver, cat }) {
   const m = {};
   // first view: a cold load straight on the catalog
   {
@@ -302,20 +302,29 @@ export async function measureAppViews({ chrome, port, Driver, cat }) {
     m.app_home_nodes = await d.domCount();
     for (const view of ["catalog", "materials", "content", "tree"]) {
       if (view === "content" && !cat.content.length) continue;
-      const s = await d.clickAndSettle(`() => document.querySelector('nav a[data-nav=${q(view)}]')`);
-      m[`app_${view}_switch_ms`] = s.ms;
+      await d.clickAndSettle(`() => document.querySelector('nav a[data-nav=${q(view)}]')`);
+      // the view must be there, with its rows, before anything is counted
+      const ok = await d.waitFor(`() => document.querySelector('#main [data-view=${q(view)}][data-ready]') && document.querySelector('.vrow, #tOutline .trow')`, 30000);
+      if (!ok) throw new Error(`view ${view} never rendered rows`);
+      // the first settle can return before a slow view renders; the time is read after the rows exist
+      const s2 = await d.settle({ quiet: 300 });
+      m[`app_${view}_switch_ms`] = s2.ms;
       m[`app_${view}_nodes`] = await d.domCount();
       m[`app_${view}_rows`] = await count(d, ".vrow, #tOutline .trow");
       if (view === "catalog") {
         await d.waitFor(`() => document.getElementById('cQ')`);
         await d.settle({ quiet: 200 });
         await d.page.eval(`document.getElementById('cQ').focus()`);
+        const shown = () => d.page.eval(`Number((document.querySelector('#cCount b')?.textContent ?? '').replace(/\\D/g, '')) || 0`);
+        const before = await shown();
         await d.type("piece0");
         await d.settle();
         await d.arm(); await d.page.key("0");
         const k = await d.settle();
         m.app_catalog_filter_ms = k.ms;
         m.app_catalog_filter_rows = await count(d, ".vrow");
+        m.app_catalog_filter_count = await shown();
+        m.app_catalog_filter_count_before = before;
         // the global search, including its 120 ms wait
         await d.focusSearch();
         await d.type("piece0");
@@ -332,4 +341,23 @@ export async function measureAppViews({ chrome, port, Driver, cat }) {
     m.app_views_js_errors = d.errors.length;
   } finally { await d.close(); }
   return m;
+}
+
+const med = a => { const x = [...a].sort((p, r) => p - r); return x.length % 2 ? x[x.length >> 1] : (x[x.length / 2 - 1] + x[x.length / 2]) / 2; };
+
+// Runs the measurement `runs` times and takes the median of each metric. Every
+// run is checked so that a metric cannot be 0, NaN or missing, and so that the
+// catalog numbers are really about the catalog (not the home view).
+export async function measureAppViews({ chrome, port, Driver, cat, runs = 3 }) {
+  const all = [];
+  for (let i = 0; i < runs; i++) {
+    const m = await measureAppViewsOnce({ chrome, port, Driver, cat });
+    const bad = Object.entries(m).filter(([k, v]) => !Number.isFinite(v) || (v <= 0 && !/errors$/.test(k)));
+    if (bad.length) throw new Error(`run ${i + 1}: metrics that are zero, NaN or missing: ${bad.map(([k, v]) => `${k}=${v}`).join(", ")}`);
+    if (m.app_catalog_nodes === m.app_home_nodes) throw new Error(`run ${i + 1}: catalog nodes equal home nodes (${m.app_home_nodes}): the catalog was not measured`);
+    if (m.app_catalog_filter_count >= m.app_catalog_filter_count_before || m.app_catalog_filter_count >= cat.pieces.length) throw new Error(`run ${i + 1}: the filter did not narrow the catalog (${m.app_catalog_filter_count_before} -> ${m.app_catalog_filter_count} of ${cat.pieces.length})`);
+    if (!(m.app_catalog_filter_rows > 0)) throw new Error(`run ${i + 1}: no rows after filtering`);
+    all.push(m);
+  }
+  return Object.fromEntries(Object.keys(all[0]).map(k => [k, med(all.map(r => r[k]))]));
 }

@@ -25,9 +25,9 @@ export function createShell({ doc = document, store, api, router, registry }) {
     }
     store.set("loadedAt", Date.now());
   }
-  async function loadProject() {
+  async function loadProject({ fresh = false } = {}) {
     const [cat, context] = await Promise.all([
-      api.getJSON("/api/catalog"),
+      api.getJSON("/api/catalog", { fresh }),
       api.getJSON("/api/context").catch(() => null),
     ]);
     store.set("context", context);
@@ -46,7 +46,7 @@ export function createShell({ doc = document, store, api, router, registry }) {
   async function reload() {
     api.forget("/api/catalog");
     api.forget("/api/context");
-    await loadProject();
+    await loadProject({ fresh: true }); // the server drops its cached catalog too
     await refreshJobs();
   }
 
@@ -170,6 +170,8 @@ export function createShell({ doc = document, store, api, router, registry }) {
     (back?.isConnected && !detailEl.contains(back) ? back : $("btnPanel")).focus();
   }
   detailEl.addEventListener("click", e => { if (e.target.closest("#closePanel")) closePanel(); });
+  // below 1100 px the panel is an overlay and the backdrop (the shell's ::after) takes the click
+  shellEl.addEventListener("click", e => { if (e.target === shellEl && store.get("panel") && doc.defaultView.matchMedia("(max-width: 1100px)").matches) closePanel(); });
   $("btnReleer").addEventListener("click", async e => {
     try {
       await busy(e.currentTarget, "Releyendo el proyecto desde el disco…", reload);

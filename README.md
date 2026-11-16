@@ -720,15 +720,20 @@ La página que abre `kiln serve` es una aplicación de módulos ES sin paso de c
 
 | medida | anterior, primera medida | anterior, ahora | nueva |
 |---|---:|---:|---:|
-| primera vista (pintada), ms | 379 | 69 | 64 |
-| cambiar a Catálogo, ms | 111 | 108 | 40 |
-| pulsación en el filtro del catálogo, ms | 74 | 65 | 1,2 |
-| pulsación en el buscador global, ms | 74 | 65 | 123 (incluye 120 de espera) |
-| nodos DOM, vista Catálogo | 8.158 | 8.160 | 413 (menos de 80 filas) |
+| primera vista (pintada), ms | 379 | 70 | 68 |
+| cambiar a Catálogo, ms | 111 | 117 | 44 |
+| pulsación en el filtro del catálogo, ms | 74 | 65 | 1,3 |
+| pulsación en el buscador global, ms | 74 | 65 | 122 (incluye 120 de espera) |
+| nodos DOM, vista Catálogo | 8.158 | 8.160 | 413 |
 | nodos DOM, vista Inicio | 123 | 125 | 183 |
-| `/api/catalog` la primera vez, ms | 330 | 21 | 21 |
-| `/api/catalog` con caché (304), ms | 330 | 21 | 19 |
+| filas en el DOM, Catálogo | - | - | 24 |
+| `/api/catalog` en frío (lectura forzada), ms | 330 | 396 | 396 |
+| `/api/catalog` con caché (304), ms | 330 | 23 | 22 |
 | memoria de JS tras recorrer las vistas, MB | 3,7 | 3,7 | 4,8 |
+
+La primera vista de la interfaz antigua también mejoró (379 a unos 70 ms) porque el servidor ahora guarda el catálogo en memoria; la columna "en frío" fuerza una lectura completa del proyecto con la marca explícita, ya que las comprobaciones previas dejan la caché caliente.
+
+"Releer" fuerza una lectura nueva del disco con la cabecera explícita `X-Kiln-Fresh: 1`; `Cache-Control: no-cache` (recarga forzada del navegador, DevTools con la caché desactivada) no vacía la caché del servidor.
 
 La mejora está en lo que crece con el proyecto: el catálogo pinta solo las filas visibles, así que el filtro y el cambio de vista dejan de depender de las 5.000 piezas. Inicio tiene más nodos y la memoria es algo mayor porque la interfaz nueva dibuja más información.
 

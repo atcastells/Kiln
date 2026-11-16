@@ -63,7 +63,7 @@ export async function walkNewViews({ d, name, port, cat, check, note, shot }) {
         await d.page.key("Escape"); await sleep(150);
       }
     }
-    check(name, "build: the view renders its actions and the review area", await go(d, port, `#/build/${encodeURIComponent(id)}`, "build") && (await count(d, "[data-job]")) === 3 && (await count(d, "#bReview")) === 1);
+    check(name, "build: the view renders its actions and the review area", await go(d, port, `#/build/${encodeURIComponent(id)}`, "build") && (await count(d, "[data-job]")) === 3 && (await count(d, "#bReview")) === ((await text(d, "#main")).includes("Aún no está montado") ? 0 : 1));
     await sleep(600);
     await shot(d, `${name}-app-build.png`);
   } else check(name, "spec: examples-like project without specs shows the empty state", await go(d, port, "#/spec", "spec") && /Todavía no hay fichas/.test(await text(d, "#main")));

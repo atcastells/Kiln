@@ -456,7 +456,8 @@ async function measureOnce(chrome, port, kit) {
 
 async function measure(chrome, port) {
   console.log(`\n== measurements on the synthetic project (${RUNS} runs, median)`);
-  const cat = await api(port, "/api/catalog");
+  // earlier checks already warmed the server cache, so the cold load is forced with the explicit marker "Releer" sends
+  const t0 = performance.now(); const cat = await (await fetch(`http://127.0.0.1:${port}/api/catalog`, { headers: { "X-Kiln-Fresh": "1" } })).json(); const cold_ms = performance.now() - t0;
   const kit = cat.kits[Math.min(3, cat.kits.length - 1)].name;
   const runs = [];
   for (let i = 0; i < RUNS; i++) { runs.push(await measureOnce(chrome, port, kit)); console.log(`  run ${i + 1} done`); }
@@ -465,7 +466,7 @@ async function measure(chrome, port) {
   // the same request with the validator the page sends on every later read: the server answers 304
   const etag = (await fetch(`http://127.0.0.1:${port}/api/catalog`)).headers.get("etag"), cached_ms = [];
   for (let i = 0; i < RUNS; i++) { const t = performance.now(); const r = await fetch(`http://127.0.0.1:${port}/api/catalog`, { headers: etag ? { "If-None-Match": etag } : {} }); await r.arrayBuffer(); cached_ms.push(performance.now() - t); }
-  const out = { api_catalog_ms: median(api_ms), api_catalog_cached_ms: median(cached_ms), api_catalog_kb: median(bytes) / 1024, pieces: cat.pieces.length, findings: cat.findings.length };
+  const out = { api_catalog_ms: cold_ms, api_catalog_warm_ms: median(api_ms), api_catalog_cached_ms: median(cached_ms), api_catalog_kb: median(bytes) / 1024, pieces: cat.pieces.length, findings: cat.findings.length };
   for (const k of Object.keys(runs[0])) out[k] = median(runs.map(r => r[k]).filter(v => v != null));
   return { median: out, runs };
 }
@@ -496,9 +497,14 @@ const BUDGET = [
 ];
 if (perf) for (const [key, limit, label, noisy] of BUDGET) {
   const v = perf.median[key], max = noisy ? limit * TOLERANCE : limit;
-  check("synthetic", `budget: ${label} < ${limit}${noisy ? ` (x${TOLERANCE} tolerance)` : ""}`, v != null && v < max, `${key} = ${v == null ? "missing" : v.toFixed(1)}`);
+  check("synthetic", `budget: ${label} < ${limit}${noisy ? ` (x${TOLERANCE} tolerance)` : ""}`, Number.isFinite(v) && v > 0 && v < max, `${key} = ${v == null ? "missing" : v.toFixed(1)}`);
   if (noisy && v != null && v >= limit && v < max) note("synthetic", `budget: ${key} = ${v.toFixed(0)} is over ${limit} but inside the tolerance`);
 }
+
+// a lower bound too: a zero, NaN or missing metric of the new UI is never a pass
+if (perf) for (const key of Object.keys(perf.median).filter(k => k.startsWith("app_") && !/errors$/.test(k)))
+  check("synthetic", `metric is real: ${key} > 0`, Number.isFinite(perf.median[key]) && perf.median[key] > 0, `${key} = ${perf.median[key]}`);
+if (perf) check("synthetic", "catalog was measured, not the home view: nodes differ", perf.median.app_catalog_nodes !== perf.median.app_home_nodes, `catalog ${perf.median.app_catalog_nodes} vs home ${perf.median.app_home_nodes}`);
 
 // ---- before / after: the previous UI (/classic) against the new one (/), same run, same project
 if (perf) {
@@ -510,8 +516,8 @@ if (perf) {
     ["global search keystroke, ms", m.keystroke_ms, m.app_search_ms],
     ["DOM nodes, catalog view", m.dom_catalog, m.app_catalog_nodes],
     ["DOM nodes, home view", m.dom_default, m.app_home_nodes],
-    ["/api/catalog first, ms", m.api_catalog_ms, m.api_catalog_ms],
-    ["/api/catalog cached (304), ms", m.api_catalog_ms, m.api_catalog_cached_ms],
+    ["/api/catalog cold (forced fresh read, X-Kiln-Fresh), ms", m.api_catalog_ms, m.api_catalog_ms],
+    ["/api/catalog cached (304 with If-None-Match), ms", m.api_catalog_warm_ms, m.api_catalog_cached_ms],
     ["JS heap after the views, MB", m.heap_after_views_mb, m.app_heap_mb],
   ];
   // the previous UI as first recorded (before the server cached the catalog), kept in the baseline as `reference`

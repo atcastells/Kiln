@@ -78,3 +78,13 @@ test("a failed GET is not cached and the in-flight slot is freed", async () => {
   assert.deepEqual(await api.getJSON("/a"), { ok: 1 });
   assert.equal(calls[1].init.headers?.["If-None-Match"], undefined);
 });
+
+test("a fresh read sends the explicit fresh marker and sends no If-None-Match", async () => {
+  const { fetch, calls } = recorder(res(200, { n: 1 }, { etag: '"a"' }), res(200, { n: 1 }, { etag: '"a"' }));
+  const api = createApi({ fetch });
+  await api.getJSON("/api/catalog");
+  const again = await api.getJSON("/api/catalog", { fresh: true });
+  assert.deepEqual(again, { n: 1 });
+  assert.equal(calls[1].init.headers["X-Kiln-Fresh"], "1");
+  assert.equal(calls[1].init.headers["If-None-Match"], undefined);
+});

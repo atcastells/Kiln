@@ -266,7 +266,10 @@ dialog::backdrop { background: rgb(10 14 9 / .55); }
 /* ---- 13. Adaptacion: panel plegado a 1100, navegacion en barra a 960 ---- */
 @media (max-width: 1100px) {
   .shell.with-detail { grid-template-columns: var(--nav) minmax(0, 1fr); }
-  #detail { position: fixed; top: var(--topbar); right: 0; bottom: 0; width: min(360px, 92vw); z-index: 35; box-shadow: var(--shadow); }
+  #detail { position: fixed; top: var(--topbar); right: 0; bottom: 0; width: min(360px, 92vw); z-index: 35; box-shadow: -14px 0 36px rgba(0, 0, 0, .3); border-left: 1px solid var(--line-ui); }
+  /* the panel is an overlay here: a backdrop dims the page, a click on it closes the panel */
+  .shell.with-detail::after { content: ""; position: fixed; top: var(--topbar); right: 0; bottom: 0; left: 0; background: rgba(12, 16, 11, .5); z-index: 34; }
+  #detail .iconbtn { width: 34px; height: 34px; border: 1px solid var(--line-ui); color: var(--fg); background: var(--panel2); }
   .home-grid, .ctx { grid-template-columns: minmax(0, 1fr); }
   .qs { position: static; }
   .btn.cmdbtn { display: none; }

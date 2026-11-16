@@ -30,9 +30,9 @@ export function createApi({ fetch: f = (...a) => globalThis.fetch(...a), base = 
     catch { throw new ApiError(0, "No se puede conectar con Kiln. ¿Sigue en marcha el servidor?"); }
   }
 
-  async function load(path) {
-    const hit = cache.get(path);
-    const res = await send(path, hit ? { headers: { "If-None-Match": hit.etag } } : {});
+  async function load(path, fresh) {
+    const hit = fresh ? null : cache.get(path);
+    const res = await send(path, fresh ? { headers: { "X-Kiln-Fresh": "1" } } : hit ? { headers: { "If-None-Match": hit.etag } } : {});
     if (res.status === 304 && hit) return hit.value;
     if (!res.ok) throw await failure(res);
     const value = await res.json();
@@ -44,10 +44,11 @@ export function createApi({ fetch: f = (...a) => globalThis.fetch(...a), base = 
   return {
     // Forget the cached copy (and its ETag) of a path: the next read is a full one.
     forget(path) { cache.delete(path); },
-    getJSON(path) {
-      let p = inflight.get(path);
+    // `fresh`: ask the server to read from disk, not from its cache ("Releer").
+    getJSON(path, { fresh = false } = {}) {
+      let p = fresh ? null : inflight.get(path);
       if (!p) {
-        p = load(path).finally(() => inflight.delete(path));
+        p = load(path, fresh).finally(() => { if (inflight.get(path) === p) inflight.delete(path); });
         inflight.set(path, p);
       }
       return p;

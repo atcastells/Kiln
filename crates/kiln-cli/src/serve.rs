@@ -297,11 +297,25 @@ fn read_request(stream: &TcpStream) -> std::io::Result<Request> {
     })
 }
 
+/// A read that explicitly asks for a fresh load from disk. Only Kiln's own UI
+/// sends `X-Kiln-Fresh: 1` ("Releer"); browsers send `Cache-Control: no-cache`
+/// on hard reloads, which must not drop the server cache.
+fn wants_fresh(headers: &[(String, String)]) -> bool {
+    headers.iter().any(|(h, v)| h == "x-kiln-fresh" && v.trim() == "1")
+}
+
+fn catalog_request(ctx: &Ctx, headers: &[(String, String)]) -> (&'static str, Option<String>, Vec<u8>) {
+    let inm = headers.iter().find(|(h, _)| h == "if-none-match").map(|(_, v)| v.as_str());
+    if wants_fresh(headers) {
+        drop_catalog(&ctx.project);
+    }
+    catalog_reply(ctx, inm)
+}
+
 fn handle(stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result<()> {
     let req = read_request(&stream)?;
     if req.method == "GET" && req.path == "/api/catalog" {
-        let inm = req.headers.iter().find(|(h, _)| h == "if-none-match").map(|(_, v)| v.as_str());
-        let (status, etag, body) = catalog_reply(ctx, inm);
+        let (status, etag, body) = catalog_request(ctx, &req.headers);
         return respond_with(stream, status, "application/json", &body, etag.as_deref());
     }
     let from_page = from_page(&req);
@@ -672,10 +686,16 @@ fn catalogs() -> &'static Mutex<HashMap<PathBuf, CatalogEntry>> {
     C.get_or_init(Default::default)
 }
 
-/// Paths, sizes and modification times of everything under the project
-/// (the loader reads specs, content, bindings, build reports and the Godot
-/// cache from there) and of the config file when it lives elsewhere. Only
-/// stats, no reads; `target`, `.git` and `node_modules` are not catalog input.
+/// Paths, sizes, modification times and (on unix) change times of everything
+/// under the project (the loader reads specs, content, bindings, build reports
+/// and the Godot cache from there), of the config file when it lives elsewhere,
+/// and of every folder or file the config points at outside the project (kits,
+/// materials tables and textures, build and cache folders...). Only stats, no
+/// reads of the data; `target`, `.git` and `node_modules` are not catalog input.
+///
+/// The change time cannot be set from user space, so a write that keeps the
+/// size and puts the modification time back is still seen on unix. Elsewhere
+/// such an edit is only picked up by "Releer", which drops the cache.
 fn fingerprint(ctx: &Ctx) -> u64 {
     fn stat(h: &mut impl Hasher, path: &Path, meta: &std::fs::Metadata) {
         path.hash(h);
@@ -685,6 +705,11 @@ fn fingerprint(ctx: &Ctx) -> u64 {
             .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
             .map(|d| d.as_nanos())
             .hash(h);
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::MetadataExt;
+            (meta.ctime(), meta.ctime_nsec()).hash(h);
+        }
     }
     fn walk(h: &mut impl Hasher, dir: &Path) {
         let mut entries: Vec<_> = std::fs::read_dir(dir).into_iter().flatten().flatten().collect();
@@ -708,7 +733,57 @@ fn fingerprint(ctx: &Ctx) -> u64 {
         stat(&mut h, c, &meta);
     }
     walk(&mut h, &ctx.project);
+    for p in outside_inputs(ctx) {
+        match std::fs::metadata(&p) {
+            Ok(meta) => {
+                stat(&mut h, &p, &meta);
+                if meta.is_dir() {
+                    walk(&mut h, &p);
+                }
+            }
+            Err(_) => p.hash(&mut h), // a missing input: creating it changes the fingerprint
+        }
+    }
     h.finish()
+}
+
+/// Inputs of the loader that the config places outside the project folder.
+fn outside_inputs(ctx: &Ctx) -> Vec<PathBuf> {
+    let cfg = match &ctx.config {
+        Some(c) => kiln_core::Config::load_file(c),
+        None => kiln_core::Config::load(&ctx.project),
+    };
+    let Ok(cfg) = cfg else { return Vec::new() };
+    let mut rel: Vec<String> = cfg.kit_roots();
+    rel.extend(cfg.materials.tables.iter().cloned());
+    rel.extend(cfg.materials.textures.iter().cloned());
+    rel.extend([
+        cfg.materials.bindings.clone(),
+        cfg.tools.build.clone(),
+        cfg.tools.cache.clone(),
+        cfg.context.file.clone(),
+        cfg.assets.specs.clone().unwrap_or_else(|| "kiln/specs".into()),
+        kiln_core::zones::FILE.into(),
+    ]);
+    for l in &cfg.levels {
+        rel.extend(l.files.iter().map(|f| {
+            // a glob: its fixed folder prefix
+            let cut = f.find(['*', '?', '[']).unwrap_or(f.len());
+            let fixed = &f[..cut];
+            if cut == f.len() { fixed.to_string() } else { fixed.rsplit_once('/').map_or(String::new(), |(d, _)| d.to_string()) }
+        }));
+    }
+    let root = std::fs::canonicalize(&ctx.project).unwrap_or_else(|_| ctx.project.clone());
+    let mut out: Vec<PathBuf> = rel
+        .iter()
+        .filter(|r| !r.is_empty())
+        .map(|r| ctx.project.join(r))
+        .map(|p| std::fs::canonicalize(&p).unwrap_or(p))
+        .filter(|p| !p.starts_with(&root))
+        .collect();
+    out.sort();
+    out.dedup();
+    out
 }
 
 fn etag_matches(header: &str, etag: &str) -> bool {
@@ -983,6 +1058,101 @@ mod tests {
         assert_eq!(catalog_loads(&ctx.project), 1);
         std::fs::write(root.join("new-file.toml"), "x").unwrap();
         catalog_reply(&ctx, None);
+        assert_eq!(catalog_loads(&ctx.project), 2);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    fn project_name_of(body: &[u8]) -> String {
+        serde_json::from_slice::<serde_json::Value>(body).unwrap()["project"].as_str().unwrap().to_string()
+    }
+
+    // What is guaranteed: a rebuilt catalog that comes out identical keeps its
+    // ETag (it is a hash of the content), so `touch` reloads but does not change it.
+    #[test]
+    fn touching_reloads_but_an_identical_catalog_keeps_its_etag() {
+        let (root, ctx) = project_copy("cache-etag-touch");
+        let first = catalog_reply(&ctx, None);
+        let f = std::fs::OpenOptions::new().write(true).open(root.join("kiln.toml")).unwrap();
+        f.set_modified(std::time::SystemTime::now() + std::time::Duration::from_secs(7)).unwrap();
+        let second = catalog_reply(&ctx, None);
+        assert_eq!(catalog_loads(&ctx.project), 2, "the loader ran again");
+        assert_eq!(first.1, second.1, "same content, same ETag");
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    // An edit that changes the content but not the size, with the modification
+    // time put back, must not be served stale (unix: the change time moves).
+    #[cfg(unix)]
+    #[test]
+    fn same_size_edit_with_restored_mtime_is_not_served_stale() {
+        let (root, ctx) = project_copy("cache-same-size");
+        let toml = root.join("kiln.toml");
+        let (_, etag1, body1) = catalog_reply(&ctx, None);
+        assert_eq!(project_name_of(&body1), "Content fixture");
+        let mtime = std::fs::metadata(&toml).unwrap().modified().unwrap();
+        let text = std::fs::read_to_string(&toml).unwrap();
+        let edited = text.replacen("Content fixture", "Content fixtuRe", 1);
+        assert_eq!(text.len(), edited.len());
+        std::fs::write(&toml, edited).unwrap();
+        std::fs::OpenOptions::new().write(true).open(&toml).unwrap().set_modified(mtime).unwrap();
+        assert_eq!(std::fs::metadata(&toml).unwrap().modified().unwrap(), mtime);
+        let (_, etag2, body2) = catalog_reply(&ctx, None);
+        assert_eq!(project_name_of(&body2), "Content fixtuRe");
+        assert_ne!(etag1, etag2);
+        assert_eq!(catalog_loads(&ctx.project), 2);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[test]
+    fn an_edit_to_a_data_file_inside_the_project_reloads() {
+        let (root, ctx) = project_copy("cache-data-edit");
+        catalog_reply(&ctx, None);
+        let ron = std::fs::read_dir(root.join("data/content")).unwrap().flatten().map(|e| e.path()).find(|p| p.extension().is_some_and(|x| x == "ron")).expect("a content file");
+        let mut text = std::fs::read_to_string(&ron).unwrap();
+        text.push_str("\n// edited\n");
+        std::fs::write(&ron, text).unwrap();
+        catalog_reply(&ctx, None);
+        assert_eq!(catalog_loads(&ctx.project), 2);
+        let _ = std::fs::remove_dir_all(&root);
+    }
+
+    // The config can put the Godot cache (or kits, tables...) outside the
+    // project folder; the loader reads them, so the fingerprint must see them.
+    #[test]
+    fn inputs_outside_the_project_are_in_the_fingerprint() {
+        let base = scratch("cache-outside");
+        let root = base.join("proj");
+        copy_dir(&Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples/content"), &root);
+        let ext = base.join("ext-cache");
+        std::fs::create_dir_all(&ext).unwrap();
+        let toml = root.join("kiln.toml");
+        let text = std::fs::read_to_string(&toml).unwrap().replacen("[tools]", "[tools]\ncache = \"../ext-cache\"", 1);
+        std::fs::write(&toml, text).unwrap();
+        let ctx = make_ctx(&std::fs::canonicalize(&root).unwrap(), None).unwrap();
+        let before = fingerprint(&ctx);
+        assert!(outside_inputs(&ctx).iter().any(|p| p.ends_with("ext-cache")));
+        std::fs::write(ext.join("pieces.json"), "{}").unwrap();
+        assert_ne!(before, fingerprint(&ctx));
+        let _ = std::fs::remove_dir_all(&base);
+    }
+
+    #[test]
+    fn releer_asks_for_a_fresh_read_with_the_explicit_marker() {
+        let h = |k: &str, v: &str| vec![(k.to_string(), v.to_string())];
+        assert!(wants_fresh(&h("x-kiln-fresh", "1")));
+        assert!(!wants_fresh(&h("x-kiln-fresh", "0")));
+        assert!(!wants_fresh(&h("if-none-match", "\"x\"")));
+    }
+
+    #[test]
+    fn cache_control_no_cache_alone_does_not_reload() {
+        let (root, ctx) = project_copy("cache-nocache");
+        let h = |k: &str, v: &str| vec![(k.to_string(), v.to_string())];
+        catalog_request(&ctx, &h("cache-control", "no-cache"));
+        catalog_request(&ctx, &h("pragma", "no-cache"));
+        catalog_request(&ctx, &h("cache-control", "no-cache"));
+        assert_eq!(catalog_loads(&ctx.project), 1);
+        catalog_request(&ctx, &h("x-kiln-fresh", "1"));
         assert_eq!(catalog_loads(&ctx.project), 2);
         let _ = std::fs::remove_dir_all(&root);
     }

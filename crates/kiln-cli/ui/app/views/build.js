@@ -114,7 +114,7 @@ export function mount(el, ctx) {
       ${b ? zonesBox(sp, b, cat) : ""}
       ${sites.length ? html`<section class="card pad"><h3 class="sec">Modelos de sitios de assets</h3><p class="muted small">Solo salen las licencias que admite el proyecto; nada se baja hasta que pulses Traer.</p>
         ${sites.map(p => html`<div class="sitepart" data-sp="${p.id}"><div class="row"><b>${p.what}</b><span class="muted small">${p.source.kind === "search" ? `busca «${p.source.query || p.what}»` : `traída de ${SITES[p.source.from.split("/")[0]]}`}</span><button class="btn sm" type="button" data-search="${p.id}"${partQ === p.id ? " data-auto" : ""}>${p.source.kind === "search" ? "Buscar" : "Buscar otra"}</button></div><div id="c-${p.id}" aria-live="polite"></div></div>`)}</section>` : ""}
-      <section class="card pad" id="bReview"></section></div>`.toString();
+      ${b ? html`<section class="card pad" id="bReview"></section>` : ""}</div>`.toString();
     Object.keys(cands).forEach(pid => paintCands(pid));
     showViewer(); showReview(b);
     const auto = q("[data-auto]"); if (auto) auto.scrollIntoView({ block: "center" });
