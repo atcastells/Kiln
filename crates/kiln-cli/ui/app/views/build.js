@@ -34,7 +34,7 @@ export function candidateHtml(c, i, budget) {
 
 export function reviewHtml(s) {
   const url = (d, f) => "/files/" + encodeURI(d + "/" + f);
-  return html`<h3 class="sec">Revisión visual · ${plural(s.rounds.length, "vuelta", "vueltas")} · ${s.model}</h3><p class="muted small">Se queda la vuelta ${s.best}: su ficha y su montaje son los que hay ahora.</p>
+  return html`<h2 class="sec">Revisión visual · ${plural(s.rounds.length, "vuelta", "vueltas")} · ${s.model}</h2><p class="muted small">Se queda la vuelta ${s.best}: su ficha y su montaje son los que hay ahora.</p>
     ${s.rounds.slice().reverse().map(r => { const rv = r.review;
       return html`<details class="round"${r.n === s.rounds.length ? " open" : ""}><summary><b>Vuelta ${r.n}</b>${r.n === s.best ? html` <span class="pill ok">la que queda</span>` : ""} <span class="pill ${rv.verdict === "pass" ? "ok" : "warn"}">${rv.verdict === "pass" ? "aprobada" : "a revisar"}</span>${r.against ? html` <span class="muted">frente a la ${r.against}: gana la ${r.kept}</span>` : ""}</summary>
         <div class="sheets">${SHEETS.map(([f, n]) => html`<a href="${url(r.dir, f)}" target="_blank" rel="noopener" title="${n}"><img src="${url(r.dir, f)}" alt="${n}" loading="lazy"></a>`)}</div>
@@ -56,7 +56,7 @@ export function mount(el, ctx) {
     const vars = (sp.variants ?? []).map(v => v.id); if (variant && !vars.includes(variant)) vars.push(variant);
     const sel = n => { const v = (sp.variants ?? []).find(x => x.id === variant), k = variant ? (v?.materials?.[n] ?? "") : chosen(sp, cat, n, ""); return html`<option value="">${variant ? "como el asset base" : "el del modelo"}</option>${cat.materials.map(m => html`<option value="${m.key}"${m.key === k ? " selected" : ""}>${m.key}${m.name !== m.key ? " · " + m.name : ""}</option>`)}`; };
     let last = null;
-    return html`<section class="card pad"><h3 class="sec">Materiales por zona</h3>
+    return html`<section class="card pad"><h2 class="sec">Materiales por zona</h2>
       <label class="slotrow"><span>variante</span><select class="field" id="zVar"><option value="">asset base</option>${vars.map(v => html`<option value="${v}"${v === variant ? " selected" : ""}>${v}${b.variants?.[v] ? "" : " · sin aplicar"}</option>`)}<option value="+">nueva variante…</option></select></label>
       ${names.map(n => { let head = ""; if (partOf(n) !== last) { last = partOf(n); const p = sp.parts.find(x => x.id === last), can = !variant && p && Object.keys(p.materials ?? {}).length && ["reuse", "variant"].includes(p.source.kind) && cat.pieces.some(c => c.key === p.source.from); head = html`<div class="slotrow"><b>${last}</b>${can ? html`<button class="btn sm" type="button" data-validate="${last}" title="Deja estos materiales como valor por defecto de ${p.source.from} en el catálogo">Validar</button>` : ""}</div>`; }
         return html`${head}<label class="slotrow"><span class="mono">${zoneOf(n)}</span><select class="field" data-zone="${n}">${sel(n)}</select></label>`; })}
@@ -84,10 +84,10 @@ export function mount(el, ctx) {
     const box = q("#bReview"); if (!box || !b) return;
     try {
       const r = await fetch("/files/" + encodeURI(dirOf(b.glb) + "review/review.json") + "?t=" + Date.now());
-      if (!r.ok) { box.innerHTML = html`<h3 class="sec">Revisión visual</h3><p class="muted">Aún no hay revisión. «Montar y revisar» la hace.</p>`.toString(); return; }
+      if (!r.ok) { box.innerHTML = html`<h2 class="sec">Revisión visual</h2><p class="muted">Aún no hay revisión. «Montar y revisar» la hace.</p>`.toString(); return; }
       const s = await r.json();
       if (alive && box.isConnected) box.innerHTML = reviewHtml(s).toString();
-    } catch { if (alive && box.isConnected) box.innerHTML = html`<h3 class="sec">Revisión visual</h3><p class="muted">No se pudo leer la revisión. Pulsa Releer el proyecto para volver a intentarlo.</p>`.toString(); }
+    } catch { if (alive && box.isConnected) box.innerHTML = html`<h2 class="sec">Revisión visual</h2><p class="muted">No se pudo leer la revisión. Pulsa Releer el proyecto para volver a intentarlo.</p>`.toString(); }
   }
 
   function draw() {
@@ -96,7 +96,7 @@ export function mount(el, ctx) {
     if (!sp) {
       el.innerHTML = html`<div class="page" data-view="build" data-ready="1"><div class="pagehead"><div><h1>Montaje</h1><div class="sub">Monta y revisa los assets con ficha</div></div></div>
         ${id ? html`<div class="callout" role="alert"><b>No hay ficha «${id}»</b><p>Elige un asset de la lista.</p></div>` : ""}
-        ${cat.specs.length ? html`<div class="card"><table class="tbl"><thead><tr><th>Asset</th><th>Montaje</th><th class="r">Triángulos</th></tr></thead><tbody>${cat.specs.map(s => html`<tr><td><a href="${format({ view: "build", args: [s.asset.id] })}">${s.asset.name}</a></td><td>${cat.builds[s.asset.id] ? "montado" : html`<span class="muted">sin montar</span>`}</td><td class="r">${fmtN(cat.builds[s.asset.id]?.tris)}</td></tr>`)}</tbody></table></div>` : html`<div class="empty"><h3>Todavía no hay assets con ficha</h3><p>Pide un asset desde Fichas y vuelve aquí para montarlo.</p><a class="btn primary" href="#/spec">Ir a Fichas</a></div>`}</div>`.toString();
+        ${cat.specs.length ? html`<div class="card"><table class="tbl"><thead><tr><th>Asset</th><th>Montaje</th><th class="r">Triángulos</th></tr></thead><tbody>${cat.specs.map(s => html`<tr><td><a href="${format({ view: "build", args: [s.asset.id] })}">${s.asset.name}</a></td><td>${cat.builds[s.asset.id] ? "montado" : html`<span class="muted">sin montar</span>`}</td><td class="r">${fmtN(cat.builds[s.asset.id]?.tris)}</td></tr>`)}</tbody></table></div>` : html`<div class="empty"><h2>Todavía no hay assets con ficha</h2><p>Pide un asset desde Fichas y vuelve aquí para montarlo.</p><a class="btn primary" href="#/spec">Ir a Fichas</a></div>`}</div>`.toString();
       return;
     }
     const b = cat.builds[id], a = sp.asset, todo = (b?.items ?? []).filter(i => i.todo), running = !!store.get("job");
@@ -107,12 +107,12 @@ export function mount(el, ctx) {
         <button class="btn primary" type="button" data-job="build"${running ? ' disabled title="Hay un trabajo en curso"' : ""}>Montar en Blender</button>
         <button class="btn" type="button" data-job="review"${running ? ' disabled title="Hay un trabajo en curso"' : ""}>Montar y revisar</button></div>
         <p class="muted small">${running ? "Hay un trabajo en marcha: espera a que termine (míralo en Trabajos)." : "Montar necesita Blender; Colocar y Revisar necesitan al agente. Cada uno se sigue en Trabajos."}</p></section>
-      ${b ? html`<div class="split2"><section class="card pad"><h3 class="sec">Modelo</h3><div class="view3d" id="b3d" aria-label="Vista 3D del montaje"></div></section>
-        <section class="card pad"><h3 class="sec">Montaje</h3>${dl([["Fichero", b.glb], ["Medida", fmtSize(b.size_m)], ["Triángulos", a.budget_tris ? `${fmtN(b.tris)} de ${fmtN(a.budget_tris)}` : fmtN(b.tris)], ["Montado", b.built_at]])}
-          <h3 class="sec">Por terminar a mano <span class="n">${todo.length}</span></h3>${todo.length ? todo.map(i => html`<div class="finding"><b>${i.name}</b>: ${i.todo}</div>`) : html`<p class="muted">Nada.</p>`}</section></div>`
-        : html`<div class="empty small"><h3>Aún no está montado</h3><p>${sp.parts.every(p => (p.at ?? []).length >= (p.count || 1)) ? "Las piezas están colocadas: monta en Blender." : "Faltan posiciones: pide colocar las piezas primero."}</p></div>`}
+      ${b ? html`<div class="split2"><section class="card pad"><h2 class="sec">Modelo</h2><div class="view3d" id="b3d" aria-label="Vista 3D del montaje"></div></section>
+        <section class="card pad"><h2 class="sec">Montaje</h2>${dl([["Fichero", b.glb], ["Medida", fmtSize(b.size_m)], ["Triángulos", a.budget_tris ? `${fmtN(b.tris)} de ${fmtN(a.budget_tris)}` : fmtN(b.tris)], ["Montado", b.built_at]])}
+          <h2 class="sec">Por terminar a mano <span class="n">${todo.length}</span></h2>${todo.length ? todo.map(i => html`<div class="finding"><b>${i.name}</b>: ${i.todo}</div>`) : html`<p class="muted">Nada.</p>`}</section></div>`
+        : html`<div class="empty small"><h2>Aún no está montado</h2><p>${sp.parts.every(p => (p.at ?? []).length >= (p.count || 1)) ? "Las piezas están colocadas: monta en Blender." : "Faltan posiciones: pide colocar las piezas primero."}</p></div>`}
       ${b ? zonesBox(sp, b, cat) : ""}
-      ${sites.length ? html`<section class="card pad"><h3 class="sec">Modelos de sitios de assets</h3><p class="muted small">Solo salen las licencias que admite el proyecto; nada se baja hasta que pulses Traer.</p>
+      ${sites.length ? html`<section class="card pad"><h2 class="sec">Modelos de sitios de assets</h2><p class="muted small">Solo salen las licencias que admite el proyecto; nada se baja hasta que pulses Traer.</p>
         ${sites.map(p => html`<div class="sitepart" data-sp="${p.id}"><div class="row"><b>${p.what}</b><span class="muted small">${p.source.kind === "search" ? `busca «${p.source.query || p.what}»` : `traída de ${SITES[p.source.from.split("/")[0]]}`}</span><button class="btn sm" type="button" data-search="${p.id}"${partQ === p.id ? " data-auto" : ""}>${p.source.kind === "search" ? "Buscar" : "Buscar otra"}</button></div><div id="c-${p.id}" aria-live="polite"></div></div>`)}</section>` : ""}
       ${b ? html`<section class="card pad" id="bReview"></section>` : ""}</div>`.toString();
     Object.keys(cands).forEach(pid => paintCands(pid));

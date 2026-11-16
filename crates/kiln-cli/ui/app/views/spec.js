@@ -37,13 +37,13 @@ export function mount(el, ctx) {
     const a = sp.asset, fs = specFindings(cat, a.id), down = madeOf(sp), up = usedIn(cat, a.id), stale = cat.builds[a.id]?.stale ?? [];
     el.innerHTML = html`<div class="page" data-view="spec" data-ready="1"><div class="pagehead"><div><h1>${a.name}</h1><div class="sub">${a.status} · «${a.asked}»</div></div>
       <div class="row"><a class="btn" href="#/spec">Todas las fichas</a><a class="btn primary" href="${format({ view: "build", args: [a.id] })}">${cat.builds[a.id] ? "Ver el montaje" : "Montar"}</a></div></div>
-      <div class="split2"><section class="card pad"><h3 class="sec">Asset</h3>${dl([["Id", a.id], ["Petición", a.asked], ["Dónde", a.where], ["Estados", (a.states ?? []).join(", ") || "sin estados"], ["Presupuesto", a.budget_tris != null ? `${fmtN(a.budget_tris)} tri` : "—"], ["Ficha", sp.file]])}${a.notes ? html`<p>${a.notes}</p>` : ""}</section>
-      <section class="card pad"><h3 class="sec">Hecho de y dónde se usa</h3>${stale.length ? html`<div class="finding"><span class="pill warn">por rehacer</span> ${stale.map(x => link(cat, x))} ${stale.length > 1 ? "cambiaron" : "cambió"} después del último montaje.</div>` : ""}
+      <div class="split2"><section class="card pad"><h2 class="sec">Asset</h2>${dl([["Id", a.id], ["Petición", a.asked], ["Dónde", a.where], ["Estados", (a.states ?? []).join(", ") || "sin estados"], ["Presupuesto", a.budget_tris != null ? `${fmtN(a.budget_tris)} tri` : "—"], ["Ficha", sp.file]])}${a.notes ? html`<p>${a.notes}</p>` : ""}</section>
+      <section class="card pad"><h2 class="sec">Hecho de y dónde se usa</h2>${stale.length ? html`<div class="finding"><span class="pill warn">por rehacer</span> ${stale.map(x => link(cat, x))} ${stale.length > 1 ? "cambiaron" : "cambió"} después del último montaje.</div>` : ""}
         <p><b>Hecho de:</b> ${down.length ? down.map(x => link(cat, x)).reduce((acc, x) => [acc, ", ", x]) : html`<span class="muted">solo piezas del catálogo</span>`}</p>
         <p><b>Se usa en:</b> ${up.length ? up.map(([s, n]) => html`${link(cat, s)}${n > 1 ? ` ×${n}` : ""}`).reduce((acc, x) => [acc, ", ", x]) : html`<span class="muted">ningún otro asset</span>`}</p></section></div>
-      <section class="card"><h3 class="sec pad">Piezas <span class="n">${sp.parts.length}</span></h3><table class="tbl"><thead><tr><th>Pieza</th><th>Fuente</th><th>De</th><th>Medida</th><th>Material</th><th>Hallazgos</th></tr></thead><tbody>
+      <section class="card"><h2 class="sec pad">Piezas <span class="n">${sp.parts.length}</span></h2><table class="tbl"><thead><tr><th>Pieza</th><th>Fuente</th><th>De</th><th>Medida</th><th>Material</th><th>Hallazgos</th></tr></thead><tbody>
         ${sp.parts.map(p => html`<tr class="clickrow" data-part="${p.id}" tabindex="0" aria-label="Pieza ${p.what}"><td><b>${p.what}</b>${p.count > 1 ? ` ×${p.count}` : ""}</td><td>${SOURCE[p.source.kind] ?? p.source.kind}</td><td class="mono">${sourceText(p)}</td><td>${p.size_m ? fmtSize(p.size_m) : "libre"}</td><td class="mono">${p.material ?? "el suyo"}</td><td>${sevBadge(worstOfList(cat.findings.filter(f => f.subject === `part:${a.id}/${p.id}`)))}</td></tr>`)}</tbody></table></section>
-      <section class="card pad">${findingsBlock(fs, "Validación de la ficha")}</section>${askForm}</div>`.toString();
+      <section class="card pad">${findingsBlock(fs, "Validación de la ficha", 2)}</section>${askForm}</div>`.toString();
   }
 
   function showPart(pid) {

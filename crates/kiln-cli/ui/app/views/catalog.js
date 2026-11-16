@@ -186,7 +186,7 @@ export function mount(el, ctx) {
     const measured = cat.findings.filter(f => f.code === "not_measured").length, stale = cat.findings.some(f => f.code === "godot_stale");
     if (!cat.kits.length && !cat.pieces.length) {
       el.innerHTML = html`<div class="page" data-view="catalog" data-ready="1"><div class="pagehead"><div><h1>Catálogo</h1><div class="sub">Piezas por kit</div></div></div>
-        <div class="empty"><h3>Todavía no hay kits</h3><p>El catálogo lista las piezas de cada kit con su estado de validación. Declara un kit en kiln.toml y aparecerán aquí.</p><a class="btn primary" href="#/home">Volver al inicio</a></div></div>`.toString();
+        <div class="empty"><h2>Todavía no hay kits</h2><p>El catálogo lista las piezas de cada kit con su estado de validación. Declara un kit en kiln.toml y aparecerán aquí.</p><a class="btn primary" href="#/home">Volver al inicio</a></div></div>`.toString();
       return;
     }
     el.innerHTML = html`<div class="page fill" data-view="catalog" data-ready="1">

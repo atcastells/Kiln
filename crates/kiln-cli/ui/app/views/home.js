@@ -36,7 +36,7 @@ export function nextStep(cat, d) {
   if (cat.kits.length === 0 && sets.length === 0) {
     return { key: "no-kits", title: "Todavía no hay kits en el proyecto",
       text: "Importa un kit de assets o pide una pieza al asistente; con eso el catálogo empieza a llenarse.",
-      actions: [{ label: "Importar o pedir una pieza", href: "/", primary: true }] };
+      actions: [{ label: "Importar o pedir una pieza", route: { view: "spec", args: [] }, primary: true }] };
   }
   const onlyContent = cat.kits.length === 0;
   return { key: "ok", title: "Todo en orden",
@@ -112,11 +112,11 @@ function jobsCard(jobs) {
   return html`<section aria-labelledby="h-jobs"><h2 class="sec" id="h-jobs">Trabajos <span class="n">${running.length ? `${fmtN(running.length)} en curso` : ""}</span></h2><div class="card">${body}</div></section>`;
 }
 
-function emptyProject() {
+export function emptyProject() {
   return html`<div class="empty" data-empty="project"><h3>Este proyecto todavía está vacío</h3>
     <p>No hay kits, piezas ni contenido. Tres pasos para empezar:</p>
     <ol><li>Escribe en el contexto qué juego es y cómo se ve.</li><li>Importa un kit de assets o pide una pieza al asistente.</li><li>Vuelve aquí: Kiln te dirá qué corregir y qué hacer a continuación.</li></ol>
-    <div class="row"><a class="btn primary" href="${href({ view: "context" })}">Ir al contexto</a> <a class="btn" href="/">Importar o pedir una pieza</a></div></div>`;
+    <div class="row"><a class="btn primary" href="${href({ view: "context" })}">Ir al contexto</a> <a class="btn" href="${href({ view: "spec" })}">Importar o pedir una pieza</a></div></div>`;
 }
 
 export function mount(el, ctx) {

@@ -39,7 +39,7 @@ export function mount(el, ctx) {
     if (alive) draw();
   }
   function finished() {
-    el.innerHTML = html`<div class="page" data-view="wizard" data-ready="1"><div class="empty"><h3>Este proyecto ya está asentado</h3><p>El asistente de inicio solo se abre en una carpeta nueva o con el inicio sin asentar.</p><a class="btn primary" href="#/home">Ir al inicio</a></div></div>`.toString();
+    el.innerHTML = html`<div class="page" data-view="wizard" data-ready="1"><div class="empty"><h1>Este proyecto ya está asentado</h1><p>El asistente de inicio solo se abre en una carpeta nueva o con el inicio sin asentar.</p><a class="btn primary" href="#/home">Ir al inicio</a></div></div>`.toString();
   }
   const fail = (e, verb) => { toasts.error(`No se pudo ${verb}`, `${e.message} Comprueba los datos y vuelve a intentarlo.`); return false; };
   const post = async (path, body, verb) => { try { return await postJSON(api, path, body); } catch (e) { fail(e, verb); return null; } };
@@ -89,26 +89,26 @@ export function mount(el, ctx) {
     store.set("wizardName", wz.name);
     const top = q("#kiln-project") ?? document.getElementById("kiln-project"); if (top) top.textContent = wz.name || "juego nuevo";
     if (s === 1) {
-      frame(html`<h2>Un juego nuevo</h2><p class="muted">En <span class="path">${wz.info.folder}</span>. Kiln escribe aquí su <span class="path">kiln.toml</span> y el contexto del juego; no toca nada más.</p>
+      frame(html`<h1>Un juego nuevo</h1><p class="muted">En <span class="path">${wz.info.folder}</span>. Kiln escribe aquí su <span class="path">kiln.toml</span> y el contexto del juego; no toca nada más.</p>
         <label class="wzfield">Nombre del juego<input class="field" id="wzName" value="${wz.name}" placeholder="Puerto Niebla" autocomplete="off"></label>
         <div class="facts"><div class="fact"><span>Tipo</span><b>Juego</b><small>De momento, el único tipo</small></div><div class="fact"><span>Motor</span><b>Godot 4</b></div></div>`, html`<button class="btn primary" type="button" id="wzNext">Seguir</button>`);
       q("#wzName").focus();
     } else if (s === 2) {
-      frame(html`<h2>Lo básico</h2><p class="muted">Cinco cosas que cualquier asset necesita saber. Elige una o escribe la tuya; puedes dejar alguna en blanco.</p>
+      frame(html`<h1>Lo básico</h1><p class="muted">Cinco cosas que cualquier asset necesita saber. Elige una o escribe la tuya; puedes dejar alguna en blanco.</p>
         ${wz.info.basics.map(b => html`<div class="qcard"><b>${b.text}</b><div class="opts">${optionsOf(b, wz.extra).map((o, i) => html`<button class="btn${wz.basics[b.id] === o ? " on" : ""}" type="button" data-b="${b.id}" data-i="${i}" aria-pressed="${String(wz.basics[b.id] === o)}">${o}</button>`)}</div>
           <div class="free"><input class="field" data-free="${b.id}" aria-label="${b.text}: con tus palabras" placeholder="O con tus palabras" value="${optionsOf(b, wz.extra).includes(wz.basics[b.id]) ? "" : wz.basics[b.id] ?? ""}"></div></div>`)}`,
         html`<button class="btn" type="button" id="wzBack">Atrás</button><button class="btn primary" type="button" id="wzMake">Crear el proyecto</button>`);
     } else if (s === 3) {
-      frame(html`<h2>Tu juego, con tus palabras</h2><p class="muted">De qué va, dónde y cuándo pasa, qué hace el jugador y cómo se ve. Si se parece a un juego que existe, dilo. El agente lo parte en afirmaciones por capa, escribe un párrafo de qué juego es y te hace preguntas.</p>
+      frame(html`<h1>Tu juego, con tus palabras</h1><p class="muted">De qué va, dónde y cuándo pasa, qué hace el jugador y cómo se ve. Si se parece a un juego que existe, dilo. El agente lo parte en afirmaciones por capa, escribe un párrafo de qué juego es y te hace preguntas.</p>
         <textarea class="field" id="wzText" aria-label="Tu juego con tus palabras" placeholder="Un juego de...">${C.text}</textarea><div id="wzLog"></div>`, html`<button class="btn primary" type="button" id="wzSort">Ordenar y preguntar</button>`);
     } else if (s === 4) {
       const qs = C.questions.filter(x => x.status === "open");
       if (!qs.length) { wz.step = 5; return draw(); }
-      frame(html`<h2>Unas preguntas</h2><p class="muted">Quedan ${qs.length}. Cada respuesta queda fijada en su capa: el agente no la cambia.</p>${questionCard(qs[0], d)}<div id="wzLog"></div>`,
+      frame(html`<h1>Unas preguntas</h1><p class="muted">Quedan ${qs.length}. Cada respuesta queda fijada en su capa: el agente no la cambia.</p>${questionCard(qs[0], d)}<div id="wzLog"></div>`,
         html`<button class="btn" type="button" id="wzMore">Otra ronda</button><button class="btn primary" type="button" id="wzSkipAll">Seguir sin responder</button>`);
     } else {
       const I = C.intent ?? {}, missing = wz.info.missing ?? [];
-      frame(html`<h2>Asentar el inicio</h2><p class="muted">Esto es lo que todo asset leerá primero. Fija el párrafo y al menos una afirmación por capa.</p>
+      frame(html`<h1>Asentar el inicio</h1><p class="muted">Esto es lo que todo asset leerá primero. Fija el párrafo y al menos una afirmación por capa.</p>
         <div class="kind">Qué juego es ${I.pinned ? html`<span class="pill ok">fijado</span>` : ""}</div>
         <textarea class="field" id="wzIntent" aria-label="Qué juego es" style="min-height:110px">${I.text}</textarea>
         <div class="row"><button class="btn" type="button" id="wzPinI">Guardar y fijar el párrafo</button></div>

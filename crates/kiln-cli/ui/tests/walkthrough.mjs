@@ -9,7 +9,7 @@ import { Driver, find } from "./driver.mjs";
 import { S } from "./selectors.mjs";
 import { walkAppViews, measureAppViews } from "./app_views.mjs";
 import { walkNewViews, walkAppWizard } from "./app_views2.mjs";
-import { walkAppA11y } from "./app_a11y.mjs";
+import { walkAppA11y, walkLongNames } from "./app_a11y.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const arg = n => { const i = process.argv.indexOf(n); return i < 0 ? null : process.argv[i + 1]; };
@@ -478,9 +478,16 @@ process.on("SIGINT", () => { chrome.kill(); process.exit(130); });
 console.log(`Chrome: ${chrome.version}`);
 let perf = null;
 try {
-  for (const [name, port] of Object.entries(targets)) await walk(chrome, name, port);
-  for (const [name, port] of Object.entries(targets)) if (name !== "wizard") await walkApp(chrome, name, port);
+  const SPECIAL = new Set(["longnames"]);
+  for (const [name, port] of Object.entries(targets)) if (!SPECIAL.has(name)) await walk(chrome, name, port);
+  for (const [name, port] of Object.entries(targets)) if (name !== "wizard" && !SPECIAL.has(name)) await walkApp(chrome, name, port);
   if (targets.wizard) await walkAppWizard({ Driver, chrome, name: "wizard", port: targets.wizard, check, shot: (d, n) => shot(d, "wizard", n) });
+  if (targets.longnames) {
+    console.log(`\n== longnames (port ${targets.longnames})`);
+    const d = await Driver.open(chrome.port, "longnames");
+    try { await d.goto(`http://127.0.0.1:${targets.longnames}/#/catalog`); await d.waitFor(`() => document.querySelector('#main [data-view="catalog"][data-ready]')`); await d.settle({ quiet: 300 }); await walkLongNames({ d, name: "longnames", port: targets.longnames, check }); }
+    finally { await d.close(); }
+  }
   if (targets.synthetic) { perf = await measure(chrome, targets.synthetic); Object.assign(perf.median, await measureApp(chrome, targets.synthetic)); Object.assign(perf.median, await measureAppViews({ chrome, port: targets.synthetic, Driver, cat: await api(targets.synthetic, '/api/catalog') })); }
 } finally { chrome.kill(); }
 

@@ -31,7 +31,6 @@ const UI_FILES: &[(&str, &str)] = &[
     ("app/ui/dialog.js", include_str!("../ui/app/ui/dialog.js")),
     ("app/views/registry.js", include_str!("../ui/app/views/registry.js")),
     ("app/views/home.js", include_str!("../ui/app/views/home.js")),
-    ("app/views/placeholder.js", include_str!("../ui/app/views/placeholder.js")),
     ("app/search.js", include_str!("../ui/app/search.js")),
     ("app/ui/palette.js", include_str!("../ui/app/ui/palette.js")),
     ("app/views/common.js", include_str!("../ui/app/views/common.js")),

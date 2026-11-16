@@ -40,9 +40,11 @@ export const sevDot = sev => html`<span class="dot ${sev ?? "none"}" aria-hidden
 
 export const dl = pairs => html`<dl>${pairs.filter(([, v]) => v != null && v !== "").map(([k, v]) => html`<dt>${k}</dt><dd>${v}</dd>`)}</dl>`;
 
-export function findingsBlock(list, title = "Hallazgos de este elemento") {
-  if (!list?.length) return html`<section><h3 class="sec">${title}</h3><p class="muted">Sin hallazgos.</p></section>`;
-  return html`<section><h3 class="sec">${title} <span class="n">${list.length}</span></h3>${list.map(f => html`
+// `level` is the heading level: 3 under the detail panel title, 2 in a page body.
+export function findingsBlock(list, title = "Hallazgos de este elemento", level = 3) {
+  const h = `h${level}`;
+  if (!list?.length) return html`<section><${raw(h)} class="sec">${title}</${raw(h)}><p class="muted">Sin hallazgos.</p></section>`;
+  return html`<section><${raw(h)} class="sec">${title} <span class="n">${list.length}</span></${raw(h)}>${list.map(f => html`
     <div class="finding"><div class="fh"><span class="sev ${f.severity}"><span class="dot ${f.severity}" aria-hidden="true"></span>${SEV_LABEL[f.severity] ?? f.severity}</span><code>${f.code}</code></div><div>${f.message}</div></div>`)}</section>`;
 }
 

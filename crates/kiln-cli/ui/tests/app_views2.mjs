@@ -143,6 +143,8 @@ export async function walkAppWizard({ Driver, chrome, name, port, check, shot })
     check(name, "app wizard: five steps, the first one current", (await count(d, ".steps li")) === 5 && /1 · proyecto/i.test(await text(d, ".steps li[aria-current=step]")));
     check(name, "app wizard: name field and the talk panel are there", (await count(d, "#wzName")) === 1 && (await count(d, "#wzTalk .msgs")) === 1 && (await count(d, "#tText")) === 1);
     check(name, "app wizard: the navigation is out of the way", !(await d.visible("nav.side")));
+    const heads = await d.page.eval(`(() => { const hs = [...document.querySelectorAll('h1,h2,h3')].filter(h => h.getClientRects().length); let prev = 0, bad = []; for (const h of hs) { const n = Number(h.tagName[1]); if (prev && n > prev + 1) bad.push(h.tagName); prev = n; } return { h1: hs.filter(h => h.tagName === 'H1').length, first: hs[0]?.tagName, bad }; })()`);
+    check(name, "a11y: the wizard has exactly one h1 and no skipped heading level", heads.h1 === 1 && heads.first === "H1" && heads.bad.length === 0, JSON.stringify(heads));
     await shot(d, "app-wizard-1.png");
     await d.clickAndSettle(`() => document.getElementById('wzNext')`);
     check(name, "app wizard: Seguir without a name says what is missing and stays", (await count(d, ".toast")) >= 1 && (await count(d, "#wzName")) === 1);

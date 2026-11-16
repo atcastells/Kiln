@@ -721,7 +721,7 @@ La página que abre `kiln serve` es una aplicación de módulos ES sin paso de c
 | medida | anterior, primera medida | anterior, ahora | nueva |
 |---|---:|---:|---:|
 | primera vista (pintada), ms | 379 | 70 | 68 |
-| cambiar a Catálogo, ms | 111 | 117 | 44 |
+| cambiar a Catálogo, ms | 111 | 117 | unos 45-60 (varía entre ejecuciones: 44 a 62) |
 | pulsación en el filtro del catálogo, ms | 74 | 65 | 1,3 |
 | pulsación en el buscador global, ms | 74 | 65 | 122 (incluye 120 de espera) |
 | nodos DOM, vista Catálogo | 8.158 | 8.160 | 413 |
@@ -730,6 +730,7 @@ La página que abre `kiln serve` es una aplicación de módulos ES sin paso de c
 | `/api/catalog` en frío (lectura forzada), ms | 330 | 396 | 396 |
 | `/api/catalog` con caché (304), ms | 330 | 23 | 22 |
 | memoria de JS tras recorrer las vistas, MB | 3,7 | 3,7 | 4,8 |
+| con 20.000 piezas (medida aparte, una ejecución): Catálogo abre en 49 ms con 24 filas y 413 nodos; pulsación en el filtro, 1,6 ms; `/api/catalog` en frío 1,5 s (9,3 MB) y 87 ms revalidado; memoria de JS, 21 MB | - | - | ver la fila |
 
 La primera vista de la interfaz antigua también mejoró (379 a unos 70 ms) porque el servidor ahora guarda el catálogo en memoria; la columna "en frío" fuerza una lectura completa del proyecto con la marca explícita, ya que las comprobaciones previas dejan la caché caliente.
 

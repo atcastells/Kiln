@@ -55,7 +55,9 @@ export async function walkAppA11y({ d, name, port, cat, check, note, shot }) {
   // ---- per-view audit
   const problems = { clickable: [], unnamed: [], unlabelled: [], skipped: [], noH1: [], live: [], overflow: [], ring: [] };
   const views = VIEWS.filter(v => v !== "content" || cat.content.length);
-  for (const view of views) {
+  // Detail routes too: the views behind a link have their own heading levels.
+  const detail = cat.specs?.some(s => s.asset.id === "cargo_quay") ? ["spec/cargo_quay", "build/cargo_quay"] : [];
+    const auditLoop = async list => { for (const view of list) {
     await openView(d, view);
     const a = await d.page.eval(AUDIT);
     a.clickable.forEach(x => problems.clickable.push(`${view}:${x}`));
@@ -71,15 +73,8 @@ export async function walkAppA11y({ d, name, port, cat, check, note, shot }) {
       const f = await d.page.eval(FOCUS_INFO);
       if (f && !f.ring) problems.ring.push(`${view}:${f.tag}#${f.id}.${f.cls} "${f.name}"`);
     }
-  }
-  check(name, "a11y: no element with a pointer cursor is out of the keyboard's reach", problems.clickable.length === 0, problems.clickable.slice(0, 6).join(" | "));
-  check(name, "a11y: every button and link has an accessible name", problems.unnamed.length === 0, problems.unnamed.slice(0, 4).join(" | "));
-  check(name, "a11y: every form input has a label", problems.unlabelled.length === 0, problems.unlabelled.slice(0, 4).join(" | "));
-  check(name, "a11y: headings never skip a level", problems.skipped.length === 0, problems.skipped.slice(0, 4).join(" | "));
-  check(name, "a11y: exactly one h1 per view", problems.noH1.length === 0, problems.noH1.join(" | "));
-  check(name, "a11y: landmarks and live regions (status, toasts, alerts) in every view", problems.live.length === 0, problems.live.slice(0, 3).join(" | "));
-  check(name, "a11y: every control reached with Tab shows a focus ring", problems.ring.length === 0, problems.ring.slice(0, 5).join(" | "));
-
+  } };
+  await auditLoop(views);
   // ---- the catalog grid exposes sort and size
   await openView(d, "catalog");
   const grid = await d.page.eval(`(() => { const g = document.querySelector('.vgrid'); if (!g) return null; return { rows: g.getAttribute('aria-rowcount'), sorts: [...g.querySelectorAll('[role=columnheader]')].every(h => h.hasAttribute('aria-sort')), n: g.querySelectorAll('[role=columnheader]').length }; })()`);
@@ -135,6 +130,16 @@ export async function walkAppA11y({ d, name, port, cat, check, note, shot }) {
     check(name, "keyboard: focus was never lost to <body> along the whole path", lost.length === 0, lost.slice(0, 5).join(", "));
   }
 
+  // ---- the detail routes (after the keyboard path: the build view moves focus around)
+  await auditLoop(detail);
+  check(name, "a11y: no element with a pointer cursor is out of the keyboard's reach", problems.clickable.length === 0, problems.clickable.slice(0, 6).join(" | "));
+  check(name, "a11y: every button and link has an accessible name", problems.unnamed.length === 0, problems.unnamed.slice(0, 4).join(" | "));
+  check(name, "a11y: every form input has a label", problems.unlabelled.length === 0, problems.unlabelled.slice(0, 4).join(" | "));
+  check(name, "a11y: headings never skip a level", problems.skipped.length === 0, problems.skipped.slice(0, 4).join(" | "));
+  check(name, "a11y: exactly one h1 per view", problems.noH1.length === 0, problems.noH1.join(" | "));
+  check(name, "a11y: landmarks and live regions (status, toasts, alerts) in every view", problems.live.length === 0, problems.live.slice(0, 3).join(" | "));
+  check(name, "a11y: every control reached with Tab shows a focus ring", problems.ring.length === 0, problems.ring.slice(0, 5).join(" | "));
+
   // ---- 900 px: no overflow in any view; the detail panel overlays and Esc closes it
   await d.page.send("Emulation.setDeviceMetricsOverride", { width: 900, height: 800, deviceScaleFactor: 1, mobile: false });
   const over = [];
@@ -151,4 +156,36 @@ export async function walkAppA11y({ d, name, port, cat, check, note, shot }) {
   check(name, "a11y: Esc closes the overlay panel and focus returns to Detalle", after.expanded === "false" && after.w === 0 && after.focus === "btnPanel", JSON.stringify(after));
   await d.page.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
   check(name, "a11y: walkthrough ran without JS errors", d.errors.length === mark0, d.errors.slice(mark0).join(" | "));
+}
+
+// Constraint: a 200-character kit or piece name must not widen the page.
+export async function walkLongNames({ d, name, port, check }) {
+  const cat = await (await fetch(`http://127.0.0.1:${port}/api/catalog`)).json();
+  const longKit = cat.kits.find(k => k.name.length >= 200), longPiece = cat.pieces.find(p => p.name.length >= 200);
+  check(name, "long names: the scratch project has a 200-character kit and piece", !!longKit && !!longPiece, JSON.stringify([cat.kits.map(k => k.name.length), cat.pieces.length]));
+  if (!longKit || !longPiece) return;
+  const e = encodeURIComponent, restOf = p => p.key.startsWith(p.kit + "/") ? p.key.slice(p.kit.length + 1) : p.key;
+  const routes = ["catalog", `catalog/${e(longKit.name)}`, ...cat.pieces.filter(p => p.name.length >= 200).map(p => `catalog/${e(p.kit)}/${restOf(p).split("/").map(e).join("/")}`)];
+  // the fields that overflowed in the field: a kit with a finding (a visually hidden
+  // status label sits after the long name), long manifest, licence and material text
+  check(name, "long names: the scratch project reaches every field (finding on the long kit, 5,000-character manifest and material text)",
+    cat.findings.some(f => f.subject.includes(longKit.name)) && cat.pieces.some(p => JSON.stringify(p.manifest ?? {}).length >= 5000) && cat.materials.some(m => (m.name ?? "").length >= 5000) && cat.pieces.some(p => Object.values(p.bindings ?? {}).some(v => v.length >= 200)),
+    JSON.stringify([cat.findings.length, cat.materials.map(m => (m.name ?? "").length)]));
+  const over = [];
+  for (const width of [1440, 900]) {
+    await d.page.send("Emulation.setDeviceMetricsOverride", { width, height: 900, deviceScaleFactor: 1, mobile: false });
+    for (const r of routes) {
+      await d.page.eval(`location.hash = '#/${r}'`);
+      await d.waitFor(`() => document.querySelector('#main [data-view]') && document.getElementById('main').getAttribute('aria-busy') === 'false'`);
+      await d.settle({ quiet: 250 });
+      const x = await d.page.eval(`document.documentElement.scrollWidth - innerWidth`);
+      await d.page.eval(`(() => { const b = document.getElementById('btnPanel'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); })()`); await d.settle({ quiet: 200 });
+      const xp = await d.page.eval(`document.documentElement.scrollWidth - innerWidth`);
+      if (xp > 0) over.push(`${width}:${r.slice(0, 40)}:panel:+${xp}`);
+      await d.page.eval(`(() => { const b = document.getElementById('btnPanel'); if (b && b.getAttribute('aria-expanded') === 'true') b.click(); })()`); await d.settle({ quiet: 150 });
+      if (x > 0) over.push(`${width}:${r.slice(0, 40)}:+${x}`);
+    }
+  }
+  await d.page.send("Emulation.setDeviceMetricsOverride", { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  check(name, "long names: no horizontal scroll on the catalog, kit and piece routes at 1440 and 900 px", over.length === 0, over.join(" | "));
 }

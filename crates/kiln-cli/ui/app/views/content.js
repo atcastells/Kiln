@@ -102,7 +102,7 @@ export function mount(el, ctx) {
     if (!cat || !d) { el.innerHTML = ""; return; }
     if (!cat.content?.length) {
       el.innerHTML = html`<div class="page" data-view="content" data-ready="1"><div class="pagehead"><div><h1>Contenido</h1><div class="sub">Datos del juego</div></div></div>
-        <div class="empty"><h3>Este proyecto no declara contenido</h3><p>Los conjuntos de contenido se declaran en kiln.toml, en [content.&lt;conjunto&gt;].</p></div></div>`.toString();
+        <div class="empty"><h2>Este proyecto no declara contenido</h2><p>Los conjuntos de contenido se declaran en kiln.toml, en [content.&lt;conjunto&gt;].</p></div></div>`.toString();
       return;
     }
     const total = cat.content.reduce((n, s) => n + s.elements.length, 0);

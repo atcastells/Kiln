@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { derive, routeOfSubject } from "../../app/derive.js";
 import { navModel } from "../../app/nav.js";
-import { nextStep, isEmptyProject } from "../../app/views/home.js";
+import { nextStep, isEmptyProject, emptyProject } from "../../app/views/home.js";
 
 const f = (severity, subject, message = "m") => ({ severity, subject, code: "c", message });
 function cat(over = {}) {
@@ -76,4 +76,13 @@ test("Astra-like project (no kits, one content set) is not an empty project", ()
   assert.equal(s.key, "ok");
   assert.equal(s.actions[0].route.view, "content");
   assert.equal(isEmptyProject(cat({ kits: [], pieces: [], materials: [], tree: { nodes: { g: {} } } })), true);
+});
+
+test("home: the action to import or ask for a piece goes to the request flow, never to the root", () => {
+  const s = nextStep(cat({ kits: [], pieces: [] }), derive(cat({ kits: [], pieces: [] })));
+  assert.deepEqual(s.actions[0].route, { view: "spec", args: [] });
+  assert.equal(s.actions[0].href, undefined);
+  const m = emptyProject().toString();
+  assert.match(m, /href="#\/spec">Importar o pedir una pieza/);
+  assert.doesNotMatch(m, /href="\/"/);
 });

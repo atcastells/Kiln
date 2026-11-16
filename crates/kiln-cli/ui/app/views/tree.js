@@ -193,7 +193,7 @@ export function mount(el, ctx) {
     if (!cat || !d) { el.innerHTML = ""; return; }
     if (!cat.tree || !Object.keys(cat.tree.nodes ?? {}).length) {
       el.innerHTML = html`<div class="page" data-view="tree" data-ready="1"><div class="pagehead"><div><h1>Árbol</h1><div class="sub">Cómo se organiza el juego</div></div></div>
-        <div class="empty"><h3>Este proyecto todavía no tiene árbol</h3><p>El árbol sale de las fichas de assets y de los niveles que declara kiln.toml.</p></div></div>`.toString();
+        <div class="empty"><h2>Este proyecto todavía no tiene árbol</h2><p>El árbol sale de las fichas de assets y de los niveles que declara kiln.toml.</p></div></div>`.toString();
       return;
     }
     model = treeModel(cat, d);

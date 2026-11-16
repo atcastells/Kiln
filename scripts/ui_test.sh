@@ -26,6 +26,49 @@ KILN="$PWD/target/debug/kiln"
 scripts/ui_fixture.sh "$OUT/synthetic" >/dev/null
 mkdir "$OUT/empty"   # a folder without kiln.toml opens the start wizard
 
+# a scratch copy of the examples where a long unbroken string (200 and 5,000
+# characters) sits in every kind of field that reaches the catalog view: kit
+# folder and piece file (200: the file-name limit), kit manifest fields, licence
+# text, a material name bound to a slot, and findings (a ghost piece named by
+# the manifest, a spec part that points at a piece that does not exist)
+cp -R examples "$OUT/longnames"
+node - "$OUT/longnames" <<'JS'
+const fs = require("fs"), path = require("path");
+const root = process.argv[2], kits = path.join(root, "godot/kits");
+const L2 = "k".repeat(200), L5 = "m".repeat(5000), P2 = "p".repeat(200), G2 = "g".repeat(200);
+fs.renameSync(path.join(kits, "props"), path.join(kits, L2));
+fs.renameSync(path.join(kits, "harbor/crate.glb"), path.join(kits, `harbor/${P2}.glb`));
+fs.renameSync(path.join(kits, `${L2}/rope_coil.glb`), path.join(kits, `${L2}/${P2}.glb`));
+for (const k of [L2, "harbor"]) {
+  fs.writeFileSync(path.join(kits, k, "LICENSE.md"), `# ${L2}\nCC0 1.0\n${L5}\n`);
+  fs.writeFileSync(path.join(kits, k, "manifest.json"), JSON.stringify({
+    [P2]: { credit: L5, author: L2, source_url: L5, license: "CC0", [L2]: L5 },
+    [G2]: { credit: L2, url: L5 },
+  }));
+}
+fs.appendFileSync(path.join(root, "data/materials.toml"),
+  `\n[[materials]]\nid = "${L2}"\nname = "${L5}"\ncolor = [0.1, 0.2, 0.3]\n\n[[materials]]\nid = "short_key"\nname = "${L2}"\ncolor = [0.3, 0.2, 0.1]\n`);
+fs.mkdirSync(path.join(root, "kiln"), { recursive: true });
+fs.writeFileSync(path.join(root, "kiln/bindings.toml"),
+  `["harbor/${P2}"]\nWood = "${L2}"\nIron = "short_key"\n\n["${L2}/${P2}"]\n${JSON.stringify(L2)} = "${L2}"\n`);
+fs.writeFileSync(path.join(root, "specs/longnames.toml"), `[asset]
+id = "longnames"
+name = "${L5}"
+asked = "${L2}"
+status = "layout"
+notes = "${L5}"
+
+[[parts]]
+id = "${L2}"
+what = "${L5}"
+count = 1
+size_m = [1, 1, 1]
+material = "${L2}"
+source = { kind = "reuse", from = "${L2}/${G2}", why = "${L5}" }
+at = [[0, 0, 0]]
+`);
+JS
+
 free_port() { node -e 'const s=require("net").createServer().listen(0,"127.0.0.1",()=>{console.log(s.address().port);s.close()})'; }
 ARGS=()
 serve() { # name dir
@@ -40,6 +83,7 @@ serve examples examples
 serve content examples/content
 serve synthetic "$OUT/synthetic"
 serve wizard "$OUT/empty"
+serve longnames "$OUT/longnames"
 
 set +e
 node crates/kiln-cli/ui/tests/walkthrough.mjs --out "$OUT" ${ARGS[@]+"${ARGS[@]}"} $UPDATE
