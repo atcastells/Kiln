@@ -19,6 +19,7 @@ const TABLE: &[(&str, Cover)] = &[
     ("GET /api/new", Tool(&["new_game_options"])),
     ("POST /api/new", Tool(&["new_game"])),
     ("GET /api/jobs/*", Tool(&["job", "jobs"])),
+    ("GET /api/jobs", Tool(&["jobs"])),
     ("GET /api/catalog", Tool(&["catalog"])),
     ("GET /api/context", Tool(&["context_get"])),
     ("POST /api/ask", Prompt("kiln-asset", &["spec_write", "spec_layout"])),
@@ -60,6 +61,16 @@ fn routes(src: &str) -> BTreeSet<String> {
                     out.insert(format!("{method} {}", &rest[..end]));
                 }
             }
+            // a route answered before the match: `req.method == "GET" && req.path == "/api/.."`
+            let cond = format!("req.method == \"{method}\" && req.path == \"");
+            if let Some(i) = line.find(&cond) {
+                let rest = &line[i + cond.len()..];
+                if let Some(end) = rest.find('"')
+                    && rest[..end].starts_with("/api/")
+                {
+                    out.insert(format!("{method} {}", &rest[..end]));
+                }
+            }
             let pre = format!("(\"{method}\", p) if p.starts_with(\"");
             if let Some(i) = line.find(&pre) {
                 let rest = &line[i + pre.len()..];
@@ -93,6 +104,12 @@ fn extractor_finds_literal_and_prefix_arms() {
     "#;
     let r = routes(sample);
     assert_eq!(r.into_iter().collect::<Vec<_>>(), ["GET /api/one", "POST /api/two/*"]);
+}
+
+#[test]
+fn extractor_finds_a_route_answered_before_the_match() {
+    let sample = r#"    if req.method == "GET" && req.path == "/api/early" {"#;
+    assert!(routes(sample).contains("GET /api/early"));
 }
 
 #[test]

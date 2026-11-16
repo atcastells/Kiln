@@ -3,7 +3,7 @@
 //!   kiln index  --project DIR [--config FILE] [--out FILE]   catalog as JSON
 //!   kiln check  --project DIR [--config FILE]                findings; exit 1 on errors
 //!   kiln mcp    --project DIR [--config FILE]                MCP over stdio, for Claude Code
-//!   kiln serve  --project DIR [--config FILE] [--port 4330]  the graph at http://127.0.0.1:PORT
+//!   kiln serve  --project DIR [--config FILE] [--port 4330] [--ui-dir DIR]  the graph at http://127.0.0.1:PORT (--ui-dir: read the new UI from disk)
 //!   kiln build  --project DIR [--config FILE] --asset ID     assemble an asset in Blender
 //!   kiln paint  --project DIR [--config FILE] --asset ID [--variant ID]   wear its materials again, no assembling
 //!   kiln godot  --project DIR [--config FILE]                Godot measures its own pieces
@@ -32,6 +32,7 @@ struct Args {
     asset: Option<String>,
     variant: Option<String>,
     set: Option<String>,
+    ui_dir: Option<PathBuf>,
 }
 
 fn parse() -> Result<Args, String> {
@@ -46,6 +47,7 @@ fn parse() -> Result<Args, String> {
         asset: None,
         variant: None,
         set: None,
+        ui_dir: None,
     };
     while let Some(flag) = it.next() {
         let mut val = || it.next().ok_or(format!("falta el valor de {flag}"));
@@ -56,6 +58,7 @@ fn parse() -> Result<Args, String> {
             "--asset" => a.asset = Some(val()?),
             "--variant" => a.variant = Some(val()?),
             "--set" => a.set = Some(val()?),
+            "--ui-dir" => a.ui_dir = Some(PathBuf::from(val()?)),
             "--port" => a.port = val()?.parse().map_err(|_| "--port debe ser un número")?,
             other => return Err(format!("opción desconocida {other}\n{USAGE}")),
         }
@@ -65,7 +68,7 @@ fn parse() -> Result<Args, String> {
     Ok(a)
 }
 
-const USAGE: &str = "uso: kiln <index|check|mcp|serve|build|paint|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--asset ID] [--variant ID] [--set NAME]";
+const USAGE: &str = "uso: kiln <index|check|mcp|serve|build|paint|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--ui-dir DIR] [--asset ID] [--variant ID] [--set NAME]";
 
 pub fn load(
     project: &std::path::Path,
@@ -135,7 +138,7 @@ fn main() -> ExitCode {
                 })
             }
             "mcp" => mcp::run(args.project.clone(), args.config.clone()).map(|_| ExitCode::SUCCESS),
-            "serve" => serve::run(args.project.clone(), args.config.clone(), args.port)
+            "serve" => serve::run(args.project.clone(), args.config.clone(), args.port, args.ui_dir.clone())
                 .map(|_| ExitCode::SUCCESS),
             "build" => {
                 let id = args.asset.as_deref().ok_or("falta --asset ID")?;

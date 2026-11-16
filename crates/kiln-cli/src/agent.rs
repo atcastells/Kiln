@@ -28,6 +28,15 @@ pub struct Job {
     /// What the agent offers for the wizard, from its `kiln` block.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub offer: Option<kiln_core::chat::Offer>,
+    /// ask | layout | sort | refine | chat, or the first word of a tool job
+    /// (montar, revisar, ...).
+    pub kind: String,
+    /// Unix seconds when the job was created.
+    pub started: u64,
+}
+
+fn now_secs() -> u64 {
+    SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
 
 pub type Jobs = Arc<Mutex<Vec<Job>>>;
@@ -63,6 +72,12 @@ pub fn start(jobs: &Jobs, ctx: Arc<Ctx>, task: Task) -> u64 {
         Task::Refine(None) => "preguntas para afinar el contexto".into(),
         Task::Refine(Some(l)) => format!("preguntas sobre la capa {l}"),
     };
+    let kind = match &task {
+        Task::Ask(_) => "ask",
+        Task::Layout(_) => "layout",
+        Task::Sort => "sort",
+        Task::Refine(_) => "refine",
+    };
     let id = {
         let mut j = jobs.lock().unwrap();
         let id = j.len() as u64 + 1;
@@ -74,6 +89,8 @@ pub fn start(jobs: &Jobs, ctx: Arc<Ctx>, task: Task) -> u64 {
             spec: None,
             reply: None,
             offer: None,
+            kind: kind.into(),
+            started: now_secs(),
         });
         id
     };
@@ -109,6 +126,7 @@ where
     let id = {
         let mut j = jobs.lock().unwrap();
         let id = j.len() as u64 + 1;
+        let kind = asked.split_whitespace().next().unwrap_or("job").to_string();
         j.push(Job {
             id,
             asked,
@@ -117,6 +135,8 @@ where
             spec: None,
             reply: None,
             offer: None,
+            kind,
+            started: now_secs(),
         });
         id
     };
@@ -249,6 +269,8 @@ pub fn chat(jobs: &Jobs, project: PathBuf, ctx: Option<Arc<Ctx>>, turn: Turn) ->
             spec: None,
             reply: None,
             offer: None,
+            kind: "chat".into(),
+            started: now_secs(),
         });
         id
     };

@@ -13,11 +13,6 @@ fn to_json<T: serde::Serialize>(v: &T) -> Result<Value, String> {
     serde_json::to_value(v).map_err(|e| e.to_string())
 }
 
-/// The whole catalog, as `/api/catalog` serves it.
-pub fn catalog_json(ctx: &Ctx) -> Result<Value, String> {
-    to_json(&load(ctx)?)
-}
-
 fn counts(cat: &Catalog) -> Value {
     let n = |s: Severity| cat.findings.iter().filter(|f| f.severity == s).count();
     json!({ "error": n(Severity::Error), "warn": n(Severity::Warn), "info": n(Severity::Info) })
@@ -144,13 +139,6 @@ mod tests {
     fn at(sub: &str) -> Ctx {
         let dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../examples").join(sub);
         super::super::ctx(&std::fs::canonicalize(dir).unwrap(), None).unwrap()
-    }
-
-    #[test]
-    fn catalog_json_is_the_served_catalog() {
-        let c = at("");
-        let cat = crate::load(&c.project, None).unwrap();
-        assert_eq!(catalog_json(&c).unwrap(), serde_json::to_value(&cat).unwrap());
     }
 
     #[test]
