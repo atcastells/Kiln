@@ -1,0 +1,1567 @@
+<!doctype html>
+<html lang="es" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kiln · maqueta</title>
+<style>
+/* =========================================================================
+   KILN · MAQUETA K003  (solo para aprobar; no es codigo de produccion)
+   Identidad visual: paleta, tipografias y tono de la interfaz actual.
+   Cambia la jerarquia: barra superior, navegacion lateral, zona de trabajo,
+   panel de detalle plegable.
+   ========================================================================= */
+
+/* ---- 1. Tokens: color (dos temas), espaciado, tipografia ---------------- */
+:root {
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+  --r1: 6px; --r2: 10px;
+  --font: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, "Cascadia Mono", Menlo, monospace;
+  --topbar: 52px; --nav: 216px; --detail: 340px;
+}
+[data-theme="light"] {
+  color-scheme: light;
+  --bg: #eef0ec; --panel: #ffffff; --panel2: #f6f7f4; --fg: #1d221c; --muted: #5d6658;
+  --line: #c5cbbf; --line2: #dfe3da; --line-ui: #7d8678; --accent: #b4561f; --accent-text: #9a4415; --accent-fg: #ffffff; --accent-soft: #f6e4d8;
+  --ok: #2f6b2c; --okbg: #e3efdf; --warn: #855600; --warnbg: #f7ecd2; --bad: #a3322a; --badbg: #f6e0dc;
+  --info: #2a567f; --infobg: #dde8f2; --shadow: 0 8px 28px rgb(29 34 28 / .18);
+}
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #161a15; --panel: #1f241e; --panel2: #1a1f19; --fg: #e6eae2; --muted: #9aa393;
+  --line: #3a4237; --line2: #2c332a; --line-ui: #6b7667; --accent: #e08a4e; --accent-text: #e08a4e; --accent-fg: #161a15; --accent-soft: #3a2a1d;
+  --ok: #8cc887; --okbg: #22331f; --warn: #e2b04f; --warnbg: #3a2f17; --bad: #ec8476; --badbg: #3d221e;
+  --info: #8ab8e2; --infobg: #1d2b38; --shadow: 0 8px 28px rgb(0 0 0 / .5);
+}
+
+/* ---- 2. Base ------------------------------------------------------------ */
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body { background: var(--bg); color: var(--fg); font: 14px/1.45 var(--font); font-variant-numeric: tabular-nums; overflow: hidden; }
+h1, h2, h3, p, ul, ol, dl, dd { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+a { color: var(--accent-text); text-underline-offset: 2px; }
+a:hover { text-decoration-thickness: 2px; }
+code, kbd, .mono { font-family: var(--mono); }
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 3px; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.muted { color: var(--muted); }
+.grow { flex: 1; }
+kbd { font: 500 11px var(--mono); padding: 1px 6px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; color: var(--muted); background: var(--panel2); }
+@keyframes spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+
+/* ---- 3. Controles ------------------------------------------------------- */
+.btn { position: relative; font: 600 13px var(--font); padding: 6px 12px; border-radius: var(--r1); border: 1px solid var(--line-ui); background: var(--panel); color: var(--fg); cursor: pointer; white-space: nowrap; line-height: 1.4; }
+.btn:hover { border-color: var(--muted); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-fg); }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ghost { background: transparent; }
+.btn.sm { font-size: 12px; padding: 3px 9px; }
+.btn[aria-disabled="true"] { opacity: .62; cursor: not-allowed; border-style: dashed; }
+.btn[aria-disabled="true"]:hover { border-color: var(--line-ui); filter: none; }
+.btn[data-tip]::after { content: attr(data-tip); position: absolute; z-index: 60; top: calc(100% + 6px); left: 0; width: 250px; padding: var(--s2) var(--s3); border-radius: var(--r1); background: var(--fg); color: var(--bg); font: 500 12px/1.4 var(--font); white-space: normal; text-align: left; box-shadow: var(--shadow); opacity: 0; pointer-events: none; transform: translateY(-2px); transition: opacity .12s, transform .12s; }
+.btn[data-tip][data-tip-align="right"]::after { left: auto; right: 0; }
+.btn[data-tip]:hover::after, .btn[data-tip]:focus-visible::after { opacity: 1; transform: none; }
+.iconbtn { border: 0; background: transparent; color: var(--muted); width: 28px; height: 28px; border-radius: var(--r1); font: 400 20px/1 var(--font); cursor: pointer; flex: none; }
+.iconbtn:hover { background: var(--line2); color: var(--fg); }
+.field { font: inherit; padding: 6px 10px; border: 1px solid var(--line-ui); border-radius: var(--r1); background: var(--panel); color: var(--fg); min-width: 0; }
+.field::placeholder { color: var(--muted); }
+.field:focus-visible { outline-offset: 0; border-color: var(--accent); }
+
+/* severidad: forma + color (no depende solo del color) */
+.dot { display: inline-block; width: 9px; height: 9px; flex: none; }
+.dot.error { background: var(--bad); border-radius: 50%; }
+.dot.warn { background: var(--warn); clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.dot.info { border: 2px solid var(--info); border-radius: 50%; }
+.dot.ok { background: var(--ok); border-radius: 50%; }
+.dot.busy { border: 2px solid var(--accent); border-top-color: transparent; border-radius: 50%; animation: spin 1s linear infinite; }
+.dot.none { visibility: hidden; }
+.sev { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; white-space: nowrap; }
+.sev.error { color: var(--bad); } .sev.warn { color: var(--warn); } .sev.info { color: var(--info); } .sev.ok { color: var(--ok); }
+.tag { font: 500 11px var(--mono); color: var(--muted); border: 1px solid var(--line); border-radius: 4px; padding: 2px 6px; white-space: nowrap; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font: 500 12px var(--font); padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line-ui); background: var(--panel); color: var(--fg); cursor: pointer; }
+.chip b { font-weight: 600; color: var(--muted); }
+.chip[aria-pressed="true"] { background: var(--accent-soft); border-color: var(--accent); }
+.chip[aria-pressed="true"] b { color: var(--fg); }
+.meter { height: 6px; border-radius: 3px; background: var(--line2); overflow: hidden; }
+.meter i { display: block; height: 100%; background: var(--accent); }
+.meter.bad i { background: var(--bad); }
+.meter.ok i { background: var(--ok); }
+
+/* ---- 4. Armazon: barra superior, navegacion, trabajo, detalle ----------- */
+.app { display: grid; grid-template-rows: var(--topbar) minmax(0, 1fr); height: 100vh; height: 100dvh; }
+.topbar { display: flex; align-items: center; gap: var(--s3); padding: 0 var(--s4); background: var(--panel); border-bottom: 1px solid var(--line); position: relative; z-index: 40; }
+.brand { display: flex; align-items: center; gap: var(--s2); width: calc(var(--nav) - var(--s4)); flex: none; }
+.brand strong { font-size: 18px; letter-spacing: -.01em; }
+.mark { width: 16px; height: 16px; border-radius: 4px; background: var(--accent); box-shadow: inset 0 -6px 0 rgb(0 0 0 / .18); }
+.search { position: relative; flex: 0 1 460px; min-width: 140px; }
+.search .field { width: 100%; padding-right: 36px; }
+.search kbd { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); pointer-events: none; }
+.sres { position: absolute; top: calc(100% + 6px); left: 0; width: max(100%, 480px); max-height: min(70vh, 520px); overflow: auto; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r2); box-shadow: var(--shadow); padding: var(--s2); z-index: 50; }
+.sres h3, .pal h3 { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: var(--s2) var(--s2) var(--s1); }
+.opt { display: flex; align-items: baseline; gap: var(--s3); padding: 6px var(--s2); border-radius: var(--r1); cursor: pointer; font-size: 13px; }
+.opt .t { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.opt .t.mono { font-size: 12.5px; }
+.opt .h { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; padding-left: var(--s3); }
+.opt[aria-selected="true"], .opt:hover { background: var(--accent-soft); }
+.opt[aria-disabled="true"] { opacity: .6; }
+mark { background: transparent; color: inherit; font-weight: 700; text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 2px; }
+.sfoot { border-top: 1px solid var(--line2); margin-top: var(--s2); padding: var(--s2) var(--s2) var(--s1); font-size: 12px; color: var(--muted); }
+.status { display: flex; align-items: center; gap: var(--s2); font-size: 12.5px; color: var(--muted); min-width: 0; padding: 0 var(--s2); }
+.status a { color: var(--fg); font-weight: 600; text-decoration: none; padding: 3px 10px; border-radius: 999px; background: var(--accent-soft); border: 1px solid var(--accent); display: inline-flex; align-items: center; gap: var(--s2); min-width: 0; }
+.status a span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.status .idle { display: inline-flex; align-items: center; gap: var(--s2); white-space: nowrap; }
+
+.shell { display: grid; grid-template-columns: var(--nav) minmax(0, 1fr); min-height: 0; }
+.shell.with-detail { grid-template-columns: var(--nav) minmax(0, 1fr) var(--detail); }
+nav.side { padding: var(--s4) var(--s3); display: flex; flex-direction: column; gap: var(--s1); overflow: auto; border-right: 1px solid var(--line2); }
+nav.side h2 { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: var(--s4) var(--s3) var(--s1); }
+nav.side h2:first-child { display: none; }
+nav.side a { display: grid; grid-template-columns: 12px 1fr auto; align-items: center; gap: var(--s2); padding: 7px var(--s3); border-radius: var(--r1); color: var(--fg); text-decoration: none; font-weight: 500; }
+nav.side a:hover { background: var(--panel); }
+nav.side a[aria-current="page"] { background: var(--panel); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent), 0 0 0 1px var(--line2); }
+nav.side .cnt { font: 500 12px var(--mono); color: var(--muted); }
+nav.side .hint { margin-top: auto; margin-bottom: 40px; padding: var(--s3); font-size: 12px; color: var(--muted); line-height: 1.7; }
+.work { overflow: auto; padding: var(--s5); min-width: 0; }
+.work:focus { outline: none; }
+#detail { display: none; background: var(--panel); border-left: 1px solid var(--line); overflow: auto; }
+.with-detail #detail { display: block; }
+
+.page { display: flex; flex-direction: column; gap: var(--s5); max-width: 1180px; }
+.page.fill { height: 100%; gap: var(--s4); max-width: none; }
+.pagehead { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--s4); flex-wrap: wrap; }
+.pagehead h1 { font-size: 20px; line-height: 1.25; letter-spacing: -.01em; }
+.pagehead .sub { color: var(--muted); font-size: 13px; margin-top: 2px; }
+.sec { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin-bottom: var(--s2); display: flex; align-items: center; gap: var(--s2); }
+.sec .n { font-weight: 500; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r2); }
+.crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s2); font-size: 13px; color: var(--muted); }
+.crumbs a { color: var(--fg); }
+.crumbs li + li::before { content: "/"; margin-right: var(--s2); color: var(--line); }
+.crumbs [aria-current] { font-weight: 600; color: var(--fg); }
+
+/* ---- 5. Inicio ---------------------------------------------------------- */
+.home-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--s5); align-items: start; }
+.home-grid > div { display: flex; flex-direction: column; gap: var(--s5); min-width: 0; }
+.tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--s3); }
+.tile { display: block; text-decoration: none; color: var(--fg); padding: var(--s3) var(--s4); background: var(--panel); border: 1px solid var(--line); border-radius: var(--r2); }
+.tile:hover { border-color: var(--accent); }
+.tile .v { font-size: 26px; font-weight: 650; letter-spacing: -.02em; line-height: 1.2; }
+.tile .l { font-size: 13px; font-weight: 600; }
+.tile .d { font-size: 12px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile.zero .v { color: var(--muted); }
+.issues { overflow: hidden; }
+.issues .gh { display: flex; align-items: center; gap: var(--s3); padding: var(--s3) var(--s4); border-bottom: 1px solid var(--line2); background: var(--panel2); }
+.issues .gh .t { font-weight: 600; }
+.issues .gh a { margin-left: auto; font-size: 12.5px; font-weight: 600; }
+.issues li + li { border-top: 1px solid var(--line2); }
+.issues .gh:not(:first-child) { border-top: 1px solid var(--line); }
+.issue { display: grid; grid-template-columns: minmax(150px, 230px) minmax(0, 1fr) 130px; gap: var(--s3); align-items: baseline; padding: 7px var(--s4); color: var(--fg); text-decoration: none; font-size: 13px; }
+.issue:hover { background: var(--accent-soft); }
+.issue .m { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.issue .w { color: var(--muted); font-size: 12px; text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.issue .mono { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.calm { display: flex; gap: var(--s4); align-items: center; padding: var(--s5); background: var(--okbg); border: 1px solid var(--ok); border-radius: var(--r2); color: var(--fg); }
+.calm svg { width: 28px; height: 28px; color: var(--ok); flex: none; }
+.calm b { display: block; font-size: 15px; }
+.calm span { color: var(--muted); font-size: 13px; }
+.next { padding: var(--s4); border-color: var(--accent); box-shadow: inset 3px 0 0 var(--accent); display: flex; flex-direction: column; gap: var(--s3); }
+.next h3 { font-size: 16px; line-height: 1.3; }
+.next p { color: var(--muted); font-size: 13px; }
+.next .row { display: flex; gap: var(--s2); flex-wrap: wrap; }
+.jobmini { padding: var(--s3) var(--s4); display: flex; flex-direction: column; gap: var(--s2); }
+.jobmini .top { display: flex; justify-content: space-between; gap: var(--s3); font-size: 13px; }
+.joblist li + li { border-top: 1px solid var(--line2); }
+.joblist a { display: flex; align-items: center; gap: var(--s2); padding: var(--s2) var(--s4); color: var(--fg); text-decoration: none; font-size: 13px; }
+.joblist a:hover { background: var(--accent-soft); }
+.joblist .when { margin-left: auto; color: var(--muted); font-size: 12px; }
+
+/* ---- 6. Estados vacios -------------------------------------------------- */
+.empty { display: flex; flex-direction: column; align-items: center; text-align: center; gap: var(--s3); padding: var(--s6) var(--s5); border: 1px dashed var(--line); border-radius: var(--r2); background: var(--panel2); }
+.empty svg { width: 32px; height: 32px; color: var(--muted); }
+.empty h3 { font-size: 16px; }
+.empty p { color: var(--muted); font-size: 13px; max-width: 460px; }
+.empty ol { text-align: left; font-size: 13px; counter-reset: s; display: flex; flex-direction: column; gap: var(--s2); }
+.empty ol li { counter-increment: s; padding-left: 28px; position: relative; }
+.empty ol li::before { content: counter(s); position: absolute; left: 0; top: 0; width: 20px; height: 20px; border-radius: 50%; background: var(--line2); text-align: center; font: 600 11px/20px var(--mono); }
+.empty.small { padding: var(--s5) var(--s4); border: 0; background: transparent; }
+
+/* ---- 7. Listas con dos columnas, barra de herramientas, tabla virtual --- */
+.split { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: var(--s4); flex: 1; min-height: 0; }
+.sidelist { overflow: auto; padding: var(--s2); }
+.sidelist h2 { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); padding: var(--s2) var(--s2) var(--s1); }
+.sidelist a { display: grid; grid-template-columns: 12px 1fr auto; align-items: center; gap: var(--s2); padding: 6px var(--s2); border-radius: var(--r1); color: var(--fg); text-decoration: none; font-size: 13px; }
+.sidelist a:hover { background: var(--panel2); }
+.sidelist a[aria-current="true"] { background: var(--accent-soft); font-weight: 600; box-shadow: inset 3px 0 0 var(--accent); }
+.sidelist a > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sidelist .cnt { font: 500 12px var(--mono); color: var(--muted); }
+.sidelist hr { border: 0; border-top: 1px solid var(--line2); margin: var(--s2) 0; }
+.pane { display: flex; flex-direction: column; gap: var(--s3); min-width: 0; min-height: 0; }
+.toolbar { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+.toolbar .field { flex: 0 1 260px; }
+.toolbar .count { font-size: 13px; color: var(--muted); white-space: nowrap; }
+.toolbar .count b { color: var(--fg); }
+.chips { display: flex; gap: var(--s2); flex-wrap: wrap; }
+.vgrid { flex: 1; min-height: 0; display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--line); border-radius: var(--r2); overflow: hidden; --cols: 1fr; }
+.vgrid:focus-visible { outline-offset: -2px; }
+.vh { display: grid; grid-template-columns: var(--cols); align-items: center; gap: var(--s3); padding: 0 var(--s4); height: 34px; border-bottom: 1px solid var(--line); background: var(--panel2); flex: none; }
+.vh > div { min-width: 0; display: flex; }
+.vh > .r { justify-content: flex-end; }
+.hbtn { all: unset; cursor: pointer; font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; padding: 4px 0; white-space: nowrap; }
+.hbtn:hover, .hbtn[data-on] { color: var(--fg); }
+.hbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.hbtn .arr { width: 0; height: 0; border-left: 4px solid transparent; border-right: 4px solid transparent; border-bottom: 5px solid currentColor; opacity: 0; }
+.hbtn[data-on] .arr { opacity: 1; }
+.hbtn[data-dir="-1"] .arr { transform: rotate(180deg); }
+.vb { flex: 1; overflow: auto; position: relative; }
+.vs { position: relative; }
+.vr { position: absolute; left: 0; right: 0; top: 0; }
+.vrow { display: grid; grid-template-columns: var(--cols); align-items: center; gap: var(--s3); padding: 0 var(--s4); border-bottom: 1px solid var(--line2); font-size: 13px; cursor: pointer; }
+.vrow:hover { background: var(--panel2); }
+.vrow.sel { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.vrow.act { outline: 2px solid var(--accent); outline-offset: -2px; }
+.vgrid:not(:focus-within) .vrow.act { outline: 0; }
+.vc { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.vc.r { text-align: right; }
+.vc.mono { font-size: 12.5px; }
+.vc.bad { color: var(--bad); font-weight: 600; }
+.vfoot { flex: none; padding: 5px var(--s4); border-top: 1px solid var(--line); background: var(--panel2); font: 500 11.5px var(--mono); color: var(--muted); display: flex; justify-content: space-between; gap: var(--s3); }
+.vnone { padding: var(--s6) var(--s4); }
+
+/* ---- 8. Arbol (esquema plegable) --------------------------------------- */
+.tree { overflow: auto; padding: var(--s2); flex: 1; min-height: 0; }
+.trow { display: grid; grid-template-columns: 20px 78px minmax(0, 1fr) auto auto; align-items: center; gap: var(--s2); padding: 0 var(--s3); height: 34px; border-radius: var(--r1); cursor: pointer; font-size: 13.5px; }
+.trow:hover { background: var(--panel2); }
+.trow[aria-selected="true"] { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.trow .tw { display: flex; align-items: center; gap: var(--s2); min-width: 0; }
+.trow .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
+.trow[aria-level="1"] .nm, .trow[aria-level="2"] .nm { font-weight: 650; }
+.trow .kd { font: 500 10.5px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.trow .ct { font: 500 12px var(--mono); color: var(--muted); text-align: right; min-width: 78px; }
+.trow .sv { min-width: 74px; display: flex; justify-content: flex-end; }
+.chev { all: unset; width: 20px; height: 20px; display: grid; place-items: center; cursor: pointer; border-radius: 4px; }
+.chev:hover { background: var(--line2); }
+.chev::before { content: ""; width: 6px; height: 6px; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); transition: transform .12s; }
+.trow[aria-expanded="true"] .chev::before { transform: rotate(45deg); }
+.trow:not([aria-expanded]) .chev { visibility: hidden; }
+.tree-guides .trow { position: relative; }
+
+/* ---- 9. Contexto -------------------------------------------------------- */
+.ctx { display: grid; grid-template-columns: minmax(0, 1fr) 330px; gap: var(--s5); align-items: start; }
+.layers { display: flex; flex-direction: column; gap: var(--s4); }
+.layer .lh { display: flex; align-items: baseline; gap: var(--s3); padding: var(--s3) var(--s4); border-bottom: 1px solid var(--line2); }
+.layer .lh h3 { font-size: 15px; }
+.layer .lh span { margin-left: auto; font-size: 12px; color: var(--muted); }
+.claim { display: grid; grid-template-columns: 82px minmax(0, 1fr) auto; gap: var(--s3); align-items: baseline; padding: 9px var(--s4); text-decoration: none; color: var(--fg); font-size: 13.5px; }
+.claim + .claim { border-top: 1px solid var(--line2); }
+.claim:hover { background: var(--panel2); }
+.claim[aria-current="true"] { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.claim .src { font: 12px var(--mono); color: var(--muted); }
+.state { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .05em; padding: 1px 7px; border-radius: 4px; text-align: center; }
+.state.set { background: var(--okbg); color: var(--ok); }
+.state.open { background: transparent; color: var(--warn); border: 1px dashed var(--warn); }
+.qs { display: flex; flex-direction: column; gap: var(--s3); position: sticky; top: 0; }
+.q { padding: var(--s4); display: flex; flex-direction: column; gap: var(--s3); }
+.q p { font-weight: 600; font-size: 14px; }
+.q .opts { display: flex; flex-direction: column; gap: var(--s2); }
+.q .opts .btn { text-align: left; font-weight: 500; white-space: normal; }
+.q.done { background: var(--panel2); border-style: dashed; }
+.q.done p { color: var(--muted); font-weight: 500; }
+.seg { display: inline-flex; border: 1px solid var(--line-ui); border-radius: var(--r1); overflow: hidden; background: var(--panel); }
+.seg a { padding: 5px 12px; font: 600 12.5px var(--font); color: var(--fg); text-decoration: none; }
+.seg a + a { border-left: 1px solid var(--line); }
+.seg a[aria-current="true"] { background: var(--accent); color: var(--accent-fg); }
+.seg a:focus-visible { outline-offset: -3px; }
+
+/* ---- 10. Trabajos ------------------------------------------------------- */
+.jlist { overflow: auto; padding: var(--s2); }
+.jlist a { display: block; padding: var(--s3); border-radius: var(--r1); text-decoration: none; color: var(--fg); }
+.jlist a + a { margin-top: 2px; }
+.jlist a:hover { background: var(--panel2); }
+.jlist a[aria-current="true"] { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.jlist .jn { font-weight: 600; font-size: 13px; display: block; margin-bottom: 3px; }
+.jlist .jm { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--muted); }
+.jdet { display: flex; flex-direction: column; gap: var(--s3); min-width: 0; min-height: 0; }
+.jhead { display: flex; align-items: center; gap: var(--s3); flex-wrap: wrap; }
+.jhead h2 { font-size: 17px; }
+.jmeta { font-size: 12.5px; color: var(--muted); display: flex; gap: var(--s4); flex-wrap: wrap; }
+.prog { display: flex; align-items: center; gap: var(--s3); }
+.prog .meter { flex: 1; height: 8px; }
+.prog b { font-size: 13px; min-width: 44px; text-align: right; }
+.logwrap { position: relative; flex: 1; min-height: 220px; display: flex; }
+.log { flex: 1; overflow: auto; background: var(--panel2); border: 1px solid var(--line); border-radius: var(--r2); padding: var(--s2) 0; font: 12px/1.7 var(--mono); }
+.log .ln { display: grid; grid-template-columns: 62px 44px minmax(0, 1fr); gap: var(--s2); padding: 0 var(--s3); white-space: pre-wrap; overflow-wrap: anywhere; }
+.log .ln:hover { background: var(--line2); }
+.log .tm { color: var(--muted); }
+.log .lv { font-weight: 600; text-transform: uppercase; font-size: 10.5px; letter-spacing: .04em; padding-top: 1px; }
+.log .lv.warn { color: var(--warn); } .log .lv.error { color: var(--bad); } .log .lv.info { color: var(--muted); }
+.toend { position: absolute; right: var(--s4); bottom: var(--s3); box-shadow: var(--shadow); }
+.callout { padding: var(--s4); border: 1px solid var(--bad); border-left-width: 3px; border-radius: var(--r2); background: var(--badbg); display: flex; flex-direction: column; gap: var(--s3); }
+.callout h3 { font-size: 14px; color: var(--bad); }
+.callout .err { font: 12.5px/1.5 var(--mono); }
+.callout ol { padding-left: var(--s5); list-style: decimal; font-size: 13px; display: flex; flex-direction: column; gap: var(--s1); }
+.callout .row { display: flex; gap: var(--s2); flex-wrap: wrap; }
+.stats { display: flex; gap: var(--s5); flex-wrap: wrap; padding: var(--s3) var(--s4); }
+.stats div { display: flex; flex-direction: column; }
+.stats b { font-size: 20px; letter-spacing: -.01em; }
+.stats span { font-size: 12px; color: var(--muted); }
+
+/* ---- 11. Panel de detalle ---------------------------------------------- */
+.dhead { display: flex; align-items: flex-start; gap: var(--s2); padding: var(--s4) var(--s4) var(--s3); border-bottom: 1px solid var(--line2); position: sticky; top: 0; background: var(--panel); z-index: 2; }
+.dhead > div { flex: 1; min-width: 0; }
+.dhead .kind { font: 600 11px var(--mono); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+.dhead h2 { font-size: 16px; line-height: 1.3; overflow-wrap: anywhere; margin-top: 2px; }
+.dhead h2.mono { font-size: 14px; }
+.dbody { padding: var(--s4); display: flex; flex-direction: column; gap: var(--s4); }
+.dbody .actions { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.dbody dl { display: grid; grid-template-columns: auto 1fr; gap: 6px var(--s4); font-size: 13px; }
+.dbody dt { color: var(--muted); }
+.dbody dd { font: 12.5px var(--mono); overflow-wrap: anywhere; }
+.finding { padding: var(--s3) 0; border-top: 1px solid var(--line2); display: flex; flex-direction: column; gap: 3px; font-size: 13px; }
+.finding code { font-size: 11.5px; color: var(--muted); }
+.finding .fix { color: var(--muted); font-size: 12.5px; }
+.finding .fh { display: flex; align-items: center; gap: var(--s2); }
+.finding .fh code { margin-left: auto; }
+.minilist li { display: flex; justify-content: space-between; gap: var(--s3); padding: 5px 0; border-top: 1px solid var(--line2); font-size: 13px; }
+.minilist a { color: var(--fg); }
+
+/* ---- 12. Avisos, dialogos, paleta, demo, error ------------------------- */
+.toastwrap { position: fixed; right: var(--s4); bottom: var(--s4); z-index: 90; display: flex; flex-direction: column; gap: var(--s2); width: min(380px, calc(100vw - 32px)); pointer-events: none; }
+.toastwrap > div { display: flex; flex-direction: column; gap: var(--s2); }
+.toast { pointer-events: auto; display: grid; grid-template-columns: 1fr auto; gap: var(--s2); padding: var(--s3) var(--s2) var(--s3) var(--s4); background: var(--panel); border: 1px solid var(--line); border-left: 4px solid var(--info); border-radius: var(--r2); box-shadow: var(--shadow); animation: tin .18s ease-out; }
+@keyframes tin { from { opacity: 0; transform: translateY(8px); } }
+.toast.ok { border-left-color: var(--ok); } .toast.error { border-left-color: var(--bad); }
+.toast strong { font-size: 13.5px; display: block; }
+.toast p { font-size: 12.5px; color: var(--muted); margin-top: 2px; }
+.toast .btn { margin-top: var(--s2); }
+dialog { border: 1px solid var(--line); border-radius: var(--r2); background: var(--panel); color: var(--fg); padding: 0; box-shadow: var(--shadow); max-width: calc(100vw - 32px); }
+dialog::backdrop { background: rgb(10 14 9 / .55); }
+.dlg { width: 440px; max-width: 100%; padding: var(--s5); display: flex; flex-direction: column; gap: var(--s3); }
+.dlg h2 { font-size: 17px; }
+.dlg p { color: var(--muted); font-size: 13px; }
+.dlg label { font-weight: 600; font-size: 13px; }
+.dlg .field { width: 100%; font-size: 15px; padding: 9px 11px; }
+.dlg .field[aria-invalid="true"] { border-color: var(--bad); }
+.dlg .err { color: var(--bad); font-size: 12.5px; min-height: 18px; }
+.dlg .prev { font: 12px var(--mono); background: var(--panel2); border: 1px solid var(--line2); border-radius: 4px; padding: 5px 8px; overflow-wrap: anywhere; }
+.dlg .btns { display: flex; justify-content: flex-end; gap: var(--s2); margin-top: var(--s2); }
+#dlgPal { margin: 12vh auto auto; }
+.pal { width: 600px; max-width: 100%; }
+.pal .field { width: 100%; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; font-size: 16px; padding: var(--s4); background: transparent; }
+.pal .field:focus-visible { outline: none; }
+.pal .list { max-height: 50vh; overflow: auto; padding: var(--s2); }
+.pal .opt { padding: 8px var(--s3); }
+.pal .foot { display: flex; gap: var(--s4); padding: var(--s2) var(--s4); border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+.demo { position: fixed; left: var(--s3); bottom: var(--s3); z-index: 80; font-size: 12px; }
+.demo > button { font: 600 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; padding: 5px 10px; border-radius: 4px; border: 1px dashed var(--muted); background: repeating-linear-gradient(135deg, var(--panel), var(--panel) 6px, var(--panel2) 6px, var(--panel2) 12px); color: var(--fg); cursor: pointer; }
+.demo .box { position: absolute; left: 0; bottom: 34px; width: 280px; padding: var(--s3); border: 1px dashed var(--muted); border-radius: var(--r2); background: var(--panel); box-shadow: var(--shadow); display: flex; flex-direction: column; gap: var(--s3); }
+.demo .box p { color: var(--muted); line-height: 1.4; }
+.demo fieldset { border: 0; padding: 0; margin: 0; display: flex; flex-direction: column; gap: var(--s1); }
+.demo legend { font: 600 10.5px var(--mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: 0 0 var(--s1); }
+.demo .seg a, .demo .seg button { padding: 4px 8px; font: 600 12px var(--font); }
+.demo .seg button { white-space: nowrap; border: 0; background: transparent; color: var(--fg); cursor: pointer; flex: 1; }
+.demo .seg button + button { border-left: 1px solid var(--line); }
+.demo .seg button[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+#errbanner { position: fixed; top: 0; left: 0; right: 0; z-index: 200; background: #b00020; color: #fff; padding: var(--s2) var(--s4); font: 600 13px var(--mono); white-space: pre-wrap; }
+.skip { position: fixed; left: var(--s3); top: -60px; z-index: 300; }
+.skip:focus { top: var(--s2); }
+
+/* ---- 13. Adaptacion: panel plegado a 1100, navegacion en barra a 960 ---- */
+@media (max-width: 1100px) {
+  .shell.with-detail { grid-template-columns: var(--nav) minmax(0, 1fr); }
+  #detail { position: fixed; top: var(--topbar); right: 0; bottom: 0; width: min(360px, 92vw); z-index: 35; box-shadow: var(--shadow); }
+  .home-grid, .ctx { grid-template-columns: minmax(0, 1fr); }
+  .qs { position: static; }
+  .btn.cmdbtn { display: none; }
+}
+@media (max-width: 960px) {
+  .shell, .shell.with-detail { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  nav.side { flex-direction: row; align-items: center; overflow-x: auto; padding: var(--s2) var(--s3); border-right: 0; border-bottom: 1px solid var(--line2); gap: var(--s1); }
+  nav.side h2, nav.side .hint, nav.side .full { display: none; }
+  .search { flex-basis: 250px; }
+  nav.side a { white-space: nowrap; padding: 6px var(--s3); gap: var(--s2); }
+  .brand { width: auto; }
+  .work { padding: var(--s4); }
+  .split { grid-template-columns: 190px minmax(0, 1fr); }
+  .issue { grid-template-columns: minmax(120px, 190px) minmax(0, 1fr); }
+  .issue .w { display: none; }
+  .status .idle .t { display: none; }
+  .trow { grid-template-columns: 20px 64px minmax(0, 1fr) auto; }
+  .trow .ct { display: none; }
+}
+@media (max-width: 700px) {
+  .tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .split { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); }
+  .sidelist { max-height: 132px; }
+}
+</style>
+</head>
+<body>
+<div id="errbanner" role="alert" hidden></div>
+<button class="btn skip" type="button" data-act="skip">Saltar al contenido</button>
+
+<div class="app">
+  <!-- ===== Barra superior: proyecto, buscador global, comandos, estado, Releer ===== -->
+  <header class="topbar">
+    <div class="brand"><span class="mark" aria-hidden="true"></span><strong>Kiln</strong><span class="tag" id="projName">Puerto Niebla</span></div>
+    <div class="search" role="search">
+      <input id="gq" class="field" type="text" role="combobox" aria-expanded="false" aria-controls="gres" aria-autocomplete="list"
+             placeholder="Buscar en el proyecto" aria-label="Buscar en el proyecto" autocomplete="off">
+      <kbd aria-hidden="true">/</kbd>
+      <div id="gres" class="sres" role="listbox" aria-label="Resultados de la búsqueda" hidden></div>
+    </div>
+    <button class="btn ghost cmdbtn" type="button" data-act="palette" aria-label="Abrir la paleta de comandos">Comandos <kbd id="kk">Ctrl K</kbd></button>
+    <div class="grow"></div>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+    <button class="btn" type="button" data-act="releer" id="btnReleer">Releer</button>
+    <button class="btn" type="button" data-act="panel" id="btnPanel" aria-controls="detail" aria-expanded="false">Detalle</button>
+  </header>
+
+  <div class="shell" id="shell">
+    <nav class="side" id="nav" aria-label="Principal"></nav>
+    <main class="work" id="main" tabindex="-1"></main>
+    <aside id="detail" aria-label="Detalle del elemento seleccionado"></aside>
+  </div>
+</div>
+
+<div class="toastwrap">
+  <div id="toasts" role="status" aria-live="polite"></div>
+  <div id="alerts" role="alert"></div>
+</div>
+
+<!-- Dialogo propio: nombrar una variante (sustituye a prompt()) -->
+<dialog id="dlgVariant" aria-labelledby="dvT">
+  <form class="dlg" id="fVariant" method="dialog" novalidate>
+    <h2 id="dvT">Crear variante</h2>
+    <p id="dvP">Una variante reutiliza la malla y cambia material o textura.</p>
+    <label for="dvName">Nombre de la variante</label>
+    <input id="dvName" class="field" type="text" autocomplete="off" aria-describedby="dvErr dvPrev" placeholder="por ejemplo: oxidado">
+    <div class="err" id="dvErr" role="alert"></div>
+    <div class="prev" id="dvPrev"></div>
+    <div class="btns">
+      <button class="btn" type="button" id="dvCancel">Cancelar</button>
+      <button class="btn primary" type="submit">Crear variante</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Paleta de comandos (Ctrl/Cmd+K) -->
+<dialog id="dlgPal" aria-label="Paleta de comandos">
+  <div class="pal">
+    <input id="pq" class="field" type="text" role="combobox" aria-expanded="true" aria-controls="plist" aria-autocomplete="list"
+           placeholder="Ir a una vista, buscar una pieza o ejecutar una acción" aria-label="Paleta de comandos" autocomplete="off">
+    <div id="plist" class="list" role="listbox" aria-label="Comandos"></div>
+    <div class="foot"><span><kbd>↑</kbd> <kbd>↓</kbd> moverse</span><span><kbd>Enter</kbd> elegir</span><span><kbd>Esc</kbd> cerrar</span></div>
+  </div>
+</dialog>
+
+<!-- Conmutador de demostracion: SOLO de la maqueta -->
+<div class="demo" id="demo"></div>
+
+<script>
+'use strict';
+/* =========================================================================
+   0. Banner de errores: cualquier fallo de script queda visible
+   ========================================================================= */
+window.onerror = function (msg, src, line, col) {
+  const b = document.getElementById('errbanner');
+  b.hidden = false;
+  b.textContent += 'Error de script: ' + msg + ' (línea ' + line + ':' + col + ')\n';
+};
+window.addEventListener('unhandledrejection', e => window.onerror('Promesa rechazada: ' + (e.reason && e.reason.message || e.reason), '', 0, 0));
+
+/* =========================================================================
+   1. Utilidades
+   ========================================================================= */
+const $ = (s, r = document) => r.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = n => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+const norm = s => String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const RANK = { '': 0, info: 1, warn: 2, error: 3 };
+const SEVNAME = { error: 'Error', warn: 'Aviso', info: 'Nota' };
+const SEVPL = { error: 'errores', warn: 'avisos', info: 'notas' };
+const worst = (a, b) => (RANK[b] > RANK[a] ? b : a);
+const plural = (n, one, many) => fmt(n) + ' ' + (n === 1 ? one : many);
+const debounce = (fn, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; };
+const dot = k => `<i class="dot ${k || 'none'}" aria-hidden="true"></i>`;
+const sevLabel = (sev, n) => sev ? `<span class="sev ${sev}">${dot(sev)}${SEVNAME[sev]}${n > 1 ? ' · ' + n : ''}</span>` : '<span class="muted">—</span>';
+const clockStr = s => { const t = 14 * 3600 + 31 * 60 + s; const p = x => String(x).padStart(2, '0'); return `${p(Math.floor(t / 3600))}:${p(Math.floor(t / 60) % 60)}:${p(t % 60)}`; };
+const isMac = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+const matchTxt = (text, q) => { // resalta la coincidencia (todo escapado)
+  const i = q ? norm(text).indexOf(q) : -1;
+  return i < 0 ? esc(text) : esc(text.slice(0, i)) + '<mark>' + esc(text.slice(i, i + q.length)) + '</mark>' + esc(text.slice(i + q.length));
+};
+const svgCheck = '<svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="10" cy="10" r="9" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M5.5 10.5l3 3 6-6.5" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>';
+const svgBox = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7l9-4 9 4v10l-9 4-9-4z M3 7l9 4 9-4 M12 11v10" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+
+/* =========================================================================
+   2. Datos de muestra: "Puerto Niebla" (inventado; generados aqui, sin servidor)
+   ========================================================================= */
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; };
+const R = rng(20261115);
+const pick = a => a[Math.floor(R() * a.length)];
+const pad2 = n => String(n).padStart(2, '0');
+
+const PLACES = [
+  { id: 'puerto', name: 'Puerto' }, { id: 'casco', name: 'Casco antiguo' }, { id: 'costa', name: 'Costa' }
+];
+const KIT_DEFS = [
+  ['muelle-viejo', 'Muelle viejo', 'muelle', 'puerto', 310, ['tablon', 'pilote', 'bolardo', 'cabo', 'escalera', 'farola', 'defensa', 'cofre'], 'Pasarelas, pilotes y mobiliario del muelle original.'],
+  ['astillero', 'Astillero', 'astillero', 'puerto', 280, ['grada', 'grua', 'casco', 'cuaderna', 'banco', 'tornillo', 'andamio', 'barril'], 'Gradas de construcción naval y herramientas.'],
+  ['lonja', 'Lonja y pescadería', 'lonja', 'puerto', 190, ['mostrador', 'caja', 'balanza', 'cartel', 'cubo', 'hielo', 'mesa', 'toldo'], 'Subasta de pescado y puestos cubiertos.'],
+  ['barcos', 'Barcos de pesca', 'barcos', 'puerto', 240, ['casco', 'mastil', 'vela', 'timon', 'remo', 'red', 'boya', 'ancla'], 'Flota amarrada, tres tamaños.'],
+  ['props-portuarios', 'Props portuarios', 'props', 'puerto', 420, ['barril', 'caja', 'saco', 'cuerda', 'linterna', 'ancla', 'carro', 'jaula', 'baul'], 'Objetos sueltos de dársena y almacén.'],
+  ['casas', 'Casas de pescadores', 'casas', 'casco', 460, ['muro', 'tejado', 'puerta', 'ventana', 'chimenea', 'balcon', 'postigo', 'escalon'], 'Módulos de fachada y cubierta del casco antiguo.'],
+  ['taberna', 'Taberna La Sirena', 'taberna', 'casco', 300, ['barra', 'mesa', 'taburete', 'jarra', 'lampara', 'barril', 'cartel', 'chimenea'], 'Interior y exterior de la taberna principal.'],
+  ['mercado', 'Mercado cubierto', 'mercado', 'casco', 210, ['puesto', 'toldo', 'cesta', 'balanza', 'caja', 'cartel', 'farol', 'mostrador'], 'Puestos y estructura del mercado.'],
+  ['callejones', 'Callejones', 'callejon', 'casco', 250, ['adoquin', 'muro', 'arco', 'escalera', 'farola', 'tubo', 'ropa', 'cubo'], 'Piezas modulares de calles estrechas.'],
+  ['faro', 'Faro del Cabo', 'faro', 'costa', 150, ['torre', 'linterna', 'escalera', 'barandilla', 'puerta', 'lente', 'verja', 'cobertizo'], 'El faro y sus dependencias.'],
+  ['vegetacion', 'Vegetación costera', 'vegetal', 'costa', 120, ['arbusto', 'hierba', 'alga', 'helecho', 'junco', 'duna', 'pino', 'flor'], 'Plantas de acantilado y duna.'],
+  ['rocas', 'Rocas y acantilado', 'rocas', 'costa', 82, ['roca', 'acantilado', 'guijarro', 'arco', 'cueva', 'grieta', 'musgo', 'bloque'], 'Geología de la costa.']
+];
+const MAT_NAMES = ['madera_envejecida', 'madera_mojada', 'madera_clara', 'piedra_musgo', 'piedra_lisa', 'piedra_cantera', 'cuerda', 'cuerda_alquitranada', 'tela_vela', 'lona_gastada', 'metal_oxidado', 'hierro_forjado', 'laton_pulido', 'cobre_verdin', 'cristal_sucio', 'vidrio_lampara', 'teja_roja', 'teja_pizarra', 'cal_blanca', 'ladrillo_viejo', 'arena_humeda', 'roca_acantilado', 'hierba_costera', 'alga_verde', 'red_pesca', 'cuero_curtido', 'alquitran', 'pintura_azul', 'pintura_roja', 'pintura_descascarada', 'barro_seco', 'paja', 'mimbre_cesta', 'cera_vela', 'escamas_pescado', 'hielo_lonja', 'agua_puerto', 'espuma_niebla', 'cartel_esmalte', 'adoquin_gris'];
+const MAT_TYPES = ['Estándar', 'Estándar', 'Estándar', 'Translúcido', 'Emisivo', 'Vegetación', 'Agua'];
+const MAT_KIT_AFFINITY = { 0: 'madera', 1: 'piedra' };
+
+const BASE = (function build() {
+  /* kits */
+  const kits = KIT_DEFS.map(d => ({ id: d[0], name: d[1], short: d[2], place: d[3], n: d[4], nouns: d[5], desc: d[6] }));
+
+  /* materiales (40) */
+  const materials = MAT_NAMES.map((n, i) => ({
+    id: n, name: n, type: i === 14 || i === 15 ? 'Translúcido' : i === 36 ? 'Agua' : i === 22 || i === 23 ? 'Vegetación' : i === 33 ? 'Emisivo' : 'Estándar',
+    tex: pick([512, 1024, 1024, 2048, 2048]), mips: true, uses: 0, kits: new Set()
+  }));
+
+  /* piezas (~3.000) */
+  const pieces = [];
+  for (const k of kits) {
+    const ki = KIT_DEFS.findIndex(d => d[0] === k.id); const prefer = materials.filter((m, i) => i < 35 && (i + 5 * ki) % 3 === 0);
+    for (let i = 0; i < k.n; i++) {
+      const noun = k.nouns[i % k.nouns.length];
+      const name = `${k.short}_${noun}_${pad2(Math.floor(i / k.nouns.length) + 1)}`;
+      const mat = pick(prefer);
+      pieces.push({
+        id: name, name, kit: k.id, noun, material: mat.id, tris: Math.round(120 + Math.pow(R(), 2.1) * 5400),
+        kb: Math.round(14 + R() * R() * 760), tex: mat.tex, variants: Math.floor(R() * R() * 4), mod: `2026-11-${pad2(1 + Math.floor(R() * 14))}`
+      });
+      mat.uses++; mat.kits.add(k.id);
+    }
+  }
+
+  /* hallazgos (~600) */
+  const findings = []; let fid = 1;
+  const HINT = {
+    'tris-excedido': 'Reduce la malla o divídela en dos piezas; el presupuesto es de 6.000 triángulos.',
+    'material-ausente': 'Declara el material en materials/ o cambia la referencia de la pieza.',
+    'malla-abierta': 'Cierra las aristas abiertas en el editor 3D y vuelve a exportar.',
+    'textura-no-potencia-2': 'Reescala la textura a una potencia de 2 (512, 1024, 2048).',
+    'escala-sospechosa': 'Comprueba que la pieza está en metros; parece fuera de proporción.',
+    'pivote-descentrado': 'Coloca el pivote en la base de la pieza antes de exportar.',
+    'lod-ausente': 'Añade al menos un nivel de detalle inferior.',
+    'nombre-no-convencional': 'Renombra siguiendo kit_objeto_nn.',
+    'sin-variantes': 'Opcional: crea una variante para evitar repeticiones visibles.',
+    'uv2-ausente': 'Genera el segundo canal UV si la pieza recibe luz horneada.',
+    'sin-mipmaps': 'Activa la generación de mipmaps en el material.',
+    'material-sin-usar': 'Ninguna pieza lo usa; elimínalo o asígnalo.',
+    'nombre-duplicado': 'Dos materiales comparten nombre normalizado; renombra uno.',
+    'referencia-rota': 'Corrige el identificador o crea el elemento referenciado.',
+    'campo-vacio': 'Rellena el campo obligatorio.',
+    'texto-largo': 'El texto supera 240 caracteres; considera dividirlo.'
+  };
+  const pickWeighted = (kitBoost) => { const pool = []; kits.forEach(k => { for (let j = 0; j < (k.id === kitBoost ? 4 : 1); j++) pool.push(k.id); }); return pick(pool); };
+  const piecesByKit = new Map(kits.map(k => [k.id, pieces.filter(p => p.kit === k.id)]));
+  const addP = (sev, code, msgFn, boost, count, tag) => {
+    for (let i = 0; i < count; i++) {
+      const p = pick(piecesByKit.get(pickWeighted(boost)));
+      if (code === 'tris-excedido') p.tris = 6100 + Math.round(R() * 3600);
+      if (code === 'material-ausente') p.material = pick(['cristal_taberna', 'madera_astillero', 'pintura_faro', 'lona_nueva']);
+      findings.push({ id: 'f' + fid++, sev, code, type: 'piece', subj: p.id, kit: p.kit, msg: msgFn(p), hint: HINT[code] });
+    }
+  };
+  addP('error', 'tris-excedido', p => `Supera el presupuesto: ${fmt(p.tris)} triángulos (máximo 6.000).`, 'astillero', 20);
+  addP('error', 'material-ausente', p => `El material «${p.material}» no existe en el proyecto.`, 'astillero', 13);
+  addP('error', 'malla-abierta', p => `Malla con ${2 + Math.floor(R() * 14)} aristas abiertas.`, 'astillero', 13);
+  addP('warn', 'textura-no-potencia-2', p => `La textura base mide ${pick([600, 1000, 1500, 3000])} px: no es potencia de 2.`, 'casas', 66);
+  addP('warn', 'escala-sospechosa', p => `Escala ×${(R() * 9 + 1.5).toFixed(1)} respecto a la media de «${p.noun}».`, 'callejones', 58);
+  addP('warn', 'pivote-descentrado', p => 'El pivote está a más de 40 cm de la base.', 'muelle-viejo', 45);
+  addP('warn', 'lod-ausente', p => 'Sin nivel de detalle inferior declarado.', 'vegetacion', 22);
+  addP('info', 'nombre-no-convencional', p => `El nombre «${p.name}» no sigue el patrón kit_objeto_nn.`, 'props-portuarios', 125);
+  addP('info', 'sin-variantes', p => 'Pieza sin variantes; se repetirá igual en escena.', 'casas', 125);
+  addP('info', 'uv2-ausente', p => 'Sin segundo canal UV para luz horneada.', 'faro', 82);
+  /* materiales: 22 hallazgos */
+  const used = materials.slice().sort(() => R() - .5);
+  used.filter(m => m.uses > 0).slice(0, 14).forEach((m, i) => { if (i < 14) findings.push({ id: 'f' + fid++, sev: 'warn', code: i < 9 ? 'sin-mipmaps' : 'nombre-duplicado', type: 'material', subj: m.id, msg: i < 9 ? `La textura de ${m.tex} px no tiene mipmaps.` : `Nombre muy parecido a otro material.`, hint: HINT[i < 9 ? 'sin-mipmaps' : 'nombre-duplicado'] }); });
+  materials.filter(m => m.uses === 0).forEach(m => findings.push({ id: 'f' + fid++, sev: 'info', code: 'material-sin-usar', type: 'material', subj: m.id, msg: 'Declarado, pero ninguna pieza lo usa todavía.', hint: HINT['material-sin-usar'] }));
+  materials.filter(m => m.uses > 0 && m.tex === 2048).slice(0, 8 - materials.filter(m => m.uses === 0).length).forEach(m => findings.push({ id: 'f' + fid++, sev: 'info', code: 'textura-grande', type: 'material', subj: m.id, msg: 'Textura de 2048 px: comprueba si hace falta tanta resolución.', hint: 'Reduce a 1024 px si cubre poco espacio en pantalla.' }));
+
+  /* contenido: 1 conjunto, 4 tipos, 120 elementos */
+  const KINDS = [
+    { id: 'mision', name: 'Misión', n: 24 }, { id: 'personaje', name: 'Personaje', n: 30 },
+    { id: 'objeto', name: 'Objeto', n: 36 }, { id: 'dialogo', name: 'Diálogo', n: 30 }
+  ];
+  const zonas = ['Muelle', 'Faro', 'Astillero', 'Mercado', 'Callejón', 'Acantilado'];
+  const elements = [];
+  const A = ['Rumores del', 'Deuda en el', 'Sombras sobre el', 'Carta para el', 'Contrabando en el', 'Última marea en el'];
+  const T1 = ['Capitán', 'Vieja', 'Joven', 'Maese', 'Tía', 'Contramaestre'], T2 = ['Bruma', 'Casilda', 'Ruperto', 'Olalla', 'Tomeu', 'Nereo', 'Salitre', 'Marea', 'Quilla', 'Sorda'];
+  const O1 = ['Llave', 'Brújula', 'Farol', 'Cuaderno', 'Cuerda', 'Mapa', 'Amuleto', 'Sextante', 'Anzuelo', 'Botella'], O2 = ['oxidada', 'empapada', 'del capitán', 'sin nombre', 'de latón', 'heredada'];
+  const D1 = ['Taberna', 'Muelle', 'Faro', 'Mercado', 'Astillero', 'Callejón'], D2 = ['saludo', 'amenaza', 'rumor', 'despedida', 'trato'];
+  const slug = s => norm(s).replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+  const mk = (kind, i, title, detail, refs) => elements.push({ id: `${kind}.${slug(title)}`, kind, title, detail, refs, i });
+  for (let i = 0; i < 24; i++) mk('mision', i, `${A[i % 6]} ${['muelle', 'faro', 'astillero', 'mercado', 'callejón', 'acantilado'][Math.floor(i / 6) % 6]}${i >= 6 && i % 6 === 5 ? ' (II)' : ''}`, `Zona: ${zonas[i % 6]} · ${3 + (i % 5)} pasos`, 2 + (i % 4));
+  for (let i = 0; i < 30; i++) mk('personaje', i, `${T1[i % 6]} ${T2[Math.floor(i / 6) * 2 % 10]}${i % 2 ? '' : ''}`, `Rol: ${pick(['pescador', 'tabernero', 'cartógrafo', 'contrabandista', 'vigía'])} · ${zonas[(i + 2) % 6]}`, 1 + (i % 3));
+  for (let i = 0; i < 36; i++) mk('objeto', i, `${O1[i % 10]} ${O2[Math.floor(i / 10) + (i % 2)]}`.replace(/ $/, ''), `Tipo: ${pick(['clave', 'consumible', 'ornamento'])} · ${(R() * 3 + .1).toFixed(1)} kg`, i % 3);
+  for (let i = 0; i < 30; i++) mk('dialogo', i, `${D1[i % 6]}: ${D2[Math.floor(i / 6)]}`, `Personaje: ${T1[i % 6]} ${T2[(i * 3) % 10]} · ${4 + (i % 9)} nodos`, 1 + (i % 2));
+  /* ids únicos */
+  const seen = new Set(); elements.forEach(e => { let b = e.id, n = 2; while (seen.has(e.id)) e.id = b + '_' + n++; seen.add(e.id); });
+  const mkF = (el, sev, code, msg) => findings.push({ id: 'f' + fid++, sev, code, type: 'element', subj: el.id, kind: el.kind, msg, hint: HINT[code] });
+  const E = k => elements.filter(e => e.kind === k);
+  mkF(E('mision')[3], 'error', 'referencia-rota', 'Referencia a «personaje.maese_salitre» que no existe.');
+  mkF(E('mision')[11], 'error', 'referencia-rota', 'Referencia a «objeto.llave_del_faro» que no existe.');
+  mkF(E('personaje')[7], 'warn', 'campo-vacio', 'El campo «zona» está vacío.');
+  mkF(E('personaje')[18], 'warn', 'campo-vacio', 'El campo «rol» está vacío.');
+  mkF(E('objeto')[5], 'warn', 'campo-vacio', 'El campo «peso» está vacío.');
+  mkF(E('dialogo')[2], 'warn', 'texto-largo', 'El nodo 6 tiene 312 caracteres.');
+  mkF(E('dialogo')[14], 'warn', 'texto-largo', 'El nodo 3 tiene 268 caracteres.');
+  mkF(E('objeto')[20], 'info', 'campo-vacio', 'Sin descripción corta para la ficha.');
+  mkF(E('dialogo')[25], 'info', 'texto-largo', 'El nodo 9 tiene 241 caracteres.');
+
+  /* contexto: capas, afirmaciones, preguntas */
+  const layers = [
+    { id: 'vision', name: 'Visión del juego', claims: [
+      ['c1', 'Aventura narrativa en un puerto costero, ritmo pausado.', 'set', 'context/vision.md:3'],
+      ['c2', 'Cámara en tercera persona fija, sin combate.', 'set', 'context/vision.md:7'],
+      ['c3', 'Duración objetivo de la partida: 6 a 8 horas.', 'open', 'context/vision.md:12']] },
+    { id: 'estilo', name: 'Estilo visual', claims: [
+      ['c4', 'Paleta desaturada con acentos cálidos.', 'set', 'context/estilo.md:2'],
+      ['c5', 'Low-poly con texturas pintadas a mano.', 'set', 'context/estilo.md:5'],
+      ['c6', 'Presupuesto: 6.000 triángulos por pieza de entorno.', 'set', 'context/estilo.md:9'],
+      ['c7', 'Niebla volumétrica en todos los exteriores.', 'open', 'context/estilo.md:14']] },
+    { id: 'mundo', name: 'Mundo y lugares', claims: [
+      ['c8', 'Tres zonas: Puerto, Casco antiguo y Costa.', 'set', 'context/mundo.md:1'],
+      ['c9', 'El faro es el punto final de la historia.', 'open', 'context/mundo.md:6'],
+      ['c10', 'Ciclo de día y noche con tres franjas.', 'open', 'context/mundo.md:11']] },
+    { id: 'tecnico', name: 'Técnico', claims: [
+      ['c11', 'Unidades en metros, eje Y hacia arriba.', 'set', 'context/tecnico.md:1'],
+      ['c12', 'Texturas en potencias de 2, máximo 2048 px.', 'set', 'context/tecnico.md:4'],
+      ['c13', 'Exportación a glTF 2.0.', 'set', 'context/tecnico.md:8']] }
+  ].map(l => ({ id: l.id, name: l.name, claims: l.claims.map(c => ({ id: c[0], text: c[1], state: c[2], src: c[3], layer: l.id })) }));
+  const questions = [
+    { id: 'q1', text: '¿El ciclo de día y noche cambia los materiales o solo la iluminación?', opts: ['Solo la iluminación', 'También los materiales emisivos', 'Aún no lo sé'], claim: 'c10' },
+    { id: 'q2', text: '¿La niebla se hornea en las texturas o es un efecto del motor?', opts: ['Efecto del motor', 'Horneada en texturas'], claim: 'c7' },
+    { id: 'q3', text: '¿Cuántas horas debe durar la partida completa?', opts: ['6 horas', '8 horas', 'Sin límite'], claim: 'c3' }
+  ];
+  return { kits, materials, pieces, findings, KINDS, elements, layers, questions, piecesByKit };
+})();
+
+/* ---- 2b. Variante de proyecto: indices calculados una sola vez ---------- */
+let DB = null;
+function buildDB(variant) {
+  const empty = variant === 'empty', clean = variant === 'clean';
+  const findings = (empty || clean) ? [] : BASE.findings;
+  const fBy = { piece: new Map(), material: new Map(), element: new Map() };
+  const bySev = { error: [], warn: [], info: [] };
+  for (const f of findings) {
+    const m = fBy[f.type]; (m.get(f.subj) || m.set(f.subj, []).get(f.subj)).push(f);
+    bySev[f.sev].push(f);
+  }
+  const sevOf = (type, id) => (fBy[type].get(id) || []).reduce((s, f) => worst(s, f.sev), '');
+  const pieces = empty ? [] : BASE.pieces.map(p => { const fl = fBy.piece.get(p.id) || []; return Object.assign({}, p, { sev: sevOf('piece', p.id), nf: fl.length, k: p.name + ' ' + p.material }); });
+  const materials = empty ? [] : BASE.materials.map(m => ({ id: m.id, name: m.name, type: m.type, tex: m.tex, uses: m.uses, nk: m.kits.size, kits: [...m.kits], sev: sevOf('material', m.id), nf: (fBy.material.get(m.id) || []).length }));
+  const elements = empty ? [] : BASE.elements.map(e => ({ ...e, sev: sevOf('element', e.id), nf: (fBy.element.get(e.id) || []).length }));
+  const kits = empty ? [] : BASE.kits.map(k => {
+    const ps = pieces.filter(p => p.kit === k.id);
+    const c = { error: 0, warn: 0, info: 0 }; findings.forEach(f => { if (f.kit === k.id) c[f.sev]++; });
+    return { ...k, count: ps.length, sev: c.error ? 'error' : c.warn ? 'warn' : c.info ? 'info' : '', c };
+  });
+  const db = {
+    variant, empty, clean, findings, bySev, fBy, pieces, materials, elements, kits,
+    kitById: new Map(kits.map(k => [k.id, k])), pieceById: new Map(pieces.map(p => [p.id, p])),
+    matById: new Map(materials.map(m => [m.id, m])), elById: new Map(elements.map(e => [e.id, e])),
+    piecesByKit: new Map(kits.map(k => [k.id, pieces.filter(p => p.kit === k.id)])),
+    kinds: empty ? [] : BASE.KINDS.map(k => { const es = elements.filter(e => e.kind === k.id); return { ...k, count: es.length, sev: es.reduce((s, e) => worst(s, e.sev), '') }; }),
+    layers: empty ? [] : BASE.layers.map(l => ({ ...l, claims: l.claims.map(c => ({ ...c })) })),
+    questions: empty ? [] : BASE.questions.map(q => ({ ...q, answer: null })),
+    reading: false, jobs: []
+  };
+  db.claimById = new Map(db.layers.flatMap(l => l.claims).map(c => [c.id, c]));
+  db.kindById = new Map(db.kinds.map(k => [k.id, k]));
+  const badKit = kits.slice().sort((a, b) => b.c.error - a.c.error)[0];
+  db.badKit = badKit && badKit.c.error ? badKit : null;
+  return db;
+}
+
+/* =========================================================================
+   3. Trabajos simulados (sin servidor): un trabajo en curso que avanza
+   ========================================================================= */
+const JOBS = { timer: null, subs: new Set(), seq: 3 };
+function genLog(n, kitId = 'astillero') {
+  const r = rng(77), out = []; const ps = BASE.piecesByKit.get(kitId);
+  out.push({ t: clockStr(0), lvl: 'info', msg: `Leyendo kit.toml de «${kitId}»` });
+  out.push({ t: clockStr(1), lvl: 'info', msg: `${ps.length} piezas declaradas` });
+  out.push({ t: clockStr(2), lvl: 'info', msg: 'Comprobando texturas en potencias de 2' });
+  for (let i = 3; i < n; i++) {
+    const p = ps[Math.floor(r() * ps.length)], x = r();
+    if (x < .1) out.push({ t: clockStr(i), lvl: 'warn', msg: `${p.name}: sin nivel de detalle inferior, se usa la malla completa` });
+    else if (x < .22) out.push({ t: clockStr(i), lvl: 'info', msg: `Atlas ${Math.floor(i / 14) + 1}/6 compilado (2048×2048)` });
+    else out.push({ t: clockStr(i), lvl: 'info', msg: `Optimizando ${p.name} (${fmt(Math.round(300 + r() * 5000))} → ${fmt(Math.round(200 + r() * 3000))} triángulos)` });
+  }
+  return out;
+}
+function makeJobs(variant) {
+  const done = { id: 'j2', name: 'Validar contenido', cmd: 'kiln validate --content', status: 'done', pct: 100, start: '14:12', dur: '1 min 12 s', out: 'out/validacion.json', log: doneLog(variant), summary: variant === 'clean' ? { a: 120, b: 0, c: 0 } : { a: 120, b: 9, c: 2 } };
+  if (variant === 'empty') return [];
+  if (variant === 'clean') return [done];
+  const failed = { id: 'j1', name: 'Exportar kit Faro a glTF', cmd: 'kiln export --kit faro --format gltf', status: 'failed', pct: 41, start: '13:48', dur: '34 s', log: genLog(26, 'faro').concat([{ t: clockStr(26), lvl: 'error', msg: 'No se puede escribir out/faro/faro_lente_01.glb' }, { t: clockStr(27), lvl: 'error', msg: 'El material «cristal_sucio» no tiene textura base' }]), err: 'No se puede escribir out/faro/faro_lente_01.glb: el material «cristal_sucio» no tiene textura base.', next: ['Abre la pieza faro_lente_01 y asigna una textura base al material «cristal_sucio».', 'Si el material debe ser translúcido, marca «sin textura» en su ficha.', 'Vuelve a lanzar la exportación.'] };
+  const running = { id: 'j3', name: 'Construir kit Astillero', cmd: 'kiln build --kit astillero', status: 'running', pct: 62, start: '14:31', dur: '', log: genLog(88), kit: 'astillero' };
+  return [running, done, failed];
+}
+function doneLog(variant) {
+  const els = BASE.elements, L = [{ t: clockStr(0), lvl: 'info', msg: 'Leyendo el conjunto «Misiones de Puerto Niebla»' }, { t: clockStr(1), lvl: 'info', msg: '120 elementos en 4 tipos' }];
+  for (let i = 0; i < 22; i++) { const e = els[(i * 5 + 2) % els.length], warn = variant !== 'clean' && i % 7 === 3; L.push({ t: clockStr(L.length), lvl: warn ? 'warn' : 'info', msg: warn ? `${e.id}: campo opcional vacío` : `${e.id} validado` }); }
+  L.push({ t: clockStr(L.length), lvl: 'info', msg: variant === 'clean' ? 'Terminado: 120 elementos, sin hallazgos' : 'Terminado: 120 elementos, 9 hallazgos (2 errores, 5 avisos, 2 notas)' });
+  return L;
+}
+const runningJob = () => DB.jobs.find(j => j.status === 'running') || null;
+const busyText = () => { const j = runningJob(); return j ? `${j.name.replace('Construir kit', 'construyendo kit')} · ${Math.floor(j.pct)} %` : DB.reading ? 'releyendo el proyecto' : null; };
+const busyReason = () => { const j = runningJob(); return j ? `Hay un trabajo en marcha: ${j.name} (${Math.floor(j.pct)} %). Espera a que termine o consúltalo en Trabajos.` : DB.reading ? 'Kiln está releyendo el proyecto.' : ''; };
+function emitJob(job, line) { JOBS.subs.forEach(fn => fn(job, line)); renderStatus(); renderNav(); }
+function startTimer() {
+  clearInterval(JOBS.timer);
+  JOBS.timer = setInterval(() => {
+    const j = runningJob(); if (!j) return;
+    j.pct = Math.min(100, j.pct + 0.9);
+    const p = pick(BASE.piecesByKit.get(j.kit || 'astillero'));
+    const line = { t: clockStr(j.log.length), lvl: R() < .08 ? 'warn' : 'info', msg: `Optimizando ${p.name} (${fmt(Math.round(300 + R() * 5000))} → ${fmt(Math.round(200 + R() * 3000))} triángulos)` };
+    j.log.push(line);
+    if (j.pct >= 100) {
+      j.status = 'done'; j.dur = '4 min 02 s'; j.out = 'out/' + (j.kit || 'astillero') + '/'; j.summary = { a: 280, b: 3, c: 0 };
+      j.log.push({ t: clockStr(j.log.length), lvl: 'info', msg: 'Construcción terminada: 280 piezas, 0 errores' });
+      toast({ kind: 'ok', title: j.name + ': terminado', text: '280 piezas procesadas.', action: { label: 'Ver el registro', fn: () => go('trabajos', [j.id]) } });
+    }
+    emitJob(j, line);
+  }, 700);
+}
+function startJob(name, kit) {
+  const j = { id: 'j' + (++JOBS.seq), name, cmd: 'kiln build --kit ' + kit, status: 'running', pct: 3, start: '14:3' + (JOBS.seq % 9), dur: '', log: genLog(6), kit };
+  DB.jobs.unshift(j); toast({ kind: 'info', title: 'Trabajo iniciado', text: name + '. Puedes seguir usando Kiln mientras tanto.', action: { label: 'Ver trabajo', fn: () => go('trabajos', [j.id]) } });
+  emitJob(j); startTimer();
+}
+
+/* =========================================================================
+   4. Ruta en la URL:  #/vista/a/b?clave=valor   (recargar y atras/adelante)
+   ========================================================================= */
+let route = { view: 'inicio', parts: [], q: new URLSearchParams() };
+const KEEP = ['p', 't', 'm', 'd'];
+function parseHash() {
+  const raw = location.hash.replace(/^#/, '') || '/inicio';
+  const [path, qs] = raw.split('?');
+  const parts = path.split('/').filter(Boolean).map(decodeURIComponent);
+  return { view: parts[0] || 'inicio', parts: parts.slice(1), q: new URLSearchParams(qs || '') };
+}
+function href(view, parts = [], params = {}) {
+  const q = new URLSearchParams();
+  route.q.forEach((v, k) => { if (KEEP.includes(k) || (view === route.view && !['x'].includes(k))) q.set(k, v); });
+  for (const [k, v] of Object.entries(params)) { if (v === null || v === '' || v === undefined) q.delete(k); else q.set(k, v); }
+  q.delete('x');
+  const s = q.toString();
+  return '#/' + [view, ...parts].map(encodeURIComponent).join('/') + (s ? '?' + s : '');
+}
+function go(view, parts, params) { location.hash = href(view, parts, params); }
+function setParams(params, rerender) { // cambia parametros sin crear historial
+  const h = href(route.view, route.parts, params);
+  history.replaceState(null, '', h); route = parseHash(); if (rerender) onRoute(false);
+}
+
+/* =========================================================================
+   5. Componentes: avisos, lista virtual, dialogos, paleta, buscador global
+   ========================================================================= */
+/* ---- Avisos (toast): ok / info se cierran solos; error se queda con accion */
+function toast(o) {
+  const host = $(o.kind === 'error' ? '#alerts' : '#toasts');
+  const el = document.createElement('div');
+  el.className = 'toast ' + o.kind;
+  el.innerHTML = `<div><strong>${esc(o.title)}</strong>${o.text ? `<p>${esc(o.text)}</p>` : ''}${o.action ? `<button type="button" class="btn sm">${esc(o.action.label)}</button>` : ''}</div><button type="button" class="iconbtn" aria-label="Cerrar aviso">×</button>`;
+  const close = () => el.remove();
+  el.querySelector('.iconbtn').onclick = close;
+  if (o.action) el.querySelector('.btn').onclick = () => { o.action.fn(); close(); };
+  host.appendChild(el);
+  while (host.children.length > 3) host.firstChild.remove();
+  if (o.kind !== 'error') setTimeout(close, 6000);
+}
+
+/* ---- Lista virtual: solo pinta la ventana visible; orden, teclado -------- */
+function VList(root, o) {
+  const H = o.rowH || 32;
+  let rows = [], idx = new Map(), sortKey = o.sort.key, sortDir = o.sort.dir, active = -1, selId = null, vis = [], rafId = 0;
+  root.innerHTML = `<div class="vgrid" role="grid" tabindex="0" aria-label="${esc(o.label)}" aria-rowcount="1">
+    <div class="vh" role="row"></div><div class="vb"><div class="vs"><div class="vr" role="rowgroup"></div></div></div><div class="vfoot" aria-hidden="true"><span></span><span></span></div></div>`;
+  const g = $('.vgrid', root), vh = $('.vh', root), vb = $('.vb', root), vs = $('.vs', root), vr = $('.vr', root), foot = $('.vfoot', root);
+  const colOf = k => o.columns.find(c => c.key === k);
+  function layout() {
+    const w = vb.clientWidth;
+    vis = o.columns.filter(c => !(o.hidden && o.hidden.includes(c.key)));
+    const droppable = () => vis.filter(c => c.opt).sort((a, b) => a.prio - b.prio)[0];
+    const need = () => vis.reduce((s, c) => s + c.min, 0) + 12 * (vis.length - 1) + 32;
+    while (need() > w && droppable()) vis.splice(vis.indexOf(droppable()), 1);
+    g.style.setProperty('--cols', vis.map(c => c.w).join(' '));
+    vh.style.paddingRight = (16 + vb.offsetWidth - vb.clientWidth) + 'px';
+    vh.innerHTML = vis.map(c => `<div role="columnheader" class="${c.align === 'r' ? 'r' : ''}" aria-sort="${c.key === sortKey ? (sortDir > 0 ? 'ascending' : 'descending') : 'none'}">${c.sort ? `<button type="button" class="hbtn" data-k="${c.key}" ${c.key === sortKey ? `data-on data-dir="${sortDir}"` : ''}>${esc(c.label)}<i class="arr" aria-hidden="true"></i></button>` : `<span class="hbtn" style="cursor:default">${esc(c.label)}</span>`}</div>`).join('');
+  }
+  function sortRows(arr) {
+    const c = colOf(sortKey); if (!c) return arr.slice();
+    const v = c.val || (r => r[c.key]);
+    return arr.slice().sort((a, b) => { const x = v(a), y = v(b); const d = typeof x === 'number' ? x - y : String(x).localeCompare(String(y), 'es', { numeric: true }); return (d || String(a.id).localeCompare(String(b.id))) * sortDir; });
+  }
+  function paint() {
+    rafId = 0;
+    const top = vb.scrollTop, hgt = vb.clientHeight || 400;
+    const first = Math.max(0, Math.floor(top / H) - 6), last = Math.min(rows.length, Math.ceil((top + hgt) / H) + 6);
+    vs.style.height = rows.length * H + 'px'; vr.style.transform = `translateY(${first * H}px)`;
+    let h = '';
+    for (let i = first; i < last; i++) {
+      const r = rows[i], sel = r.id === selId;
+      h += `<div class="vrow${sel ? ' sel' : ''}${i === active ? ' act' : ''}" role="row" id="vr${i}" aria-rowindex="${i + 2}" aria-selected="${sel}" data-i="${i}" style="height:${H}px">${vis.map(c => `<div class="vc ${c.cls || ''}${c.align === 'r' ? ' r' : ''}${c.bad && c.bad(r) ? ' bad' : ''}" role="gridcell">${c.cell(r)}</div>`).join('')}</div>`;
+    }
+    vr.innerHTML = h;
+    foot.firstChild.textContent = rows.length ? `Filas ${fmt(first + 1)}–${fmt(last)} de ${fmt(rows.length)}` : 'Sin filas';
+    foot.lastChild.textContent = `${vr.children.length} filas en el DOM`;
+    g.setAttribute('aria-rowcount', rows.length + 1);
+    g.setAttribute('aria-activedescendant', active >= first && active < last ? 'vr' + active : '');
+  }
+  const schedule = () => { if (!rafId) rafId = requestAnimationFrame(paint); };
+  function ensure(i) { const t = i * H; if (t < vb.scrollTop) vb.scrollTop = t; else if (t + H > vb.scrollTop + vb.clientHeight) vb.scrollTop = t + H - vb.clientHeight; }
+  function choose(i) { if (i >= 0 && i < rows.length) { active = i; o.onSelect(rows[i]); paint(); } }
+  vb.addEventListener('scroll', schedule);
+  vh.addEventListener('click', e => { const b = e.target.closest('.hbtn[data-k]'); if (!b) return; const k = b.dataset.k; sortDir = k === sortKey ? -sortDir : (colOf(k).align === 'r' ? -1 : 1); sortKey = k; rows = sortRows(rows); reindex(); layout(); vb.scrollTop = 0; paint(); o.onSort && o.onSort(k, sortDir); $('.hbtn[data-k="' + k + '"]', vh).focus(); });
+  vr.addEventListener('click', e => { const r = e.target.closest('.vrow'); if (r) { g.focus({ preventScroll: true }); choose(+r.dataset.i); } });
+  g.addEventListener('keydown', e => {
+    const page = Math.max(1, Math.floor(vb.clientHeight / H) - 1);
+    const map = { ArrowDown: 1, ArrowUp: -1, PageDown: page, PageUp: -page };
+    if (e.key in map) { e.preventDefault(); active = Math.max(0, Math.min(rows.length - 1, (active < 0 ? (e.key === 'ArrowUp' ? 0 : -1) : active) + map[e.key])); ensure(active); paint(); }
+    else if (e.key === 'Home') { e.preventDefault(); active = 0; ensure(0); paint(); }
+    else if (e.key === 'End') { e.preventDefault(); active = rows.length - 1; ensure(active); paint(); }
+    else if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (active < 0 && rows.length) active = 0; choose(active); }
+  });
+  const ro = new ResizeObserver(() => { layout(); paint(); }); ro.observe(vb);
+  const reindex = () => { idx = new Map(rows.map((r, i) => [r.id, i])); };
+  layout();
+  return {
+    setRows(arr, keepScroll) { rows = sortRows(arr); reindex(); if (!keepScroll) vb.scrollTop = 0; active = selId && idx.has(selId) ? idx.get(selId) : -1; layout(); paint(); },
+    select(id, scroll) { selId = id; active = id && idx.has(id) ? idx.get(id) : active; if (scroll && id && idx.has(id)) { const i = idx.get(id); const t = i * H; if (t < vb.scrollTop || t > vb.scrollTop + vb.clientHeight - H) vb.scrollTop = Math.max(0, t - vb.clientHeight / 3); } paint(); },
+    hide(keys) { o.hidden = keys; layout(); paint(); }, destroy() { ro.disconnect(); }, get nodes() { return vr.children.length; }
+  };
+}
+
+/* ---- Barra de filtros comun a Catalogo, Contenido y Materiales ---------- */
+function Filters(root, o) { // o: {id,label,placeholder,noun:[uno,muchos],onChange,extra}
+  root.innerHTML = `<div class="toolbar"><label class="sr" for="${o.id}-f">${esc(o.label)}</label>
+    <input id="${o.id}-f" class="field" type="text" placeholder="${esc(o.placeholder)}" autocomplete="off">
+    <span class="count" role="status" aria-live="polite" id="${o.id}-n"></span>
+    <div class="chips" role="group" aria-label="Filtrar por gravedad" id="${o.id}-c"></div>
+    <button type="button" class="btn sm ghost" id="${o.id}-x" hidden>Quitar filtros</button><span class="grow"></span><span id="${o.id}-e"></span></div>`;
+  const inp = $('#' + o.id + '-f', root), cnt = $('#' + o.id + '-n', root), chips = $('#' + o.id + '-c', root), clr = $('#' + o.id + '-x', root);
+  let sevs = new Set(), q = '', tally = {};
+  const state = () => ({ q: norm(q.trim()), sevs });
+  const emit = debounce(() => { setParams({ q: q.trim() || null, sev: sevs.size ? [...sevs].join(',') : null }); o.onChange(state()); }, 0);
+  inp.addEventListener('input', debounce(() => { q = inp.value; emit(); }, 120));
+  clr.onclick = () => { q = ''; inp.value = ''; sevs = new Set(); drawChips(); emit(); inp.focus(); };
+  chips.addEventListener('click', e => { const b = e.target.closest('.chip'); if (!b) return; const s = b.dataset.sev; sevs.has(s) ? sevs.delete(s) : sevs.add(s); drawChips(); emit(); });
+  function drawChips() {
+    chips.innerHTML = ['error', 'warn', 'info', 'none'].map(s => `<button type="button" class="chip" data-sev="${s}" aria-pressed="${sevs.has(s)}">${s === 'none' ? '<i class="dot ok" aria-hidden="true"></i>Sin problemas' : dot(s) + SEVNAME[s]}<b>${fmt(tally[s] || 0)}</b></button>`).join('');
+    clr.hidden = !(sevs.size || q.trim());
+  }
+  return {
+    sync(rt) { q = rt.q.get('q') || ''; inp.value = q; sevs = new Set((rt.q.get('sev') || '').split(',').filter(Boolean)); drawChips(); },
+    setTally(t) { tally = t; drawChips(); },
+    setCount(n, total) { cnt.innerHTML = n === total ? `<b>${fmt(total)}</b> ${total === 1 ? o.noun[0] : o.noun[1]}` : `<b>${fmt(n)}</b> de ${fmt(total)} ${o.noun[1]}`; },
+    state, extra: $('#' + o.id + '-e', root), focus: () => inp.focus()
+  };
+}
+const passSev = (sevs, sev) => !sevs.size || sevs.has(sev || 'none');
+
+/* ---- Botones con razon cuando estan deshabilitados por un trabajo ------- */
+let tipN = 0;
+function actBtn(label, act, o = {}) {
+  const busy = o.needsIdle && busyReason();
+  const id = 'tip' + (++tipN);
+  return `<button type="button" class="btn${o.primary ? ' primary' : ''}${o.sm ? ' sm' : ''}" data-act="${act}" ${o.data || ''} ${busy ? `aria-disabled="true" data-tip="${esc(busy)}" data-tip-align="${o.align || 'left'}" aria-describedby="${id}"` : ''}>${esc(label)}</button>${busy ? `<span class="sr" id="${id}">${esc(busy)}</span>` : ''}`;
+}
+const emptyBlock = (title, text, btnLabel, act, o = {}) => `<div class="empty${o.small ? ' small' : ''}">${svgBox}<h3>${esc(title)}</h3><p>${text}</p>${o.extra || ''}${btnLabel ? `<button type="button" class="btn primary" data-act="${act}">${esc(btnLabel)}</button>` : ''}</div>`;
+const pageHead = (title, sub, right = '') => `<div class="pagehead"><div><h1>${esc(title)}</h1><p class="sub">${sub}</p></div>${right}</div>`;
+
+/* ---- Dialogo propio: nombrar una variante ------------------------------- */
+const dlgV = $('#dlgVariant'); let variantFor = null;
+function openVariant(pieceId) {
+  variantFor = pieceId;
+  $('#dvP').textContent = `Variante de ${pieceId}: reutiliza la malla y cambia material o textura.`;
+  $('#dvName').value = ''; $('#dvName').removeAttribute('aria-invalid'); $('#dvErr').textContent = '';
+  updatePrev(); dlgV.showModal(); $('#dvName').focus();
+}
+const variantOk = v => /^[a-z0-9][a-z0-9_-]{2,31}$/.test(v);
+function updatePrev() { const v = $('#dvName').value.trim(); $('#dvPrev').textContent = 'Se creará: ' + variantFor + '__' + (v || '…'); }
+$('#dvName').addEventListener('input', () => { updatePrev(); $('#dvErr').textContent = ''; $('#dvName').removeAttribute('aria-invalid'); });
+$('#dvCancel').onclick = () => dlgV.close();
+$('#fVariant').addEventListener('submit', e => {
+  e.preventDefault();
+  const v = $('#dvName').value.trim(); let err = '';
+  if (!v) err = 'Escribe un nombre para la variante.';
+  else if (!variantOk(v)) err = 'Usa de 3 a 32 caracteres: minúsculas, números, guion o guion bajo.';
+  else if (['oxidado', 'nocturno'].includes(v)) err = `Ya existe una variante «${v}» de esta pieza. Elige otro nombre.`;
+  if (err) { $('#dvErr').textContent = err; $('#dvName').setAttribute('aria-invalid', 'true'); $('#dvName').focus(); return; }
+  dlgV.close(); toast({ kind: 'ok', title: 'Variante creada', text: `${variantFor}__${v} está lista para asignar material.` });
+});
+dlgV.addEventListener('click', e => { if (e.target === dlgV) dlgV.close(); });
+
+/* ---- Paleta de comandos (Ctrl/Cmd+K) ------------------------------------ */
+const dlgP = $('#dlgPal'); let palItems = [], palActive = 0;
+const VIEWLIST = [['inicio', 'Inicio'], ['contexto', 'Contexto'], ['arbol', 'Árbol'], ['contenido', 'Contenido'], ['catalogo', 'Catálogo'], ['materiales', 'Materiales'], ['trabajos', 'Trabajos']];
+function palCollect(q) {
+  const out = [], n = norm(q.trim());
+  VIEWLIST.forEach(([id, label]) => { if (!n || norm(label).includes(n) || 'ir a'.includes(n)) out.push({ g: 'Ir a', label: label, hint: 'Vista', run: () => go(id) }); });
+  const sel = route.view === 'catalogo' && route.parts[1] && DB.pieceById.get(route.parts[1]);
+  const acts = [
+    { label: 'Releer el proyecto', hint: 'Acción', run: () => doReleer() },
+    { label: sel ? `Crear variante de ${sel.name}…` : 'Crear variante de la pieza seleccionada…', hint: sel ? 'Acción' : 'Selecciona una pieza', dis: !sel, run: () => openVariant(sel.id) },
+    { label: 'Construir el kit Astillero', hint: busyReason() ? 'No disponible: hay un trabajo en marcha' : 'Acción', dis: !!busyReason() || DB.empty, run: () => startJob('Construir kit Astillero', 'astillero') },
+    { label: 'Mostrar u ocultar el panel de detalle', hint: 'Acción', run: () => togglePanel() },
+    { label: 'Cambiar de tema, claro u oscuro', hint: 'Acción', run: () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark') }
+  ];
+  acts.forEach(a => { if (!n || norm(a.label).includes(n) || norm(a.hint).includes(n)) out.push({ g: 'Acciones', ...a }); });
+  if (n.length >= 2) {
+    DB.pieces.filter(p => norm(p.k).includes(n)).sort((a, b) => norm(a.name).includes(n) === norm(b.name).includes(n) ? 0 : norm(a.name).includes(n) ? -1 : 1).slice(0, 8).forEach(p => out.push({ g: 'Piezas', label: p.name, mono: true, hint: DB.kitById.get(p.kit).name, run: () => go('catalogo', [p.kit, p.id], { q: null, sev: null }) }));
+  }
+  return out;
+}
+function palRender(q) {
+  palItems = palCollect(q); palActive = Math.min(palActive, Math.max(0, palItems.length - 1));
+  let h = '', g = '';
+  palItems.forEach((it, i) => { if (it.g !== g) { g = it.g; h += `<h3>${esc(g)}</h3>`; } h += `<div class="opt" role="option" id="po${i}" data-i="${i}" aria-selected="${i === palActive}" ${it.dis ? 'aria-disabled="true"' : ''}><span class="t${it.mono ? ' mono' : ''}">${matchTxt(it.label, norm(q.trim()))}</span><span class="h">${esc(it.hint)}</span></div>`; });
+  $('#plist').innerHTML = h || '<p class="muted" style="padding:16px">Nada coincide. Prueba con el nombre de una vista o de una pieza.</p>';
+  $('#pq').setAttribute('aria-activedescendant', palItems.length ? 'po' + palActive : '');
+  const el = $('#po' + palActive); el && el.scrollIntoView({ block: 'nearest' });
+}
+function palRun(i) { const it = palItems[i]; if (!it) return; if (it.dis) { toast({ kind: 'info', title: 'No disponible ahora', text: it.hint }); return; } dlgP.close(); it.run(); }
+function openPalette() { $('#pq').value = ''; palActive = 0; palRender(''); if (!dlgP.open) dlgP.showModal(); $('#pq').focus(); }
+$('#pq').addEventListener('input', () => { palActive = 0; palRender($('#pq').value); });
+$('#pq').addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown') { e.preventDefault(); palActive = (palActive + 1) % Math.max(1, palItems.length); palRender($('#pq').value); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); palActive = (palActive - 1 + palItems.length) % Math.max(1, palItems.length); palRender($('#pq').value); }
+  else if (e.key === 'Enter') { e.preventDefault(); palRun(palActive); }
+});
+$('#plist').addEventListener('click', e => { const o = e.target.closest('.opt'); if (o) palRun(+o.dataset.i); });
+dlgP.addEventListener('click', e => { if (e.target === dlgP) dlgP.close(); });
+
+/* ---- Buscador global con resultados agrupados (espera de 120 ms) -------- */
+const gq = $('#gq'), gres = $('#gres'); let gItems = [], gActive = -1;
+function gSearch() {
+  const n = norm(gq.value.trim()); gItems = [];
+  if (n.length < 2) { gClose(); return; }
+  const groups = [
+    ['Piezas', DB.pieces.filter(p => norm(p.k).includes(n)).sort((a, b) => norm(a.name).includes(n) === norm(b.name).includes(n) ? 0 : norm(a.name).includes(n) ? -1 : 1), p => ({ label: p.name, mono: 1, hint: DB.kitById.get(p.kit).name, go: () => go('catalogo', [p.kit, p.id], { q: null, sev: null }) }), 5],
+    ['Materiales', DB.materials.filter(m => norm(m.name).includes(n)), m => ({ label: m.name, mono: 1, hint: plural(m.uses, 'pieza', 'piezas'), go: () => go('materiales', [m.id], { q: null, sev: null }) }), 3],
+    ['Kits', DB.kits.filter(k => norm(k.name).includes(n)), k => ({ label: k.name, hint: plural(k.count, 'pieza', 'piezas'), go: () => go('catalogo', [k.id], { q: null, sev: null }) }), 3],
+    ['Contenido', DB.elements.filter(e => norm(e.title + ' ' + e.id).includes(n)), e => ({ label: e.title, hint: DB.kindById.get(e.kind).name, go: () => go('contenido', [e.kind, e.id], { q: null, sev: null }) }), 3]
+  ];
+  let h = '', i = 0;
+  groups.forEach(([name, list, map, lim]) => {
+    if (!list.length) return;
+    h += `<div role="group" aria-label="${name}"><h3>${name} <span style="font-weight:500">${fmt(list.length)}</span></h3>`;
+    list.slice(0, lim).forEach(x => { const r = map(x); gItems.push(r); h += `<div class="opt" role="option" id="g${i}" data-i="${i}" aria-selected="false"><span class="t${r.mono ? ' mono' : ''}">${matchTxt(r.label, n)}</span><span class="h">${esc(r.hint)}</span></div>`; i++; });
+    if (list.length > lim) h += `<div class="sfoot" style="border:0;margin:0;padding:2px 8px 6px">y ${fmt(list.length - lim)} más</div>`;
+    h += '</div>';
+  });
+  if (!gItems.length) h = `<p class="muted" style="padding:12px 8px">Nada coincide con «${esc(gq.value.trim())}». Prueba con parte del nombre.</p>`;
+  else h += '<div class="sfoot">↑ ↓ para moverte · Enter para abrir · Esc para cerrar</div>';
+  gres.innerHTML = h; gres.hidden = false; gq.setAttribute('aria-expanded', 'true'); gActive = -1;
+}
+function gClose() { gres.hidden = true; gq.setAttribute('aria-expanded', 'false'); gq.removeAttribute('aria-activedescendant'); gActive = -1; }
+function gMove(d) { if (!gItems.length) return; gActive = (gActive + d + gItems.length) % gItems.length; gres.querySelectorAll('.opt').forEach((o, i) => o.setAttribute('aria-selected', i === gActive)); gq.setAttribute('aria-activedescendant', 'g' + gActive); $('#g' + gActive).scrollIntoView({ block: 'nearest' }); }
+function gRun(i) { const it = gItems[i]; if (!it) return; gClose(); gq.value = ''; gq.blur(); it.go(); }
+gq.addEventListener('input', debounce(gSearch, 120));
+gq.addEventListener('focus', () => { if (gq.value.trim().length >= 2) gSearch(); });
+gq.addEventListener('keydown', e => {
+  if (e.key === 'ArrowDown') { e.preventDefault(); if (gres.hidden) gSearch(); gMove(1); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); gMove(-1); }
+  else if (e.key === 'Enter') { e.preventDefault(); gRun(gActive < 0 ? 0 : gActive); }
+  else if (e.key === 'Escape') { if (!gres.hidden) { e.preventDefault(); gClose(); } else gq.blur(); }
+});
+gres.addEventListener('mousedown', e => { const o = e.target.closest('.opt'); if (o) { e.preventDefault(); gRun(+o.dataset.i); } });
+document.addEventListener('click', e => { if (!e.target.closest('.search')) gClose(); });
+
+/* =========================================================================
+   6. Panel de detalle (derecha, plegable)
+   ========================================================================= */
+let panelOpen = true, lastDetailKey = '';
+const wide = () => matchMedia('(min-width: 1101px)').matches;
+function findingsHtml(list) {
+  if (!list.length) return `<div class="calm" style="padding:14px">${svgCheck}<div><b>Sin hallazgos</b><span>Esta ficha valida sin problemas.</span></div></div>`;
+  return list.map(f => `<div class="finding"><div class="fh"><span class="sev ${f.sev}">${dot(f.sev)}${SEVNAME[f.sev]}</span><code>${esc(f.code)}</code></div><div>${esc(f.msg)}</div><div class="fix">Qué hacer: ${esc(f.hint)}</div></div>`).join('');
+}
+function detailFor(rt) {
+  const part = rt.parts, v = rt.view;
+  if (v === 'catalogo') {
+    const p = part[1] && DB.pieceById.get(part[1]);
+    if (p) {
+      const k = DB.kitById.get(p.kit), fl = DB.fBy.piece.get(p.id) || [], over = p.tris > 6000;
+      return { kind: 'Pieza', title: p.name, mono: 1, html: `
+        <div class="actions">${actBtn('Crear variante…', 'variante', { data: `data-piece="${esc(p.id)}"` })}${actBtn('Abrir en el visor 3D', 'visor', { data: `data-piece="${esc(p.id)}"` })}${actBtn('Construir el kit', 'construir', { needsIdle: true, data: `data-kit="${esc(k.id)}"`, align: 'left' })}</div>
+        <section><h3 class="sec">Datos</h3><dl>
+          <dt>Kit</dt><dd><a href="${href('catalogo', [k.id])}">${esc(k.name)}</a></dd>
+          <dt>Material</dt><dd><a href="${href('materiales', [p.material], { q: null, sev: null })}">${esc(p.material)}</a></dd>
+          <dt>Triángulos</dt><dd>${fmt(p.tris)} de 6.000</dd>
+          <dt>Tamaño</dt><dd>${fmt(p.kb)} KB · textura ${p.tex} px</dd>
+          <dt>Variantes</dt><dd>${p.variants}</dd><dt>Modificada</dt><dd>${esc(p.mod)}</dd>
+          <dt>Archivo</dt><dd>${esc(k.id)}/${esc(p.name)}.glb</dd></dl>
+          <div class="meter ${over ? 'bad' : ''}" style="margin-top:12px" role="img" aria-label="Presupuesto de triángulos: ${Math.round(p.tris / 60)} %"><i style="width:${Math.min(100, p.tris / 60)}%"></i></div></section>
+        <section><h3 class="sec">Hallazgos de esta pieza <span class="n">${fl.length}</span></h3>${findingsHtml(fl)}</section>` };
+    }
+    const k = DB.kitById.get(part[0]);
+    if (k) return { kind: 'Kit', title: k.name, html: `
+      <p class="muted">${esc(k.desc)}</p>
+      <div class="actions">${actBtn('Construir este kit', 'construir', { primary: 1, needsIdle: true, data: `data-kit="${esc(k.id)}"` })}<a class="btn" href="${href('arbol', ['kit-' + k.id], { q: null, sev: null })}" style="text-decoration:none;color:inherit">Ver en el árbol</a></div>
+      <section><h3 class="sec">Resumen</h3><dl><dt>Piezas</dt><dd>${fmt(k.count)}</dd><dt>Errores</dt><dd>${k.c.error}</dd><dt>Avisos</dt><dd>${k.c.warn}</dd><dt>Notas</dt><dd>${k.c.info}</dd><dt>Carpeta</dt><dd>kits/${esc(k.id)}/kit.toml</dd></dl></section>` };
+    return { hint: 'Selecciona una pieza para ver su ficha, sus hallazgos y sus acciones.' };
+  }
+  if (v === 'contenido') {
+    const e = part[1] && DB.elById.get(part[1]);
+    if (e) { const fl = DB.fBy.element.get(e.id) || [], kd = DB.kindById.get(e.kind);
+      return { kind: kd.name, title: e.title, html: `<div class="actions">${actBtn('Abrir el fichero', 'copiar', { data: `data-what="content/${esc(e.kind)}/${esc(e.id)}.toml"` })}</div>
+        <section><h3 class="sec">Datos</h3><dl><dt>Identificador</dt><dd>${esc(e.id)}</dd><dt>Conjunto</dt><dd>Misiones de Puerto Niebla</dd><dt>Detalle</dt><dd>${esc(e.detail)}</dd><dt>Referencias</dt><dd>${e.refs}</dd><dt>Fichero</dt><dd>content/${esc(e.kind)}/${esc(e.id)}.toml</dd></dl></section>
+        <section><h3 class="sec">Hallazgos <span class="n">${fl.length}</span></h3>${findingsHtml(fl)}</section>` }; }
+    return { hint: 'Selecciona un elemento para ver sus campos y hallazgos.' };
+  }
+  if (v === 'materiales') {
+    const m = part[0] && DB.matById.get(part[0]);
+    if (m) { const fl = DB.fBy.material.get(m.id) || [];
+      return { kind: 'Material', title: m.name, mono: 1, html: `
+        <section><h3 class="sec">Datos</h3><dl><dt>Tipo</dt><dd>${esc(m.type)}</dd><dt>Textura</dt><dd>${m.tex} px</dd><dt>Usado por</dt><dd>${plural(m.uses, 'pieza', 'piezas')} en ${plural(m.nk, 'kit', 'kits')}</dd><dt>Fichero</dt><dd>materials/${esc(m.name)}.toml</dd></dl></section>
+        <section><h3 class="sec">Kits que lo usan</h3>${m.kits.length ? `<ul class="minilist">${m.kits.map(id => `<li><a href="${href('catalogo', [id], { q: m.name, sev: null })}">${esc(DB.kitById.get(id).name)}</a><span class="muted">${plural(DB.piecesByKit.get(id).filter(p => p.material === m.id).length, 'pieza', 'piezas')}</span></li>`).join('')}</ul>` : '<p class="muted">Ningún kit lo usa todavía.</p>'}</section>
+        <section><h3 class="sec">Hallazgos <span class="n">${fl.length}</span></h3>${findingsHtml(fl)}</section>` }; }
+    return { hint: 'Selecciona un material para ver dónde se usa.' };
+  }
+  if (v === 'arbol') {
+    const n = TREE.byId.get(part[0] || 'juego');
+    if (n) return { kind: n.kindLabel, title: n.name, html: `
+      <dl><dt>Identificador</dt><dd>${esc(n.id)}</dd><dt>Declarado en</dt><dd>${esc(n.src)}</dd><dt>Elementos</dt><dd>${fmt(n.count)} ${esc(n.unit)}</dd><dt>Hijos</dt><dd>${n.kids.length}</dd></dl>
+      <div class="actions">${n.open ? `<a class="btn primary" style="text-decoration:none" href="${n.open}">${esc(n.openLabel)}</a>` : ''}</div>
+      <section><h3 class="sec">Gravedad</h3><p>${n.sev ? sevLabel(n.sev) + ` · ${fmt(n.nf)} hallazgos debajo` : '<span class="sev ok">' + dot('ok') + 'Sin problemas</span>'}</p></section>
+      ${n.kids.length ? `<section><h3 class="sec">Contiene</h3><ul class="minilist">${n.kids.map(c => `<li><a href="${href('arbol', [c.id])}">${esc(c.name)}</a><span class="muted">${fmt(c.count)}</span></li>`).join('')}</ul></section>` : ''}` };
+  }
+  if (v === 'contexto') {
+    const c = part[0] && DB.claimById.get(part[0]);
+    if (c) return { kind: 'Afirmación', title: c.text, html: `<dl><dt>Estado</dt><dd>${c.state === 'set' ? 'Fijada' : 'Abierta'}</dd><dt>Capa</dt><dd>${esc(DB.layers.find(l => l.id === c.layer).name)}</dd><dt>Declarada en</dt><dd>${esc(c.src)}</dd></dl>
+      <div class="actions"><button type="button" class="btn ${c.state === 'open' ? 'primary' : ''}" data-act="claim" data-id="${c.id}">${c.state === 'open' ? 'Marcar como fijada' : 'Reabrir'}</button></div>
+      <p class="muted">${c.state === 'open' ? 'Mientras esté abierta, Kiln no puede comprobar nada que dependa de ella.' : 'Kiln usa esta afirmación para validar piezas y contenido.'}</p>` };
+    return { hint: 'Selecciona una afirmación para ver de dónde sale.' };
+  }
+  if (v === 'trabajos') {
+    const j = DB.jobs.find(x => x.id === part[0]) || DB.jobs[0];
+    if (j) return { kind: 'Trabajo', title: j.name, html: `<section><h3 class="sec">Parámetros</h3><dl><dt>Orden</dt><dd>${esc(j.cmd)}</dd><dt>Inicio</dt><dd>${esc(j.start)}</dd><dt>Estado</dt><dd>${j.status === 'running' ? 'en curso' : j.status === 'done' ? 'terminado' : 'fallido'}</dd>${j.out ? `<dt>Salida</dt><dd>${esc(j.out)}</dd>` : ''}</dl></section>`
+      + (j.status === 'running' ? `<div class="actions">${actBtn('Cancelar el trabajo', 'cancelar', {})}</div>` : '') };
+  }
+  return null;
+}
+function renderDetail(force) {
+  const d = $('#detail'), rt = route;
+  const key = rt.view + '|' + rt.parts.join('/') + '|' + DB.variant + '|' + (DB.reading ? 1 : 0) + '|' + (runningJob() ? 1 : 0);
+  if (!force && key === lastDetailKey) return; lastDetailKey = key;
+  const x = detailFor(rt);
+  if (!x) { d.innerHTML = ''; return; }
+  const closeBtn = '<button type="button" class="iconbtn" data-act="panel" aria-label="Cerrar el panel de detalle">×</button>';
+  if (x.hint) { d.innerHTML = `<div class="dhead"><div><div class="kind">Detalle</div></div>${closeBtn}</div><div class="dbody"><div class="empty small">${svgBox}<p>${esc(x.hint)}</p><p><kbd>↑</kbd> <kbd>↓</kbd> para moverte, <kbd>Enter</kbd> para abrir</p></div></div>`; return; }
+  d.innerHTML = `<div class="dhead"><div><div class="kind">${esc(x.kind)}</div><h2 class="${x.mono ? 'mono' : ''}">${esc(x.title)}</h2></div>${closeBtn}</div><div class="dbody">${x.html}</div>`;
+}
+function applyPanel() {
+  const hasPanel = route.view !== 'inicio' && !(cur && cur.noPanel && cur.name === route.view);
+  $('#shell').classList.toggle('with-detail', hasPanel && panelOpen);
+  const b = $('#btnPanel'); b.hidden = !hasPanel; b.setAttribute('aria-expanded', hasPanel && panelOpen);
+}
+function togglePanel(force) { panelOpen = force === undefined ? !panelOpen : force; applyPanel(); if (panelOpen && !wide()) { const c = $('#detail .iconbtn'); c && c.focus(); } }
+
+/* =========================================================================
+   7. Navegacion lateral y barra de estado
+   ========================================================================= */
+function renderNav() {
+  const j = runningJob(), failed = DB.jobs.some(x => x.status === 'failed');
+  const openQ = DB.questions.filter(q => !q.answer).length;
+  const sevAll = DB.findings.reduce((s, f) => worst(s, f.sev), '');
+  const maxOf = (t) => DB.findings.filter(f => f.type === t).reduce((s, f) => worst(s, f.sev), '');
+  const items = [
+    ['inicio', 'Inicio', '', ''], null,
+    ['contexto', 'Contexto', openQ ? 'info' : '', DB.layers.length ? openQ + '<span class="full"> abiertas</span>' : ''], ['arbol', 'Árbol', sevAll, DB.kits.length ? fmt(DB.kits.length) : ''], null,
+    ['contenido', 'Contenido', maxOf('element'), DB.elements.length ? fmt(DB.elements.length) : ''], ['catalogo', 'Catálogo', maxOf('piece'), DB.pieces.length ? fmt(DB.pieces.length) : ''], ['materiales', 'Materiales', maxOf('material'), DB.materials.length ? fmt(DB.materials.length) : ''], null,
+    ['trabajos', 'Trabajos', j ? 'busy' : failed ? 'error' : '', j ? '1<span class="full"> en curso</span>' : DB.jobs.length ? fmt(DB.jobs.length) : '']
+  ];
+  const heads = ['', 'Estructura', 'Datos', 'Actividad']; let hi = 0, h = '';
+  h += `<h2>${heads[hi++]}</h2>`;
+  items.forEach(it => {
+    if (!it) { h += `<h2>${heads[hi++]}</h2>`; return; }
+    const [id, label, sev, cnt] = it;
+    const sr = sev === 'busy' ? 'trabajo en curso' : sev ? ({ error: 'con errores', warn: 'con avisos', info: 'con notas' }[sev]) : '';
+    h += `<a href="${href(id, [], { q: null, sev: null, f: null })}" ${route.view === id ? 'aria-current="page"' : ''}>${dot(sev || 'none')}<span>${label}${sr ? `<span class="sr"> (${sr})</span>` : ''}</span><span class="cnt">${cnt}</span></a>`;
+  });
+  h += `<div class="hint"><div><kbd>${isMac ? '⌘' : 'Ctrl'}</kbd> <kbd>K</kbd> comandos</div><div><kbd>/</kbd> buscar</div></div>`;
+  $('#nav').innerHTML = h;
+}
+function renderStatus() {
+  const t = busyText(), j = runningJob();
+  $('#status').innerHTML = t
+    ? `<a href="${href('trabajos', j ? [j.id] : [], { q: null, sev: null })}" title="Ver el trabajo">${dot('busy')}<span>ocupado: ${esc(t)}</span></a>`
+    : `<span class="idle">${dot('ok')}<span class="t">Listo · releído hace 2 min</span></span>`;
+}
+function doReleer() {
+  if (DB.reading) return;
+  DB.reading = true; renderStatus(); renderNav();
+  setTimeout(() => {
+    DB.reading = false; renderStatus(); renderNav();
+    toast(DB.empty ? { kind: 'info', title: 'Proyecto releído', text: 'Sigue sin haber kits. Añade uno y vuelve a leer.' }
+      : { kind: 'ok', title: 'Proyecto releído', text: `${fmt(DB.pieces.length)} piezas y ${fmt(DB.findings.length)} hallazgos (sin cambios).` });
+  }, 1100);
+}
+
+/* =========================================================================
+   8. VISTA · Inicio
+   ========================================================================= */
+function viewInicio(root) {
+  const k = DB.kits.length, p = DB.pieces.length;
+  const tile = (v, l, d, to) => `<a class="tile${v ? '' : ' zero'}" href="${href(to, [], { q: null, sev: null })}"><div class="v">${fmt(v)}</div><div class="l">${l}</div><div class="d">${d}</div></a>`;
+  const claims = DB.layers.reduce((n, l) => n + l.claims.length, 0);
+  const tiles = `<div class="tiles">${tile(k, 'Kits', k ? '3 lugares' : 'ninguno todavía', 'catalogo')}${tile(p, 'Piezas', k ? 'en ' + k + ' kits' : 'sin piezas', 'catalogo')}${tile(DB.materials.length, 'Materiales', DB.materials.length ? 'de 512 a 2048 px' : 'sin materiales', 'materiales')}${tile(DB.elements.length, 'Elementos', DB.elements.length ? '1 conjunto · 4 tipos' : 'sin contenido', 'contenido')}${tile(DB.layers.length, 'Capas de contexto', claims ? claims + ' afirmaciones' : 'sin contexto', 'contexto')}</div>`;
+  const linkOf = f => f.type === 'piece' ? href('catalogo', [f.kit, f.subj], { q: null, sev: null }) : f.type === 'material' ? href('materiales', [f.subj], { q: null, sev: null }) : href('contenido', [f.kind, f.subj], { q: null, sev: null });
+  const whereOf = f => f.type === 'piece' ? DB.kitById.get(f.kit).name : f.type === 'material' ? 'Material' : 'Contenido';
+  const group = sev => {
+    const list = DB.bySev[sev]; if (!list.length) return '';
+    const top = sev === 'info' ? [] : list.slice(0, 4);
+    return `<div class="gh"><span class="sev ${sev}">${dot(sev)}</span><span class="t">${fmt(list.length)} ${SEVPL[sev]}</span><a href="${href('catalogo', [], { sev, q: null })}">Ver todos</a></div>${top.length ? `<ul>${top.map(f => `<li><a class="issue" href="${linkOf(f)}"><span class="mono">${esc(f.subj)}</span><span class="m">${esc(f.msg)}</span><span class="w">${esc(whereOf(f))}</span></a></li>`).join('')}</ul>` : ''}`;
+  };
+  let wrong;
+  if (DB.empty) wrong = `<section aria-labelledby="hw"><h2 class="sec" id="hw">Cómo empezar</h2>${emptyBlock('Este proyecto aún no tiene nada que validar', 'Kiln lee <code>kiln.toml</code> y las carpetas que declare. Con estos tres pasos tendrás la primera validación.', '', '', { extra: '<ol><li>Declara un kit con su <code>kit.toml</code>.</li><li>Añade las piezas y los materiales que usa.</li><li>Pulsa <b>Releer</b> y revisa lo que Kiln encuentre.</li></ol>' })}</section>`;
+  else if (!DB.findings.length) wrong = `<section aria-labelledby="hw"><h2 class="sec" id="hw">Qué falla</h2><div class="calm">${svgCheck}<div><b>Sin problemas</b><span>${fmt(p)} piezas, ${DB.materials.length} materiales y ${DB.elements.length} elementos validan. Última comprobación hace 2 min.</span></div></div></section>`;
+  else wrong = `<section aria-labelledby="hw"><h2 class="sec" id="hw">Qué falla <span class="n">${fmt(DB.findings.length)} hallazgos</span></h2><div class="card issues">${group('error')}${group('warn')}${group('info')}</div></section>`;
+  let next;
+  if (DB.empty) next = `<div class="card next"><div class="sec" style="margin:0">Siguiente paso</div><h3>Declara tu primer kit</h3><p>Un kit es una carpeta con un <code>kit.toml</code> y las piezas que agrupa. Con uno ya podrás validar y construir.</p><div class="row"><button type="button" class="btn primary" data-act="asistente">Abrir el asistente de inicio</button></div></div>`;
+  else if (DB.badKit) { const first = DB.fBy.piece && DB.findings.find(f => f.sev === 'error' && f.kit === DB.badKit.id); next = `<div class="card next"><div class="sec" style="margin:0">Siguiente paso</div><h3>Corrige los ${DB.badKit.c.error} errores del kit ${esc(DB.badKit.name)}</h3><p>Bloquean su construcción. Empieza por el primero: ${esc(first.msg)}</p><div class="row"><a class="btn primary" style="text-decoration:none" href="${linkOf(first)}">Abrir el primer error</a><a class="btn" style="text-decoration:none;color:inherit" href="${href('catalogo', [DB.badKit.id], { sev: 'error', q: null })}">Ver los ${DB.badKit.c.error} errores</a></div></div>`; }
+  else next = `<div class="card next"><div class="sec" style="margin:0">Siguiente paso</div><h3>Construye el kit Muelle viejo</h3><p>Es el último que cambió y no tiene una construcción reciente. Todo lo demás está validado.</p><div class="row">${actBtn('Construir el kit', 'construir', { primary: 1, needsIdle: true, data: 'data-kit="muelle-viejo"' })}</div></div>`;
+  const j = runningJob();
+  const jobs = DB.jobs.length ? `<section aria-labelledby="hj"><h2 class="sec" id="hj">Trabajos</h2><div class="card">${j ? `<div class="jobmini"><div class="top"><b>${esc(j.name)}</b><span class="muted">${Math.floor(j.pct)} %</span></div><div class="meter" role="progressbar" aria-valuenow="${Math.floor(j.pct)}" aria-valuemin="0" aria-valuemax="100" aria-label="Progreso de ${esc(j.name)}"><i id="hjbar" style="width:${j.pct}%"></i></div></div>` : ''}<ul class="joblist">${DB.jobs.filter(x => x !== j).slice(0, 3).map(x => `<li><a href="${href('trabajos', [x.id], { q: null, sev: null })}">${dot(x.status === 'failed' ? 'error' : 'ok')}<span>${esc(x.name)}</span><span class="when">${x.status === 'failed' ? 'falló' : 'terminado'} · ${esc(x.start)}</span></a></li>`).join('')}</ul></div></section>` : '';
+  root.innerHTML = `<div class="page">${pageHead('Puerto Niebla', DB.empty ? 'Proyecto sin contenido todavía · kiln.toml encontrado' : 'Releído hace 2 min · kiln.toml · 3 lugares')}
+    <div class="home-grid"><div><section aria-labelledby="hh"><h2 class="sec" id="hh">Qué tiene el proyecto</h2>${tiles}</section>${wrong}</div>
+    <div>${next}${jobs}</div></div></div>`;
+  const sub = (job) => { const b = $('#hjbar', root); if (b && job.status === 'running') { b.style.width = job.pct + '%'; b.parentNode.setAttribute('aria-valuenow', Math.floor(job.pct)); b.parentNode.previousElementSibling.lastChild.textContent = Math.floor(job.pct) + ' %'; } };
+  JOBS.subs.add(sub);
+  return { update() {}, destroy() { JOBS.subs.delete(sub); } };
+}
+
+/* =========================================================================
+   9. VISTA · Catálogo (kits + tabla virtual + filtros + detalle)
+   ========================================================================= */
+function viewCatalogo(root, rt) {
+  if (!DB.pieces.length) {
+    root.innerHTML = `<div class="page">${pageHead('Catálogo', 'Piezas por kit')}${emptyBlock('Todavía no hay kits', 'El catálogo lista las piezas de cada kit con su estado de validación. Declara un kit y aparecerán aquí.', 'Abrir el asistente de inicio', 'asistente')}</div>`;
+    return { update() {}, destroy() {}, noPanel: true };
+  }
+  root.innerHTML = `<div class="page fill">${pageHead('Catálogo', `${fmt(DB.pieces.length)} piezas en ${DB.kits.length} kits`, '<div id="cat-act"></div>')}
+    <div class="split"><nav class="card sidelist" aria-label="Kits" id="kl"></nav><div class="pane"><div id="ft"></div><div id="vl" style="display:flex;flex-direction:column;flex:1;min-height:0"></div></div></div></div>`;
+  let kit = 'todos', sel = null;
+  const f = Filters($('#ft', root), { id: 'cat', label: 'Filtrar piezas', placeholder: 'Filtrar por nombre, kit o material', noun: ['pieza', 'piezas'], onChange: () => recompute() });
+  const pcol = { fr: v => v };
+  const vl = VList($('#vl', root), {
+    label: 'Piezas', sort: { key: 'name', dir: 1 }, rowH: 33,
+    columns: [
+      { key: 'name', label: 'Nombre', w: 'minmax(150px, 2.2fr)', min: 150, sort: 1, cls: 'mono', cell: r => esc(r.name) },
+      { key: 'kitn', label: 'Kit', w: 'minmax(96px, 1.2fr)', min: 96, sort: 1, opt: 1, prio: 5, val: r => DB.kitById.get(r.kit).name, cell: r => esc(DB.kitById.get(r.kit).name) },
+      { key: 'material', label: 'Material', w: 'minmax(110px, 1.3fr)', min: 110, sort: 1, opt: 1, prio: 4, cls: 'mono', cell: r => esc(r.material) },
+      { key: 'tris', label: 'Triángulos', w: '80px', min: 80, align: 'r', sort: 1, opt: 1, prio: 6, bad: r => r.tris > 6000, cell: r => fmt(r.tris) },
+      { key: 'kb', label: 'Tamaño KB', w: '84px', min: 84, align: 'r', sort: 1, opt: 1, prio: 2, cell: r => fmt(r.kb) },
+      { key: 'sev', label: 'Estado', w: '108px', min: 108, sort: 1, val: r => RANK[r.sev] * 1000 + r.nf, cell: r => sevLabel(r.sev, r.nf) }
+    ],
+    onSelect: r => { panelOpen = true; go('catalogo', [kit, r.id]); }
+  });
+  function scope() { return kit === 'todos' ? DB.pieces : DB.piecesByKit.get(kit) || []; }
+  function recompute(keepScroll) {
+    const s = scope(), st = f.state();
+    const tally = { error: 0, warn: 0, info: 0, none: 0 };
+    s.forEach(p => tally[p.sev || 'none']++);
+    f.setTally(tally);
+    const rows = s.filter(p => passSev(st.sevs, p.sev) && (!st.q || norm(p.k + ' ' + DB.kitById.get(p.kit).name).includes(st.q)));
+    f.setCount(rows.length, s.length);
+    if (!rows.length) { $('#vl', root).dataset.empty = '1'; }
+    vl.hide(kit === 'todos' ? [] : ['kitn']);
+    vl.setRows(rows, keepScroll);
+    const none = $('#cat-none', root); if (none) none.remove();
+    if (!rows.length) $('.vb', root).insertAdjacentHTML('beforebegin', `<div class="vnone" id="cat-none">${emptyBlock('Ninguna pieza coincide', `Ningún resultado con los filtros actuales en ${kit === 'todos' ? 'todos los kits' : esc(DB.kitById.get(kit).name)}.`, 'Quitar filtros', 'clear-filters', { small: 1 })}</div>`);
+    $('#cat-act', root).innerHTML = kit === 'todos' ? '' : actBtn('Construir este kit', 'construir', { needsIdle: true, data: `data-kit="${esc(kit)}"`, align: 'right' });
+  }
+  function kitList() {
+    $('#kl', root).innerHTML = `<h2>Kits</h2><a href="${href('catalogo', [], { q: null, sev: null })}" ${kit === 'todos' ? 'aria-current="true"' : ''}>${dot('none')}<span>Todos los kits</span><span class="cnt">${fmt(DB.pieces.length)}</span></a><hr>` +
+      DB.kits.map(k => `<a href="${href('catalogo', [k.id], {})}" title="${esc(k.name)}" ${kit === k.id ? 'aria-current="true"' : ''}>${dot(k.sev || 'none')}<span>${esc(k.name)}${k.sev ? `<span class="sr"> (${{ error: 'con errores', warn: 'con avisos', info: 'con notas' }[k.sev]})</span>` : ''}</span><span class="cnt">${fmt(k.count)}</span></a>`).join('');
+  }
+  function apply(rt, first) {
+    const nk = rt.parts[0] && DB.kitById.has(rt.parts[0]) ? rt.parts[0] : 'todos', ns = rt.parts[1] || null;
+    const kitChanged = nk !== kit || first; kit = nk; sel = ns;
+    f.sync(rt); kitList(); recompute(!kitChanged);
+    vl.select(sel, true);
+  }
+  apply(rt, true);
+  return { update: rt2 => apply(rt2, false), destroy() { vl.destroy(); }, clearFilters: () => { setParams({ q: null, sev: null }); apply(route, false); }, focusFilter: f.focus };
+}
+
+/* =========================================================================
+   10. VISTA · Contenido (conjuntos → tipos → elementos)
+   ========================================================================= */
+function viewContenido(root, rt) {
+  if (!DB.elements.length) {
+    root.innerHTML = `<div class="page">${pageHead('Contenido', 'Conjuntos, tipos y elementos')}${emptyBlock('Todavía no hay contenido', 'El contenido son misiones, personajes, objetos y diálogos descritos en ficheros. Crea un conjunto y Kiln lo validará.', 'Crear el primer conjunto', 'asistente')}</div>`;
+    return { update() {}, destroy() {}, noPanel: true };
+  }
+  const withIssues = DB.elements.filter(e => e.sev).length;
+  root.innerHTML = `<div class="page fill">${pageHead('Contenido', `Conjunto «Misiones de Puerto Niebla» · ${DB.elements.length} elementos`)}
+    ${withIssues ? '' : `<div class="calm">${svgCheck}<div><b>Sin problemas</b><span>Los ${DB.elements.length} elementos validan. Última comprobación hace 2 min.</span></div></div>`}
+    <div class="split"><nav class="card sidelist" aria-label="Conjuntos y tipos" id="kl"></nav><div class="pane"><div id="ft"></div><div id="vl" style="display:flex;flex-direction:column;flex:1;min-height:0"></div></div></div></div>`;
+  let kind = 'todos', sel = null;
+  const f = Filters($('#ft', root), { id: 'con', label: 'Filtrar elementos', placeholder: 'Filtrar por título o identificador', noun: ['elemento', 'elementos'], onChange: () => recompute() });
+  const vl = VList($('#vl', root), {
+    label: 'Elementos', sort: { key: 'sev', dir: -1 }, rowH: 33,
+    columns: [
+      { key: 'title', label: 'Título', w: 'minmax(160px, 1.6fr)', min: 160, sort: 1, cell: r => esc(r.title) },
+      { key: 'kind', label: 'Tipo', w: '90px', min: 90, sort: 1, opt: 1, prio: 4, val: r => DB.kindById.get(r.kind).name, cell: r => esc(DB.kindById.get(r.kind).name) },
+      { key: 'detail', label: 'Detalle', w: 'minmax(130px, 1.6fr)', min: 130, opt: 1, prio: 3, cell: r => `<span class="muted">${esc(r.detail)}</span>` },
+      { key: 'refs', label: 'Refs.', w: '60px', min: 60, align: 'r', sort: 1, opt: 1, prio: 2, cell: r => r.refs },
+      { key: 'sev', label: 'Hallazgos', w: 'minmax(170px, 1.4fr)', min: 170, sort: 1, val: r => RANK[r.sev] * 1000 + r.nf, cell: r => { const fl = DB.fBy.element.get(r.id); return fl ? `${sevLabel(r.sev, r.nf)} <span class="muted" style="font-weight:400">${esc(fl[0].code)}</span>` : '<span class="muted">—</span>'; } }
+    ],
+    onSelect: r => { panelOpen = true; go('contenido', [kind, r.id]); }
+  });
+  function scope() { return kind === 'todos' ? DB.elements : DB.elements.filter(e => e.kind === kind); }
+  function recompute(keep) {
+    const s = scope(), st = f.state();
+    const tally = { error: 0, warn: 0, info: 0, none: 0 }; s.forEach(e => tally[e.sev || 'none']++); f.setTally(tally);
+    const rows = s.filter(e => passSev(st.sevs, e.sev) && (!st.q || norm(e.title + ' ' + e.id).includes(st.q)));
+    f.setCount(rows.length, s.length); vl.hide(kind === 'todos' ? [] : ['kind']); vl.setRows(rows, keep);
+    const none = $('#con-none', root); if (none) none.remove();
+    if (!rows.length) {
+      const allClear = !tally.error && !tally.warn && !tally.info;
+      $('.vb', root).insertAdjacentHTML('beforebegin', `<div class="vnone" id="con-none">${allClear && !st.q ? `<div class="calm">${svgCheck}<div><b>Sin problemas</b><span>Ningún elemento de este tipo tiene hallazgos.</span></div></div>` : emptyBlock('Ningún elemento coincide', 'Prueba con otro texto o quita los filtros de gravedad.', 'Quitar filtros', 'clear-filters', { small: 1 })}</div>`);
+    }
+  }
+  function kindList() {
+    $('#kl', root).innerHTML = `<h2>Conjunto</h2><a href="${href('contenido', [], { q: null, sev: null })}" title="Misiones de Puerto Niebla" ${kind === 'todos' ? 'aria-current="true"' : ''}>${dot(DB.elements.reduce((s, e) => worst(s, e.sev), '') || 'none')}<span>Misiones de Puerto Niebla</span><span class="cnt">${DB.elements.length}</span></a><hr><h2>Tipos</h2>` +
+      DB.kinds.map(k => `<a href="${href('contenido', [k.id], {})}" title="${esc(k.name)}" ${kind === k.id ? 'aria-current="true"' : ''}>${dot(k.sev || 'none')}<span>${esc(k.name)}${k.sev ? `<span class="sr"> (${{ error: 'con errores', warn: 'con avisos', info: 'con notas' }[k.sev]})</span>` : ''}</span><span class="cnt">${k.count}</span></a>`).join('');
+  }
+  function apply(rt, first) {
+    const nk = rt.parts[0] && DB.kindById.has(rt.parts[0]) ? rt.parts[0] : 'todos', ns = rt.parts[1] || null;
+    const ch = nk !== kind || first; kind = nk; sel = ns; f.sync(rt); kindList(); recompute(!ch); vl.select(sel, true);
+  }
+  apply(rt, true);
+  return { update: r => apply(r, false), destroy() { vl.destroy(); }, clearFilters: () => { setParams({ q: null, sev: null }); apply(route, false); } };
+}
+
+/* =========================================================================
+   11. VISTA · Materiales (los 40; sin corte silencioso)
+   ========================================================================= */
+function viewMateriales(root, rt) {
+  if (!DB.materials.length) {
+    root.innerHTML = `<div class="page">${pageHead('Materiales', 'Cómo se pintan las piezas')}${emptyBlock('Todavía no hay materiales', 'Un material describe el aspecto de una superficie y se declara en <code>materials/</code>.', 'Abrir el asistente de inicio', 'asistente')}</div>`;
+    return { update() {}, destroy() {}, noPanel: true };
+  }
+  root.innerHTML = `<div class="page fill">${pageHead('Materiales', `${DB.materials.length} materiales · se muestran todos`)}<div class="pane" style="flex:1"><div id="ft"></div><div id="vl" style="display:flex;flex-direction:column;flex:1;min-height:0"></div></div></div>`;
+  let sel = null;
+  const f = Filters($('#ft', root), { id: 'mat', label: 'Filtrar materiales', placeholder: 'Filtrar por nombre o tipo', noun: ['material', 'materiales'], onChange: () => recompute() });
+  const vl = VList($('#vl', root), {
+    label: 'Materiales', sort: { key: 'name', dir: 1 }, rowH: 33,
+    columns: [
+      { key: 'name', label: 'Nombre', w: 'minmax(180px, 2fr)', min: 180, sort: 1, cls: 'mono', cell: r => esc(r.name) },
+      { key: 'type', label: 'Tipo', w: 'minmax(100px, 1fr)', min: 100, sort: 1, opt: 1, prio: 3, cell: r => esc(r.type) },
+      { key: 'tex', label: 'Textura px', w: '96px', min: 96, align: 'r', sort: 1, opt: 1, prio: 2, cell: r => r.tex },
+      { key: 'uses', label: 'Piezas', w: '76px', min: 76, align: 'r', sort: 1, cell: r => fmt(r.uses) },
+      { key: 'nk', label: 'Kits', w: '56px', min: 56, align: 'r', sort: 1, opt: 1, prio: 4, cell: r => r.nk },
+      { key: 'sev', label: 'Estado', w: '116px', min: 116, sort: 1, val: r => RANK[r.sev] * 1000 + r.nf, cell: r => sevLabel(r.sev, r.nf) }
+    ],
+    onSelect: r => { panelOpen = true; go('materiales', [r.id]); }
+  });
+  function recompute(keep) {
+    const st = f.state(), s = DB.materials;
+    const tally = { error: 0, warn: 0, info: 0, none: 0 }; s.forEach(m => tally[m.sev || 'none']++); f.setTally(tally);
+    const rows = s.filter(m => passSev(st.sevs, m.sev) && (!st.q || norm(m.name + ' ' + m.type).includes(st.q)));
+    f.setCount(rows.length, s.length); vl.setRows(rows, keep);
+    const none = $('#mat-none', root); if (none) none.remove();
+    if (!rows.length) $('.vb', root).insertAdjacentHTML('beforebegin', `<div class="vnone" id="mat-none">${emptyBlock('Ningún material coincide', 'Prueba con otro texto o quita los filtros.', 'Quitar filtros', 'clear-filters', { small: 1 })}</div>`);
+  }
+  function apply(rt, first) { sel = rt.parts[0] || null; f.sync(rt); recompute(!first); vl.select(sel, true); }
+  apply(rt, true);
+  return { update: r => apply(r, false), destroy() { vl.destroy(); }, clearFilters: () => { setParams({ q: null, sev: null }); apply(route, false); } };
+}
+
+/* =========================================================================
+   12. VISTA · Árbol (esquema plegable con recuentos, no un lienzo libre)
+   ========================================================================= */
+const TREE = { byId: new Map(), root: null };
+function buildTree() {
+  const mk = (id, name, kindLabel, o = {}) => ({ id, name, kindLabel, kids: [], count: 0, unit: o.unit || 'piezas', nf: 0, sev: '', src: o.src || 'kiln.toml', open: null, openLabel: '', parent: null, ...o });
+  const root = mk('juego', 'Puerto Niebla', 'Juego', { src: 'kiln.toml' });
+  TREE.byId = new Map([[root.id, root]]);
+  const reg = (n, parent) => { n.parent = parent; parent.kids.push(n); TREE.byId.set(n.id, n); return n; };
+  if (DB.kits.length) {
+    const lug = reg(mk('lugares', 'Lugares', 'Grupo', { src: 'kiln.toml' }), root);
+    PLACES.forEach(pl => {
+      const pn = reg(mk('lugar-' + pl.id, pl.name, 'Lugar', { src: 'kiln.toml' }), lug);
+      DB.kits.filter(k => k.place === pl.id).forEach(k => {
+        const kn = reg(mk('kit-' + k.id, k.name, 'Kit', { src: `kits/${k.id}/kit.toml`, open: href('catalogo', [k.id], { q: null, sev: null }), openLabel: 'Abrir en el catálogo' }), pn);
+        kn.count = k.count; kn.nf = k.c.error + k.c.warn + k.c.info; kn.sev = k.sev; kn.leaf = true;
+      });
+    });
+    const con = reg(mk('contenido', 'Contenido', 'Grupo', { src: 'content/', unit: 'elementos' }), root);
+    const cs = reg(mk('conjunto-misiones', 'Misiones de Puerto Niebla', 'Conjunto', { src: 'content/set.toml', unit: 'elementos', open: href('contenido', [], { q: null, sev: null }), openLabel: 'Abrir en Contenido' }), con);
+    DB.kinds.forEach(k => { const kn = reg(mk('tipo-' + k.id, k.name, 'Tipo', { src: `content/${k.id}/`, unit: 'elementos', open: href('contenido', [k.id], { q: null, sev: null }), openLabel: 'Abrir en Contenido' }), cs); kn.count = k.count; kn.sev = k.sev; kn.nf = DB.findings.filter(f => f.kind === k.id).length; kn.leaf = true; });
+  }
+  (function roll(n) { n.kids.forEach(roll); if (n.kids.length) { n.count = n.kids.reduce((s, c) => s + c.count, 0); n.nf = n.kids.reduce((s, c) => s + c.nf, 0); n.sev = n.kids.reduce((s, c) => worst(s, c.sev), ''); } })(root);
+  TREE.root = root;
+}
+function viewArbol(root, rt) {
+  buildTree();
+  const expanded = new Set(['juego', 'lugares', 'lugar-puerto', 'lugar-casco', 'lugar-costa', 'contenido', 'conjunto-misiones']);
+  let onlyIssues = false, focusId = 'juego', sel = null;
+  root.innerHTML = `<div class="page fill">${pageHead('Árbol', 'Cómo se organiza el juego: lugares, kits y contenido')}
+    <ol class="crumbs" id="crumbs" aria-label="Ruta del nodo seleccionado"></ol>
+    <div class="toolbar"><button type="button" class="btn sm" id="ex">Desplegar todo</button><button type="button" class="btn sm" id="co">Plegar todo</button>
+      <button type="button" class="chip" id="oi" aria-pressed="false">Solo con problemas</button><span class="grow"></span><span class="muted" style="font-size:12px">Flechas para moverte · ← → para plegar y desplegar · Enter para seleccionar</span></div>
+    <div class="card tree" id="tr" role="tree" aria-label="Estructura del proyecto"></div></div>`;
+  const tr = $('#tr', root);
+  function visible() {
+    const out = [];
+    (function walk(n, lvl) { if (onlyIssues && !n.sev && n.id !== 'juego') return; out.push({ n, lvl }); if (n.kids.length && expanded.has(n.id)) n.kids.forEach(c => walk(c, lvl + 1)); })(TREE.root, 1);
+    return out;
+  }
+  function draw() {
+    const vis = visible();
+    if (!vis.some(v => v.n.id === focusId)) focusId = vis[0].n.id;
+    tr.innerHTML = vis.map(({ n, lvl }, i) => {
+      const exp = n.kids.length ? ` aria-expanded="${expanded.has(n.id)}"` : '';
+      return `<div class="trow" role="treeitem" id="tn-${esc(n.id)}" data-id="${esc(n.id)}" aria-level="${lvl}" aria-posinset="${i + 1}" aria-setsize="${vis.length}"${exp} aria-selected="${n.id === sel}" tabindex="${n.id === focusId ? 0 : -1}" style="padding-left:${12 + (lvl - 1) * 22}px">
+        <button type="button" class="chev" tabindex="-1" aria-label="${expanded.has(n.id) ? 'Plegar' : 'Desplegar'} ${esc(n.name)}"></button><span class="kd">${esc(n.kindLabel)}</span><span class="nm">${esc(n.name)}</span>
+        <span class="ct">${fmt(n.count)} ${esc(n.unit)}</span><span class="sv">${n.sev ? `<span class="sev ${n.sev}">${dot(n.sev)}${fmt(n.nf)}<span class="sr"> hallazgos, ${SEVNAME[n.sev]}</span></span>` : '<span class="sev ok" title="Sin problemas">' + dot('ok') + '<span class="sr">sin problemas</span></span>'}</span></div>`;
+    }).join('');
+    if (!DB.kits.length) tr.insertAdjacentHTML('beforeend', `<div style="padding:16px">${emptyBlock('El árbol aún no tiene kits', 'Declara lugares y kits y aparecerán aquí con sus recuentos.', 'Abrir el asistente de inicio', 'asistente', { small: 1 })}</div>`);
+    $('#oi', root).setAttribute('aria-pressed', onlyIssues);
+  }
+  function crumbs() {
+    const chain = []; for (let n = TREE.byId.get(sel || 'juego'); n; n = n.parent) chain.unshift(n);
+    $('#crumbs', root).innerHTML = chain.map((n, i) => `<li>${i === chain.length - 1 ? `<span aria-current="location">${esc(n.name)}</span>` : `<a href="${href('arbol', [n.id])}">${esc(n.name)}</a>`}</li>`).join('');
+  }
+  const focusRow = id => { focusId = id; draw(); const el = $('#tn-' + CSS.escape(id), tr); el && el.focus(); };
+  tr.addEventListener('click', e => {
+    const row = e.target.closest('.trow'); if (!row) return; const id = row.dataset.id, n = TREE.byId.get(id);
+    if (e.target.closest('.chev')) { expanded.has(id) ? expanded.delete(id) : expanded.add(id); focusId = id; draw(); return; }
+    focusId = id; panelOpen = true; go('arbol', [id]);
+  });
+  tr.addEventListener('dblclick', e => { const row = e.target.closest('.trow'); if (!row) return; const id = row.dataset.id; if (TREE.byId.get(id).kids.length) { expanded.has(id) ? expanded.delete(id) : expanded.add(id); draw(); } });
+  tr.addEventListener('keydown', e => {
+    const vis = visible(), i = vis.findIndex(v => v.n.id === focusId); if (i < 0) return; const n = vis[i].n;
+    const k = e.key;
+    if (k === 'ArrowDown' && i < vis.length - 1) { e.preventDefault(); focusRow(vis[i + 1].n.id); }
+    else if (k === 'ArrowUp' && i > 0) { e.preventDefault(); focusRow(vis[i - 1].n.id); }
+    else if (k === 'Home') { e.preventDefault(); focusRow(vis[0].n.id); }
+    else if (k === 'End') { e.preventDefault(); focusRow(vis[vis.length - 1].n.id); }
+    else if (k === 'ArrowRight') { e.preventDefault(); if (n.kids.length && !expanded.has(n.id)) { expanded.add(n.id); focusRow(n.id); } else if (n.kids.length) focusRow(n.kids[0].id); }
+    else if (k === 'ArrowLeft') { e.preventDefault(); if (n.kids.length && expanded.has(n.id)) { expanded.delete(n.id); focusRow(n.id); } else if (n.parent) focusRow(n.parent.id); }
+    else if (k === 'Enter' || k === ' ') { e.preventDefault(); panelOpen = true; go('arbol', [n.id]); }
+  });
+  $('#ex', root).onclick = () => { TREE.byId.forEach(n => n.kids.length && expanded.add(n.id)); draw(); };
+  $('#co', root).onclick = () => { expanded.clear(); expanded.add('juego'); draw(); };
+  $('#oi', root).onclick = () => { onlyIssues = !onlyIssues; draw(); };
+  function apply(rt) {
+    sel = rt.parts[0] && TREE.byId.has(rt.parts[0]) ? rt.parts[0] : null;
+    for (let n = sel && TREE.byId.get(sel).parent; n; n = n.parent) expanded.add(n.id);
+    if (sel) focusId = sel; draw(); crumbs();
+  }
+  apply(rt);
+  return { update: apply, destroy() {} };
+}
+
+/* =========================================================================
+   13. VISTA · Contexto (capas, afirmaciones fijadas o abiertas, preguntas)
+   ========================================================================= */
+function viewContexto(root, rt) {
+  if (!DB.layers.length) {
+    root.innerHTML = `<div class="page">${pageHead('Contexto', 'Lo que el equipo ha decidido sobre el juego')}${emptyBlock('Todavía no hay contexto', 'El contexto reúne decisiones de visión, estilo y mundo. Kiln las usa para validar y para preguntarte lo que falta.', 'Escribir la primera capa', 'asistente')}</div>`;
+    return { update() {}, destroy() {}, noPanel: true };
+  }
+  let sel = null, filt = 'all';
+  root.innerHTML = `<div class="page">${pageHead('Contexto', '<span id="cx-sub"></span>', `<div class="seg" role="group" aria-label="Mostrar afirmaciones" id="cx-f"></div>`)}<div class="ctx"><div class="layers" id="cx-l"></div><aside class="qs" aria-labelledby="cx-qh"><h2 class="sec" id="cx-qh" style="margin:0">Preguntas</h2><div id="cx-q" style="display:flex;flex-direction:column;gap:12px"></div></aside></div></div>`;
+  function draw() {
+    const all = DB.layers.flatMap(l => l.claims), open = all.filter(c => c.state === 'open').length;
+    $('#cx-sub', root).textContent = `${plural(DB.layers.length, 'capa', 'capas')} · ${plural(all.length - open, 'fijada', 'fijadas')} · ${plural(open, 'abierta', 'abiertas')}`;
+    $('#cx-f', root).innerHTML = [['all', 'Todas'], ['open', 'Abiertas'], ['set', 'Fijadas']].map(([k, l]) => `<a href="${href('contexto', sel ? [sel] : [], { f: k === 'all' ? null : k })}" ${filt === k ? 'aria-current="true"' : ''}>${l}</a>`).join('');
+    $('#cx-l', root).innerHTML = DB.layers.map(l => {
+      const cs = l.claims.filter(c => filt === 'all' || c.state === filt); if (!cs.length) return '';
+      const o = l.claims.filter(c => c.state === 'open').length;
+      return `<section class="card layer" aria-label="${esc(l.name)}"><div class="lh"><h3>${esc(l.name)}</h3><span>${plural(l.claims.length - o, 'fijada', 'fijadas')}${o ? ' · ' + plural(o, 'abierta', 'abiertas') : ''}</span></div>${cs.map(c => `<a class="claim" href="${href('contexto', [c.id])}" ${sel === c.id ? 'aria-current="true"' : ''}><span class="state ${c.state}">${c.state === 'set' ? 'Fijada' : 'Abierta'}</span><span>${esc(c.text)}</span><span class="src">${esc(c.src)}</span></a>`).join('')}</section>`;
+    }).join('') || `<div class="card" style="padding:16px">${emptyBlock('Nada con este filtro', 'No hay afirmaciones en ese estado.', 'Ver todas', 'ctx-all', { small: 1 })}</div>`;
+    const qs = DB.questions;
+    $('#cx-q', root).innerHTML = qs.map(q => q.answer
+      ? `<div class="card q done"><p>${esc(q.text)}</p><span class="sev ok">${dot('ok')}Respondida: ${esc(q.answer)}</span></div>`
+      : `<div class="card q" role="group" aria-label="Pregunta abierta"><p>${esc(q.text)}</p><div class="opts">${q.opts.map(o => `<button type="button" class="btn" data-act="answer" data-q="${q.id}" data-o="${esc(o)}">${esc(o)}</button>`).join('')}</div><button type="button" class="btn sm ghost" data-act="later" style="align-self:flex-start">Responder más tarde</button></div>`).join('')
+      + (qs.every(q => q.answer) ? `<div class="calm">${svgCheck}<div><b>Sin preguntas pendientes</b><span>Kiln tiene todo lo que necesita por ahora.</span></div></div>` : '');
+  }
+  function apply(rt) { sel = rt.parts[0] || null; filt = rt.q.get('f') || 'all'; draw(); }
+  apply(rt);
+  return { update: apply, destroy() {}, redraw: draw };
+}
+
+/* =========================================================================
+   14. VISTA · Trabajos (en curso, terminado, fallido; registro con pastilla)
+   ========================================================================= */
+function viewTrabajos(root, rt) {
+  if (!DB.jobs.length) {
+    root.innerHTML = `<div class="page">${pageHead('Trabajos', 'Construcciones, validaciones y exportaciones')}${emptyBlock('Todavía no se ha lanzado ningún trabajo', 'Aquí verás el progreso y el registro de cada construcción o validación. Empieza releyendo el proyecto.', 'Releer el proyecto', 'releer')}</div>`;
+    return { update() {}, destroy() {}, noPanel: true };
+  }
+  root.innerHTML = `<div class="page fill">${pageHead('Trabajos', 'Construcciones, validaciones y exportaciones')}<div class="split"><nav class="card jlist" aria-label="Trabajos" id="jl"></nav><div class="jdet" id="jd"></div></div></div>`;
+  let cur = null, newCount = 0, log, pill, stuck = true, lro = null;
+  const jstat = j => j.status === 'running' ? `<span class="sev info" style="color:var(--accent)">${dot('busy')}En curso</span>` : j.status === 'done' ? `<span class="sev ok">${dot('ok')}Terminado</span>` : `<span class="sev error">${dot('error')}Falló</span>`;
+  function list() {
+    $('#jl', root).innerHTML = DB.jobs.map(j => `<a href="${href('trabajos', [j.id])}" ${cur && cur.id === j.id ? 'aria-current="true"' : ''}><span class="jn">${esc(j.name)}</span><span class="jm">${jstat(j)}<span>${esc(j.start)}${j.status === 'running' ? ' · ' + Math.floor(j.pct) + ' %' : ''}</span></span></a>`).join('');
+  }
+  const lineHtml = l => `<div class="ln"><span class="tm">${esc(l.t)}</span><span class="lv ${l.lvl}">${l.lvl === 'info' ? 'info' : l.lvl === 'warn' ? 'aviso' : 'error'}</span><span>${esc(l.msg)}</span></div>`;
+  const atBottom = () => log.scrollHeight - log.scrollTop - log.clientHeight < 24;
+  function detail() {
+    const j = cur, d = $('#jd', root);
+    const meta = `<div class="jmeta"><span>Inicio ${esc(j.start)}</span>${j.dur ? `<span>Duración ${esc(j.dur)}</span>` : ''}<span class="mono">${esc(j.cmd)}</span></div>`;
+    let body = '';
+    if (j.status === 'running') body = `<div class="prog"><div class="meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.floor(j.pct)}" aria-label="Progreso"><i id="jbar" style="width:${j.pct}%"></i></div><b id="jpct">${Math.floor(j.pct)} %</b></div>`;
+    if (j.status === 'done') body = `<div class="card stats"><div><b>${fmt(j.summary.a)}</b><span>elementos revisados</span></div><div><b>${j.summary.b}</b><span>avisos</span></div><div><b>${j.summary.c}</b><span>errores</span></div>${j.out ? `<div><b class="mono" style="font-size:14px;padding-top:6px">${esc(j.out)}</b><span>salida</span></div>` : ''}</div>`;
+    if (j.status === 'failed') body = `<div class="callout" role="group" aria-label="Qué hacer ahora"><h3>Falló al ${Math.floor(j.pct)} %</h3><div class="err">${esc(j.err)}</div><div><b style="font-size:13px">Qué hacer ahora</b><ol>${j.next.map(s => `<li>${esc(s)}</li>`).join('')}</ol></div><div class="row"><button type="button" class="btn primary" data-act="retry">Reintentar</button><a class="btn" style="text-decoration:none;color:inherit" href="${href('catalogo', ['faro'], { sev: 'error', q: null })}">Ver el kit Faro</a></div></div>`;
+    d.innerHTML = `<div class="jhead"><h2>${esc(j.name)}</h2>${jstat(j)}</div>${meta}${body}
+      <div class="logwrap"><div class="log" id="log" role="log" aria-live="polite" aria-relevant="additions" aria-label="Registro de ${esc(j.name)}" tabindex="0">${j.log.map(lineHtml).join('')}</div>
+      <button type="button" class="btn primary toend" id="toend" hidden></button></div>`;
+    log = $('#log', root); pill = $('#toend', root); newCount = 0; stuck = true;
+    log.scrollTop = log.scrollHeight;
+    log.addEventListener('scroll', () => { stuck = atBottom(); if (stuck) { newCount = 0; pill.hidden = true; } });
+    if (lro) lro.disconnect();
+    lro = new ResizeObserver(() => { if (stuck) log.scrollTop = log.scrollHeight; }); lro.observe(log);
+    pill.onclick = () => { log.scrollTop = log.scrollHeight; stuck = true; newCount = 0; pill.hidden = true; log.focus(); };
+  }
+  const sub = (job, line) => {
+    list();
+    if (!cur || job.id !== cur.id) return;
+    if (job.status !== 'running') { detail(); return; }
+    const b = $('#jbar', root); if (b) { b.style.width = job.pct + '%'; b.parentNode.setAttribute('aria-valuenow', Math.floor(job.pct)); $('#jpct', root).textContent = Math.floor(job.pct) + ' %'; }
+    if (line && log) {
+      stuck = atBottom(); // medida en vivo: no depende de que haya llegado el evento de scroll
+      log.insertAdjacentHTML('beforeend', lineHtml(line));
+      if (stuck) log.scrollTop = log.scrollHeight; else { newCount++; pill.hidden = false; pill.textContent = `${newCount} ${newCount === 1 ? 'línea nueva' : 'líneas nuevas'} · ir al final`; }
+    }
+  };
+  JOBS.subs.add(sub);
+  function apply(rt) {
+    const j = DB.jobs.find(x => x.id === rt.parts[0]) || DB.jobs.find(x => x.status === 'running') || DB.jobs[0];
+    if (cur && cur.id === j.id && log && log.isConnected) { list(); return; }
+    cur = j; list(); detail();
+  }
+  apply(rt);
+  return { update: apply, destroy() { JOBS.subs.delete(sub); lro && lro.disconnect(); } };
+}
+
+/* =========================================================================
+   15. Conmutador de demostracion (SOLO maqueta) y acciones globales
+   ========================================================================= */
+function setTheme(t) { setParams({ t }); document.documentElement.dataset.theme = t; renderDemo(); }
+function renderDemo() {
+  const open = route.q.get('m') === '1', v = DB.variant, t = document.documentElement.dataset.theme;
+  const pb = (k, l) => `<button type="button" data-act="variant" data-v="${k}" aria-pressed="${v === k}">${l}</button>`;
+  const tb = (k, l) => `<button type="button" data-act="theme" data-v="${k}" aria-pressed="${t === k}">${l}</button>`;
+  $('#demo').innerHTML = `<button type="button" data-act="demo" aria-expanded="${open}" aria-controls="demobox">Maqueta · demo</button>${open ? `<div class="box" id="demobox" role="group" aria-label="Controles de demostración"><p><b>Solo de la maqueta.</b> No existe en el producto real.</p>
+    <fieldset><legend>Proyecto</legend><div class="seg">${pb('problems', 'Con problemas')}${pb('clean', 'Limpio')}${pb('empty', 'Vacío')}</div></fieldset>
+    <fieldset><legend>Tema</legend><div class="seg">${tb('light', 'Claro')}${tb('dark', 'Oscuro')}</div></fieldset>
+    <fieldset><legend>Probar avisos</legend><div class="seg"><button type="button" data-act="toast-ok">Éxito</button><button type="button" data-act="toast-err">Error</button></div></fieldset></div>` : ''}`;
+}
+function setVariant(v) { // cambia de proyecto de demostracion: reinicia indices y trabajos
+  clearInterval(JOBS.timer);
+  DB = buildDB(v); DB.jobs = makeJobs(v); lastDetailKey = '';
+  if (runningJob()) startTimer();
+  $('#projName').textContent = 'Puerto Niebla';
+}
+
+document.addEventListener('click', e => {
+  const dis = e.target.closest('[aria-disabled="true"][data-act]');
+  if (dis) { e.preventDefault(); toast({ kind: 'info', title: 'No disponible ahora', text: dis.dataset.tip }); return; }
+  const b = e.target.closest('[data-act]'); if (!b) return;
+  const act = b.dataset.act;
+  const sel = () => route.view === 'catalogo' && route.parts[1];
+  switch (act) {
+    case 'skip': $('#main').focus(); break;
+    case 'palette': openPalette(); break;
+    case 'panel': togglePanel(); break;
+    case 'releer': doReleer(); break;
+    case 'variante': openVariant(b.dataset.piece || sel()); break;
+    case 'visor': toast({ kind: 'info', title: 'Visor 3D', text: 'En el producto, el visor se carga bajo demanda y libera su contexto al cerrarse.' }); break;
+    case 'construir': { const k = b.dataset.kit || 'astillero'; startJob('Construir kit ' + DB.kitById.get(k).name, k); break; }
+    case 'copiar': toast({ kind: 'ok', title: 'Ruta copiada', text: b.dataset.what || 'Ruta copiada al portapapeles.' }); break;
+    case 'asistente': toast({ kind: 'info', title: 'Asistente de inicio', text: 'En el producto se abriría aquí el asistente actual (sin cambios).' }); break;
+    case 'cancelar': toast({ kind: 'info', title: 'Cancelación solicitada', text: 'Maqueta: el trabajo simulado sigue hasta el final.' }); break;
+    case 'retry': toast({ kind: 'error', title: 'No se pudo reintentar', text: 'El material «cristal_sucio» sigue sin textura base. Corrígelo antes de volver a lanzar la exportación.', action: { label: 'Abrir el kit Faro', fn: () => go('catalogo', ['faro'], { sev: 'error', q: null }) } }); break;
+    case 'clear-filters': cur && cur.clearFilters && cur.clearFilters(); break;
+    case 'ctx-all': setParams({ f: null }, true); break;
+    case 'claim': { const c = DB.claimById.get(b.dataset.id); c.state = c.state === 'open' ? 'set' : 'open'; renderNav(); renderDetail(true); cur.redraw && cur.redraw(); toast({ kind: 'ok', title: c.state === 'set' ? 'Afirmación fijada' : 'Afirmación reabierta', text: c.text }); break; }
+    case 'answer': { const q = DB.questions.find(x => x.id === b.dataset.q); q.answer = b.dataset.o; const c = DB.claimById.get(q.claim); if (c) c.state = 'set'; renderNav(); cur.redraw && cur.redraw(); toast({ kind: 'ok', title: 'Respuesta guardada', text: `«${q.answer}». Se ha fijado la afirmación relacionada.` }); break; }
+    case 'later': toast({ kind: 'info', title: 'Pregunta aplazada', text: 'Seguirá en la lista de Contexto.' }); break;
+    case 'demo': setParams({ m: route.q.get('m') === '1' ? null : '1' }); renderDemo(); $('#demo button').focus(); break;
+    case 'variant': setParams({ p: b.dataset.v === 'problems' ? null : b.dataset.v }, true); renderDemo(); break;
+    case 'theme': setTheme(b.dataset.v); $('#demo [data-act=theme][aria-pressed=true]').focus(); break;
+    case 'toast-ok': toast({ kind: 'ok', title: 'Guardado', text: 'Los cambios se han aplicado.' }); break;
+    case 'toast-err': toast({ kind: 'error', title: 'No se pudo leer kits/faro/kit.toml', text: 'Línea 14: falta el cierre de la tabla [materials].', action: { label: 'Reintentar', fn: () => toast({ kind: 'ok', title: 'Releído', text: 'El fichero ya es válido.' }) } }); break;
+  }
+});
+
+document.addEventListener('keydown', e => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); dlgP.open ? dlgP.close() : openPalette(); return; }
+  const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName);
+  if (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey) { e.preventDefault(); gq.focus(); gq.select(); }
+  if (e.key === 'Escape' && panelOpen && !wide() && !dlgP.open && !dlgV.open && route.view !== 'inicio' && $('#shell').classList.contains('with-detail')) togglePanel(false);
+});
+
+/* =========================================================================
+   16. Arranque y enrutado
+   ========================================================================= */
+const VIEWS = { inicio: viewInicio, contexto: viewContexto, arbol: viewArbol, contenido: viewContenido, catalogo: viewCatalogo, materiales: viewMateriales, trabajos: viewTrabajos };
+const TITLES = { inicio: 'Inicio', contexto: 'Contexto', arbol: 'Árbol', contenido: 'Contenido', catalogo: 'Catálogo', materiales: 'Materiales', trabajos: 'Trabajos' };
+let cur = null, firstLoad = true, lastSel = '';
+function onRoute() {
+  route = parseHash();
+  if (!VIEWS[route.view]) { route.view = 'inicio'; route.parts = []; }
+  const p = ['problems', 'clean', 'empty'].includes(route.q.get('p')) ? route.q.get('p') : 'problems';
+  const t = route.q.get('t') || document.documentElement.dataset.themeBoot;
+  document.documentElement.dataset.theme = t === 'light' ? 'light' : 'dark';
+  let rebuilt = false;
+  if (!DB || DB.variant !== p) { setVariant(p); rebuilt = true; }
+  const selKey = route.view + '|' + route.parts.join('/');
+  if (firstLoad) { const d = route.q.get('d'); panelOpen = d ? d === '1' : wide(); }
+  else if (route.parts.length && selKey !== lastSel) panelOpen = panelOpen || true;
+  lastSel = selKey;
+  applyPanel();
+  const main = $('#main');
+  if (rebuilt || !cur || cur.name !== route.view) {
+    cur && cur.destroy && cur.destroy(); main.innerHTML = ''; main.scrollTop = 0;
+    cur = VIEWS[route.view](main, route); cur.name = route.view;
+    if (!firstLoad) main.focus({ preventScroll: true });
+  } else cur.update && cur.update(route);
+  document.title = TITLES[route.view] + ' · Kiln (maqueta)';
+  renderNav(); renderStatus(); renderDetail(rebuilt); applyPanel(); renderDemo();
+  if (firstLoad && ['ok', 'err'].includes(route.q.get('x'))) { const x = route.q.get('x'); setTimeout(() => { x === 'err' ? toast({ kind: 'error', title: 'No se pudo leer kits/faro/kit.toml', text: 'Línea 14: falta el cierre de la tabla [materials].', action: { label: 'Reintentar', fn() {} } }) : toast({ kind: 'ok', title: 'Proyecto releído', text: '3.012 piezas y 600 hallazgos (sin cambios).' }); }, 50); }
+  if (firstLoad && route.q.get('x') === 'dlg') setTimeout(() => openVariant('astillero_grua_01'), 60);
+  if (firstLoad && route.q.get('x') === 'pal') setTimeout(openPalette, 60);
+  if (firstLoad && route.q.get('x') === 'search') setTimeout(() => { gq.focus(); gq.value = 'asti'; gSearch(); }, 60);
+  firstLoad = false;
+}
+document.documentElement.dataset.themeBoot = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+$('#kk').textContent = isMac ? '⌘ K' : 'Ctrl K';
+window.addEventListener('hashchange', onRoute);
+window.addEventListener('resize', debounce(() => { applyPanel(); }, 100));
+onRoute();
+document.documentElement.dataset.ready = '1';
+</script>
+</body>
+</html>
