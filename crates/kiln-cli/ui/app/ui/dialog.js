@@ -4,6 +4,10 @@ import { html } from "../html.js";
 
 let seq = 0;
 
+export function openDialog(doc, markup, { onReady }) {
+  return open(doc, markup, { onReady });
+}
+
 function open(doc, markup, { onReady }) {
   const opener = doc.activeElement;
   const dlg = doc.createElement("dialog");

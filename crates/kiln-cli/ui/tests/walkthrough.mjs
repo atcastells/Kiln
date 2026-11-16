@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 import { launchChrome, sleep } from "./cdp.mjs";
 import { Driver, find } from "./driver.mjs";
 import { S } from "./selectors.mjs";
+import { walkAppViews, measureAppViews } from "./app_views.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const arg = n => { const i = process.argv.indexOf(n); return i < 0 ? null : process.argv[i + 1]; };
@@ -204,6 +205,8 @@ async function walkApp(chrome, name, port) {
       const back = await d.waitFor(`() => document.querySelector('#main [data-view]') && location.hash === ${JSON.stringify(first)}`);
       await d.settle({ quiet: 300 });
       check(name, "app: reload keeps the route", back && (await d.page.eval("location.hash")) === first);
+      await d.goto(`http://127.0.0.1:${port}/app#/build`);
+      await d.waitFor(`() => document.querySelector('#main [data-view=placeholder]')`);
       const place = await d.page.eval(`document.querySelector('[data-view=placeholder] a[href="/"]')?.textContent ?? null`);
       check(name, "app: a view not built yet says so and links to the old UI", place !== null, "no placeholder");
     }
@@ -214,6 +217,7 @@ async function walkApp(chrome, name, port) {
     await d.clickAndSettle(`() => document.getElementById('btnReleer')`);
     check(name, "app: Releer answers with a toast and gives the button back", await d.page.eval(`!!document.querySelector('.toast.ok') && !document.getElementById('btnReleer').disabled`));
     check(name, "app: Releer no JS errors", d.errors.length === mark, d.errors.slice(mark).join(" | "));
+    await walkAppViews({ d, name, port, cat, check, note, shot: appShot });
     if (name === "examples") await walkComponents(d, name);
     check(name, "app: ran without JS errors", d.errors.length === 0, d.errors.join(" | "));
   } catch (e) {
@@ -466,7 +470,7 @@ let perf = null;
 try {
   for (const [name, port] of Object.entries(targets)) await walk(chrome, name, port);
   for (const [name, port] of Object.entries(targets)) if (name !== "wizard") await walkApp(chrome, name, port);
-  if (targets.synthetic) { perf = await measure(chrome, targets.synthetic); Object.assign(perf.median, await measureApp(chrome, targets.synthetic)); }
+  if (targets.synthetic) { perf = await measure(chrome, targets.synthetic); Object.assign(perf.median, await measureApp(chrome, targets.synthetic)); Object.assign(perf.median, await measureAppViews({ chrome, port: targets.synthetic, Driver, cat: await api(targets.synthetic, '/api/catalog') })); }
 } finally { chrome.kill(); }
 
 // ---- report and baseline

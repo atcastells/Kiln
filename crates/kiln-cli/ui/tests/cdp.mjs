@@ -71,7 +71,7 @@ export class Page {
     for (let i = 1; i <= count; i++) { await this.mouse("mousePressed", x, y, i); await this.mouse("mouseReleased", x, y, i); }
   }
   async key(ch) {
-    const named = { Enter: 13, Escape: 27 };
+    const named = { Enter: 13, Escape: 27, ArrowDown: 40, ArrowUp: 38, ArrowLeft: 37, ArrowRight: 39 };
     if (named[ch]) {
       const ev = { key: ch, code: ch, windowsVirtualKeyCode: named[ch] };
       await this.send("Input.dispatchKeyEvent", { type: ch === "Enter" ? "keyDown" : "rawKeyDown", ...ev, ...(ch === "Enter" ? { text: "\r" } : {}) });
@@ -83,6 +83,12 @@ export class Page {
     }
     await this.send("Input.dispatchKeyEvent", { type: "keyDown", key: ch, text: ch, unmodifiedText: ch });
     return this.send("Input.dispatchKeyEvent", { type: "keyUp", key: ch });
+  }
+  // A shortcut such as Ctrl+K: `modifiers` is the CDP bit mask (1 alt, 2 ctrl, 4 meta, 8 shift).
+  async combo(key, vk, modifiers) {
+    const ev = { key, code: "Key" + key.toUpperCase(), windowsVirtualKeyCode: vk, modifiers };
+    await this.send("Input.dispatchKeyEvent", { type: "rawKeyDown", ...ev });
+    return this.send("Input.dispatchKeyEvent", { type: "keyUp", ...ev });
   }
   async screenshot(file, fs) {
     const r = await this.send("Page.captureScreenshot", { format: "png" });

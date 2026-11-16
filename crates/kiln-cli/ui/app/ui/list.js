@@ -122,9 +122,10 @@ export function createList(host, { columns, rows = [], rowId = (r, i) => i, rowH
     const b = e.target.closest("button[data-key]");
     if (b) { sorting = nextSort(sorting, b.dataset.key); body.scrollTop = 0; recompute(); }
   });
-  rowsEl.addEventListener("click", e => {
-    const r = e.target.closest(".vrow");
-    if (r) { grid.focus(); select(Number(r.dataset.i)); }
+  // mousedown, not click: focusing the grid repaints the rows, and a click needs the same node at press and release.
+  rowsEl.addEventListener("mousedown", e => {
+    const r = e.button === 0 && e.target.closest(".vrow");
+    if (r) { e.preventDefault(); grid.focus(); select(Number(r.dataset.i)); }
   });
   grid.addEventListener("keydown", e => {
     if (e.key === "Enter") { if (activeIdx >= 0) { e.preventDefault(); select(activeIdx); } return; }

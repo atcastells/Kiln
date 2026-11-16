@@ -5,6 +5,8 @@ import { derive } from "./derive.js";
 import { navModel, isRunning } from "./nav.js";
 import { createToasts, busy } from "./ui/feedback.js";
 import { askText, confirmDialog } from "./ui/dialog.js";
+import { createSearch, openPalette } from "./ui/palette.js";
+import { indexFor } from "./search.js";
 
 const SEV_TEXT = { error: "con errores", warn: "con avisos", info: "con notas", busy: "en curso" };
 const POLL_FIRST = 1500, POLL_MAX = 8000;
@@ -107,26 +109,32 @@ export function createShell({ doc = document, store, api, router, registry }) {
       : html`<div class="dhead"><div><div class="kind">Detalle</div><h2>Nada seleccionado</h2></div><button class="iconbtn" type="button" id="closePanel" aria-label="Cerrar el panel de detalle">×</button></div><div class="dbody"><p class="muted">Elige un elemento en la lista o en el árbol y su detalle aparece aquí.</p></div>`.toString();
   }
 
-  // ---- search box and commands (results and palette come in a later task)
+  // ---- search box and command palette
   const gq = $("gq"), gres = $("gres");
-  const closeResults = () => { gres.hidden = true; gq.setAttribute("aria-expanded", "false"); };
-  let debounce = null;
-  gq.addEventListener("input", () => {
-    clearTimeout(debounce);
-    debounce = setTimeout(() => {
-      store.set("query", gq.value.trim());
-      if (!gq.value.trim()) return closeResults();
-      gres.innerHTML = html`<div class="sfoot">La búsqueda con resultados llega en el siguiente encargo. La <a href="/">interfaz anterior</a> tiene el buscador completo.</div>`.toString();
-      gres.hidden = false; gq.setAttribute("aria-expanded", "true");
-    }, 120);
-  });
-  gq.addEventListener("keydown", e => { if (e.key === "Escape") { gq.value = ""; store.set("query", ""); closeResults(); } });
-  const commands = () => toasts.info("La paleta de comandos llega en el siguiente encargo", "Mientras tanto, usa la navegación de la izquierda.");
+  createSearch({ doc, input: gq, panel: gres, getIndex: () => indexFor(store.get("catalog"), store.get("context")), go: r => router.navigate(r), onQuery: q => store.set("query", q) });
+  const views = () => {
+    const cat = store.get("catalog"), derived = store.get("derived");
+    if (!cat || !derived) return [];
+    return navModel({ catalog: cat, derived, context: store.get("context"), jobs: store.get("jobs") ?? [] }).flatMap(g => g.items).map(i => ({ view: i.view, label: i.label, hint: i.count }));
+  };
+  const actions = () => [
+    { label: "Releer el proyecto", keywords: "recargar actualizar", run: () => $("btnReleer").click() },
+    ...(store.get("selectionActions") ?? []).map(a => ({ group: "Acciones para la selección", ...a })),
+    { label: store.get("panel") ? "Cerrar el panel de detalle" : "Abrir el panel de detalle", keywords: "detalle", run: () => store.set("panel", !store.get("panel")) },
+    { label: "Abrir la interfaz anterior", keywords: "antigua clásica", run: () => { location.href = "/"; } },
+  ];
+  let paletteOpen = false;
+  const commands = async () => {
+    if (paletteOpen) return;
+    paletteOpen = true;
+    try { await openPalette({ doc, views: views(), actions: actions(), getIndex: () => indexFor(store.get("catalog"), store.get("context")), go: r => router.navigate(r) }); }
+    finally { paletteOpen = false; }
+  };
   $("btnCmd").addEventListener("click", commands);
   doc.addEventListener("keydown", e => {
     const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(doc.activeElement?.tagName ?? "");
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); commands(); }
-    else if (e.key === "/" && !typing && !e.ctrlKey && !e.metaKey) { e.preventDefault(); gq.focus(); }
+    else if (e.key === "/" && !typing && !e.ctrlKey && !e.metaKey && !paletteOpen) { e.preventDefault(); gq.focus(); }
   });
   $("skip").addEventListener("click", () => main.focus());
   $("btnPanel").addEventListener("click", () => store.set("panel", !store.get("panel")));
