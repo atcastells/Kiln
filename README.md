@@ -381,6 +381,86 @@ at = [[2.2, 0.2, 0]]
 
 El ejemplo está en `examples/specs/cargo_quay.toml`.
 
+## Entrega 11: Kiln por MCP
+
+`kiln mcp --project DIR [--config FICHERO]` sirve Kiln por MCP sobre stdio,
+para Claude Code. El agente que llama hace el trabajo de agente (desglosar
+una petición en ficha, colocar, ordenar el contexto) siguiendo los prompts;
+Kiln comprueba y escribe. No escucha en ninguna red.
+
+```bash
+cargo build --release
+claude mcp add kiln -- /ruta/a/kiln mcp --project /ruta/al/juego
+# con --scope project queda en el .mcp.json del repo del juego y se comparte
+claude mcp add --scope project kiln -- /ruta/a/kiln mcp --project /ruta/al/juego
+```
+
+Son 27 herramientas. Empieza por `status`.
+
+| Grupo | Herramientas |
+|---|---|
+| Leer | `status` resumen y siguiente paso; `tree` árbol, un nivel cada vez; `catalog` kits, piezas, materiales o fichas; `check` hallazgos; `content` conjuntos de contenido; `spec_get` una ficha; `review_sheets` hojas de la revisión como imágenes |
+| Fichas | `spec_write` escribe una ficha si pasa la comprobación; `spec_layout` solo coloca piezas (`at`, `turn`) |
+| Contexto | `context_get` lee; `context_propose` la voz del agente; `context_edit` la voz de la persona |
+| Producción y trabajos | `build` monta con Blender; `paint` aplica materiales; `godot_measure` mide lo que solo Godot abre; `review` revisa el montaje; `job` y `jobs` siguen los trabajos |
+| Materiales y zonas | `material_set` material de una zona; `material_validate` lo pasa al catálogo; `bind` vincula una ranura a la paleta; `zones_split` parte una pieza en zonas |
+| Fuera | `search` busca candidatos (no escribe); `import` trae un modelo con su licencia |
+| Juego nuevo | `new_game_options` el paso de arranque; `new_game` crea el juego; `settle` lo da por asentado si no falta nada |
+
+Tres prompts: `kiln-asset` (de la petición a la ficha), `kiln-context`
+(ordenar o afinar el contexto) y `kiln-review` (explicar los hallazgos de la
+revisión).
+
+### Lo que hace la página, por MCP
+
+| Página | MCP |
+|---|---|
+| `GET /api/catalog`, `/api/context` | `catalog` (y `status`), `context_get` |
+| `POST /api/ask` (pedir ficha, colocar) | prompt `kiln-asset` + `spec_write`, `spec_layout` |
+| `POST /api/context/sort`, `/refine` | prompt `kiln-context` + `context_propose` |
+| `POST /api/context/text`, `intent`, `answer`, `claim` | `context_edit` |
+| `POST /api/build`, `paint`, `godot`, `review` | `build`, `paint`, `godot_measure`, `review` (+ `review_sheets`) |
+| `POST /api/search`, `import` | `search`, `import` |
+| `POST /api/bind`, `material`, `validate`, `split` | `bind`, `material_set`, `material_validate`, `zones_split` |
+| `GET` y `POST /api/new`, `POST /api/settle` | `new_game_options`, `new_game`, `settle` |
+| `GET /api/jobs/<id>` | `job`, `jobs` |
+| `GET` y `POST /api/chat` | no hay (D2) |
+
+`tests/coverage.rs` falla si la página gana una ruta sin su herramienta.
+
+### Un trabajo largo
+
+`build`, `paint`, `godot_measure`, `review` e `import` tardan minutos: devuelven
+un trabajo. `job` espera hasta 30 s a que haya líneas nuevas o termine, y
+cuando llegan sigue juntándolas hasta un segundo de silencio; se vuelve a
+llamar con `since` = el `next` anterior hasta que el estado deje de ser
+`running`. `jobs` los lista.
+
+`kiln-asset` se puede lanzar sin argumentos (`/mcp__kiln__kiln-asset`): el
+agente pregunta qué asset quieres. Claude Code parte el slash command por
+espacios, así que una petición de varias palabras va en el mensaje siguiente.
+
+`review` cambia la ficha con lo que corrige el revisor y deja cada vuelta en
+`<build>/<id>/review/round-N/`.
+
+### Las dos voces del contexto
+
+`context_propose` es el agente: lo que fijó la persona no se toca, queda como
+propuesta pendiente. `context_edit` es la persona: solo para lo que dice o
+elige con sus palabras, y lo que registra queda fijado.
+
+### Límites
+
+- `review` sigue lanzando el revisor propio de Kiln, aparte (D1): usa la
+  sesión de `claude` y gasta uso de la suscripción.
+- No hay chat por MCP (D2): el agente que llama ya es el agente.
+- Probado solo con Claude Code (D3).
+- Los trabajos viven en el proceso: cerrarlo pierde el que esté en curso.
+- `kiln serve` y `kiln mcp` abiertos a la vez sobre el mismo juego pueden
+  escribir los mismos ficheros, sin bloqueo. La página no ve los trabajos
+  lanzados por MCP.
+- Las claves de Poly Pizza y Sketchfab nunca salen de Kiln.
+
 ## Validar contenido
 
 Opcional y por proyecto. Kiln no sabe nada de ningún juego: cada proyecto
@@ -686,5 +766,4 @@ el `side` de cada conector esté en una lista cerrada (`within` + `one_of`).
 
 - El primer asset de punta a punta y la app de escritorio (Tauri).
 - Assets hechos de assets, lo que falta: la vista 3D con el padre en gris, el árbol que sigue por las piezas-asset, el agente que pide un nivel cada vez y los anclajes.
-- Kiln como servidor MCP, para que cualquier Claude le pida catálogo o assets.
 - El grafo pasará a Rete.js cuando los nodos se puedan editar.

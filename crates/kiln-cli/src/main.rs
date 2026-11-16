@@ -2,6 +2,7 @@
 //!
 //!   kiln index  --project DIR [--config FILE] [--out FILE]   catalog as JSON
 //!   kiln check  --project DIR [--config FILE]                findings; exit 1 on errors
+//!   kiln mcp    --project DIR [--config FILE]                MCP over stdio, for Claude Code
 //!   kiln serve  --project DIR [--config FILE] [--port 4330]  the graph at http://127.0.0.1:PORT
 //!   kiln build  --project DIR [--config FILE] --asset ID     assemble an asset in Blender
 //!   kiln paint  --project DIR [--config FILE] --asset ID [--variant ID]   wear its materials again, no assembling
@@ -12,6 +13,8 @@
 mod agent;
 mod content;
 mod fetch;
+mod mcp;
+mod ops;
 mod production;
 mod review;
 mod serve;
@@ -62,7 +65,7 @@ fn parse() -> Result<Args, String> {
     Ok(a)
 }
 
-const USAGE: &str = "uso: kiln <index|check|serve|build|paint|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--asset ID] [--variant ID] [--set NAME]";
+const USAGE: &str = "uso: kiln <index|check|mcp|serve|build|paint|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--asset ID] [--variant ID] [--set NAME]";
 
 pub fn load(
     project: &std::path::Path,
@@ -131,6 +134,7 @@ fn main() -> ExitCode {
                     ExitCode::SUCCESS
                 })
             }
+            "mcp" => mcp::run(args.project.clone(), args.config.clone()).map(|_| ExitCode::SUCCESS),
             "serve" => serve::run(args.project.clone(), args.config.clone(), args.port)
                 .map(|_| ExitCode::SUCCESS),
             "build" => {
