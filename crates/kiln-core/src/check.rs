@@ -130,6 +130,67 @@ pub fn run(config: &Config, cat: &mut Catalog) {
         .sort_by(|a, b| b.severity.cmp(&a.severity).then(a.subject.cmp(&b.subject)));
 }
 
+/// Anchor classes: every one a spec uses or a `fits` names must be declared,
+/// and a built asset must fit the opening its anchor class asks for.
+pub fn anchors(config: &Config, cat: &mut Catalog) {
+    if config.anchors.is_empty() && cat.specs.iter().all(|s| s.anchors.is_empty()) {
+        return;
+    }
+    let mut out = Vec::new();
+    let mut finding = |subject: String, code: &str, message: String| {
+        out.push(Finding {
+            severity: Severity::Error,
+            subject,
+            code: code.into(),
+            message,
+        })
+    };
+    for (class, def) in &config.anchors {
+        for f in def.fits.iter().filter(|f| !config.anchors.contains_key(*f)) {
+            finding(
+                format!("anchors.{class}"),
+                "anchor_class",
+                format!("la clase «{class}» encaja en «{f}», que no está declarada en [anchors]"),
+            );
+        }
+    }
+    for s in &cat.specs {
+        let id = &s.asset.id;
+        for a in s
+            .anchors
+            .iter()
+            .filter(|a| !config.anchors.contains_key(&a.class))
+        {
+            finding(
+                format!("anchor:{id}/{}", a.id),
+                "anchor_class",
+                format!("la clase «{}» no está declarada en [anchors]", a.class),
+            );
+        }
+        let Some([w, h, _]) = cat.builds.get(id).and_then(|r| r.size_m) else {
+            continue;
+        };
+        let mut classes: Vec<&str> = s.anchors.iter().map(|a| a.class.as_str()).collect();
+        classes.sort();
+        classes.dedup();
+        for class in classes {
+            let Some([ow, oh]) = config.anchors.get(class).and_then(|c| c.opening_m) else {
+                continue;
+            };
+            if w > ow + 0.001 || h > oh + 0.001 {
+                finding(
+                    format!("asset:{id}"),
+                    "anchor_opening",
+                    format!(
+                        "mide {w:.3} x {h:.3} m y el hueco de «{class}» es de {ow:.3} x {oh:.3} m"
+                    ),
+                );
+            }
+        }
+    }
+    cat.findings.extend(out);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -160,5 +221,61 @@ mod tests {
         let mut cat = empty();
         run(&film, &mut cat);
         assert_eq!(cat.findings[0].code, "kind_unknown");
+    }
+
+    const SPEC: &str = "[asset]\nid = \"door\"\nname = \"D\"\n[[parts]]\nid = \"p\"\nwhat = \"p\"\nmaterial = \"oak\"\n[parts.source]\nkind = \"search\"\nquery = \"q\"\n[[anchors]]\nid = \"in\"\nclass = \"doorway\"\n";
+    const CLASSES: &str = "[project]\nname = \"x\"\n[anchors.doorway]\nopening_m = [1.4, 2.2]\n";
+
+    fn anchor_codes(toml: &str, spec: Option<&str>, size: Option<[f64; 3]>) -> Vec<String> {
+        let config = Config::parse(toml).unwrap();
+        let mut cat = empty();
+        if let Some(s) = spec {
+            cat.specs.push(crate::spec::parse(s).unwrap());
+        }
+        if size.is_some() {
+            cat.builds.insert(
+                "door".into(),
+                crate::build::Report {
+                    size_m: size,
+                    ..Default::default()
+                },
+            );
+        }
+        anchors(&config, &mut cat);
+        cat.findings.into_iter().map(|f| f.code).collect()
+    }
+
+    #[test]
+    fn an_anchor_of_an_undeclared_class_is_an_error() {
+        let c = anchor_codes("[project]\nname = \"x\"\n", Some(SPEC), None);
+        assert_eq!(c, ["anchor_class"]);
+    }
+
+    #[test]
+    fn a_fits_entry_that_is_not_a_class_is_an_error() {
+        let toml = "[project]\nname = \"x\"\n[anchors.doorway]\nfits = [\"nowhere\"]\n";
+        assert_eq!(anchor_codes(toml, None, None), ["anchor_class"]);
+    }
+
+    #[test]
+    fn a_built_asset_wider_than_the_opening_is_an_error() {
+        let c = anchor_codes(CLASSES, Some(SPEC), Some([1.6, 2.0, 0.2]));
+        assert_eq!(c, ["anchor_opening"]);
+    }
+
+    #[test]
+    fn an_asset_exactly_the_opening_size_passes() {
+        assert!(anchor_codes(CLASSES, Some(SPEC), Some([1.4, 2.2, 0.2])).is_empty());
+    }
+
+    #[test]
+    fn an_asset_not_built_is_not_measured() {
+        assert!(anchor_codes(CLASSES, Some(SPEC), None).is_empty());
+    }
+
+    #[test]
+    fn no_anchors_anywhere_adds_nothing() {
+        let c = anchor_codes("[project]\nname = \"x\"\n", None, Some([9.0, 9.0, 9.0]));
+        assert!(c.is_empty());
     }
 }

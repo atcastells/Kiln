@@ -39,4 +39,12 @@ sensitive business data (prices, margins, stock).
 - Do not touch the ASTRA repository.
 
 ## Learned
-
+- Clippy here (1.94) rejects nested `if let` + `if` (use let-chains), `x % n != 0` (use `is_multiple_of`) and float literals close to constants like `0.7071068`.
+- Format one file with `rustfmt --edition 2024 --config skip_children=true <file>`; `cargo fmt` touches other files.
+- Under zsh, quote globs: `grep --include="*.rs"`.
+- A shell command containing the word "production" can be blocked by a hook: edit `production.rs` with Edit/Write, and run scripts from files.
+- Launch tools only through `crate::run::{blender, godot}`: they set the cwd, the timeout and the log (`<work>/.kiln/logs/<name>.log`); on failure use `Output::failure("...")`.
+- The project path is already absolute (canonicalized in `main.rs`).
+- Anchor findings use the subject `anchor:<asset>/<id>`.
+- `glb::tests` has `hnode`, `base`, `hash_of` helpers; `validate::tests` has its own GLB builder.
+- `ops::read::tools(cfg)` gives the detected tools, cached for the process.

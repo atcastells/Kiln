@@ -160,6 +160,158 @@ fn from_doc(doc: &Value) -> Result<GlbInfo, String> {
     })
 }
 
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct Node {
+    pub name: String,
+    pub parent: Option<String>,
+    pub translation: [f64; 3],
+    /// Quaternion x, y, z, w.
+    pub rotation: [f64; 4],
+    pub scale: [f64; 3],
+    pub extras: std::collections::BTreeMap<String, Value>,
+    pub mesh: Option<MeshInfo>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct MeshInfo {
+    pub tris: u64,
+    /// Material name per primitive, in order; empty when it has none.
+    pub materials: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct Structure {
+    pub nodes: Vec<Node>,
+}
+
+/// Reads the node structure of a `.glb` or `.gltf`.
+pub fn structure(path: &Path) -> Result<Structure, String> {
+    let bytes = std::fs::read(path).map_err(|e| e.to_string())?;
+    let doc = if path
+        .extension()
+        .is_some_and(|e| e.eq_ignore_ascii_case("gltf"))
+    {
+        serde_json::from_slice(&bytes).map_err(|e| format!("glTF roto: {e}"))?
+    } else {
+        json_chunk(&bytes)?
+    };
+    Ok(structure_of(&doc))
+}
+
+/// Every node of the document, in file order (not only those of the default scene).
+pub fn structure_of(doc: &Value) -> Structure {
+    let empty = Vec::new();
+    let arr = |k: &str| doc.get(k).and_then(Value::as_array).unwrap_or(&empty);
+    let (accessors, meshes, materials, nodes) = (
+        arr("accessors"),
+        arr("meshes"),
+        arr("materials"),
+        arr("nodes"),
+    );
+    let name_of = |v: Option<&Value>| {
+        v.and_then(|v| v.get("name"))
+            .and_then(Value::as_str)
+            .unwrap_or("")
+            .to_string()
+    };
+
+    let mut parents: Vec<Option<usize>> = vec![None; nodes.len()];
+    for (i, n) in nodes.iter().enumerate() {
+        for c in n
+            .get("children")
+            .and_then(Value::as_array)
+            .unwrap_or(&empty)
+        {
+            if let Some(slot) = c.as_u64().and_then(|c| parents.get_mut(c as usize)) {
+                *slot = Some(i);
+            }
+        }
+    }
+
+    let count = |a: Option<&Value>| {
+        a.and_then(Value::as_u64)
+            .and_then(|i| accessors.get(i as usize))
+            .and_then(|a| a.get("count"))
+            .and_then(Value::as_u64)
+            .unwrap_or(0)
+    };
+    let mesh_info = |m: &Value| {
+        let (mut tris, mut mats) = (0u64, Vec::new());
+        for p in m
+            .get("primitives")
+            .and_then(Value::as_array)
+            .unwrap_or(&empty)
+        {
+            if p.get("mode").and_then(Value::as_u64).unwrap_or(4) == 4 {
+                let verts = match p.get("indices") {
+                    Some(i) => count(Some(i)),
+                    None => count(p.pointer("/attributes/POSITION")),
+                };
+                tris += verts / 3;
+            }
+            let mat = p
+                .get("material")
+                .and_then(Value::as_u64)
+                .and_then(|i| materials.get(i as usize));
+            mats.push(name_of(mat));
+        }
+        MeshInfo {
+            tris,
+            materials: mats,
+        }
+    };
+
+    let out = nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| {
+            let (mut translation, mut scale, mut rotation) = (
+                vec3(n.get("translation")).unwrap_or([0.; 3]),
+                [1.; 3],
+                [0., 0., 0., 1.],
+            );
+            if let Some(s) = vec3(n.get("scale")) {
+                scale = s;
+            }
+            if let Some(r) = n
+                .get("rotation")
+                .and_then(Value::as_array)
+                .map(|a| a.iter().filter_map(Value::as_f64).collect::<Vec<_>>())
+                .filter(|v| v.len() == 4)
+            {
+                rotation = [r[0], r[1], r[2], r[3]];
+            }
+            if n.get("matrix").is_some() {
+                let m = local(n);
+                translation = [m[12], m[13], m[14]];
+                let len = |c: usize| {
+                    (m[c * 4].powi(2) + m[c * 4 + 1].powi(2) + m[c * 4 + 2].powi(2)).sqrt()
+                };
+                scale = [len(0), len(1), len(2)];
+                rotation = [0., 0., 0., 1.];
+            }
+            Node {
+                name: name_of(Some(n)),
+                parent: parents[i].map(|p| name_of(nodes.get(p))),
+                translation,
+                rotation,
+                scale,
+                extras: n
+                    .get("extras")
+                    .and_then(Value::as_object)
+                    .map(|o| o.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                    .unwrap_or_default(),
+                mesh: n
+                    .get("mesh")
+                    .and_then(Value::as_u64)
+                    .and_then(|m| meshes.get(m as usize))
+                    .map(mesh_info),
+            }
+        })
+        .collect();
+    Structure { nodes: out }
+}
+
 fn vec3(v: Option<&Value>) -> Option<[f64; 3]> {
     let a = v?.as_array()?;
     Some([
@@ -255,6 +407,47 @@ fn apply(m: &Mat, p: [f64; 3]) -> [f64; 3] {
     ]
 }
 
+fn fmt4(x: f64) -> String {
+    let s = format!("{x:.4}");
+    if s == "-0.0000" { "0.0000".into() } else { s }
+}
+
+/// Hash of the structure that two equivalent builds share: order of nodes,
+/// the sign of quaternions and noise below 1e-4 do not change it.
+pub fn structure_hash(s: &Structure) -> String {
+    let mut nodes: Vec<&Node> = s.nodes.iter().collect();
+    nodes.sort_by(|a, b| (&a.name, &a.parent).cmp(&(&b.name, &b.parent)));
+    let mut text = String::new();
+    for n in nodes {
+        let mut q = n.rotation.map(|v| fmt4(v).parse::<f64>().unwrap_or(0.0));
+        let flip = if q[3] != 0.0 {
+            q[3] < 0.0
+        } else {
+            q[..3].iter().find(|v| **v != 0.0).is_some_and(|v| *v < 0.0)
+        };
+        if flip {
+            q = q.map(|v| -v);
+        }
+        let list = |v: &[f64]| v.iter().map(|x| fmt4(*x)).collect::<Vec<_>>().join(",");
+        text.push_str(&format!(
+            "{}|{}|{}|{}|{}",
+            n.name,
+            n.parent.as_deref().unwrap_or(""),
+            list(&n.translation),
+            list(&q),
+            list(&n.scale)
+        ));
+        if let Some(m) = &n.mesh {
+            text.push_str(&format!("|mesh:{}:{}", m.tris, m.materials.join(",")));
+        }
+        for (k, v) in n.extras.iter().filter(|(k, _)| k.starts_with("kiln_")) {
+            text.push_str(&format!("|{k}={v}"));
+        }
+        text.push('\n');
+    }
+    crate::asset::sha256_hex(text.as_bytes())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -285,6 +478,120 @@ mod tests {
         assert_eq!(info.max, [1.0, 3.0, 1.0]);
         assert_eq!(info.tris, 2);
         assert_eq!(info.materials, ["wood"]);
+    }
+
+    #[test]
+    fn reads_node_structure() {
+        let s = structure_of(
+            &json_chunk(&glb(r#"{"nodes":[
+                {"name":"door","translation":[1,2,3],"children":[1]},
+                {"name":"leaf","rotation":[0,0.6,0,0.8],"mesh":0,
+                 "extras":{"kiln_part":"leaf","kiln_moves":"slides"}}],
+              "meshes":[{"primitives":[
+                {"attributes":{"POSITION":0},"indices":1,"material":0},
+                {"attributes":{"POSITION":2}}]}],
+              "accessors":[{"count":4},{"count":6},{"count":3}],
+              "materials":[{"name":"steel"}]}"#))
+            .unwrap(),
+        );
+        let (door, leaf) = (&s.nodes[0], &s.nodes[1]);
+        assert_eq!((door.name.as_str(), door.parent.clone()), ("door", None));
+        assert_eq!(door.translation, [1.0, 2.0, 3.0]);
+        assert_eq!(door.rotation, [0.0, 0.0, 0.0, 1.0]);
+        assert_eq!(door.scale, [1.0; 3]);
+        assert!(door.mesh.is_none() && door.extras.is_empty());
+        assert_eq!(leaf.parent.as_deref(), Some("door"));
+        assert_eq!(leaf.translation, [0.0; 3]);
+        assert_eq!(leaf.rotation, [0.0, 0.6, 0.0, 0.8]);
+        assert_eq!(leaf.extras["kiln_part"], "leaf");
+        assert_eq!(leaf.extras["kiln_moves"], "slides");
+        let mesh = leaf.mesh.as_ref().unwrap();
+        assert_eq!(mesh.tris, 3);
+        assert_eq!(mesh.materials, ["steel", ""]);
+    }
+
+    #[test]
+    fn node_matrix_gives_translation_and_scale() {
+        let s = structure_of(&serde_json::json!({"nodes":[{"name":"m","matrix":
+            [2,0,0,0, 0,3,0,0, 0,0,4,0, 5,6,7,1]}]}));
+        let n = &s.nodes[0];
+        assert_eq!(n.translation, [5.0, 6.0, 7.0]);
+        assert_eq!(n.scale, [2.0, 3.0, 4.0]);
+        assert_eq!(n.rotation, [0.0, 0.0, 0.0, 1.0]);
+    }
+
+    fn hnode(name: &str, parent: Option<&str>) -> Node {
+        Node {
+            name: name.into(),
+            parent: parent.map(String::from),
+            translation: [0.0; 3],
+            rotation: [0.0, 0.0, 0.0, 1.0],
+            scale: [1.0; 3],
+            extras: Default::default(),
+            mesh: None,
+        }
+    }
+
+    fn hash_of(nodes: Vec<Node>) -> String {
+        structure_hash(&Structure { nodes })
+    }
+
+    fn base() -> Vec<Node> {
+        let mut leaf = hnode("leaf", Some("door"));
+        leaf.mesh = Some(MeshInfo {
+            tris: 12,
+            materials: vec!["steel".into()],
+        });
+        leaf.extras.insert("kiln_part".into(), "leaf".into());
+        vec![hnode("door", None), leaf]
+    }
+
+    #[test]
+    fn structure_hash_ignores_order_sign_and_noise() {
+        let h = hash_of(base());
+        let mut rev = base();
+        rev.reverse();
+        assert_eq!(hash_of(rev), h);
+
+        let mut a = base();
+        a[0].rotation = [0.0, 0.6, 0.0, 0.8];
+        let mut b = base();
+        b[0].rotation = [0.0, -0.6, 0.0, -0.8];
+        assert_eq!(hash_of(a), hash_of(b));
+
+        let mut a = base();
+        a[0].rotation = [0.0, 0.0, 1.0, 0.0];
+        let mut b = base();
+        b[0].rotation = [0.0, 0.0, -1.0, -0.0];
+        assert_eq!(hash_of(a), hash_of(b));
+
+        let mut n = base();
+        n[0].translation = [0.00001, -0.0, 0.0];
+        assert_eq!(hash_of(n), h);
+
+        let mut n = base();
+        n[1].extras.insert("other".into(), "x".into());
+        assert_eq!(hash_of(n), h);
+    }
+
+    #[test]
+    fn structure_hash_sees_real_changes() {
+        let h = hash_of(base());
+        let mut n = base();
+        n[0].translation[0] = 0.001;
+        assert_ne!(hash_of(n), h);
+        let mut n = base();
+        n[1].mesh.as_mut().unwrap().tris = 13;
+        assert_ne!(hash_of(n), h);
+        let mut n = base();
+        n[1].mesh.as_mut().unwrap().materials[0] = "wood".into();
+        assert_ne!(hash_of(n), h);
+        let mut n = base();
+        n[1].parent = None;
+        assert_ne!(hash_of(n), h);
+        let mut n = base();
+        n[1].extras.insert("kiln_part".into(), "panel".into());
+        assert_ne!(hash_of(n), h);
     }
 
     #[test]

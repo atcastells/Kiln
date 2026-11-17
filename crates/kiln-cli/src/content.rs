@@ -6,7 +6,6 @@ use crate::production::config;
 use kiln_core::content::{index, schema::ContentSet};
 use kiln_core::Severity;
 use std::path::Path;
-use std::process::Command;
 
 const SCRIPT: &str = include_str!("../godot/content_manifest.gd");
 
@@ -75,25 +74,29 @@ pub fn export(
         std::fs::write(&script, SCRIPT).map_err(|e| e.to_string())?;
         let _ = std::fs::remove_file(&output);
         say(format!("{name}: Godot lee {} escenas ({})", scenes.len(), cfg.tools.godot));
-        let run = Command::new(&cfg.tools.godot)
-            .args(["--headless", "--path"])
-            .arg(project.join(gp))
-            .arg("--script")
-            .arg(&script)
-            .arg("--")
-            .args([&input, &output])
-            .output()
-            .map_err(|e| format!("no se puede lanzar {}: {e}", cfg.tools.godot))?;
+        let run = crate::run::godot(
+            &cfg,
+            vec![
+                "--path".into(),
+                project.join(gp).into(),
+                "--script".into(),
+                (&script).into(),
+                "--".into(),
+                (&input).into(),
+                (&output).into(),
+            ],
+            &dir,
+            "content-manifest",
+        )?;
         let text = std::fs::read_to_string(&output).map_err(|_| {
-            let err = String::from_utf8_lossy(&run.stderr);
-            format!("Godot no escribió el manifiesto: {}", err.lines().last().unwrap_or(""))
+            format!("Godot no escribió el manifiesto: {}", run.stderr.lines().last().unwrap_or(""))
         })?;
         let out: serde_json::Value = serde_json::from_str(&text).map_err(|e| e.to_string())?;
         let failed = out["scenes"].as_array().into_iter().flatten().find(|s| s.get("error").is_some());
         if let Some(s) = failed {
             return Err(format!("{}: {}", s["scene"].as_str().unwrap_or("?"), s["error"].as_str().unwrap_or("")));
         }
-        if !run.status.success() {
+        if !run.success() {
             return Err(format!("Godot falló al leer las escenas de {name}"));
         }
         let target = project.join(rel);

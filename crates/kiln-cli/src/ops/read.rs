@@ -4,6 +4,7 @@ use super::rel;
 use crate::agent::Ctx;
 use kiln_core::{Catalog, Severity};
 use serde_json::{Value, json};
+use std::sync::Mutex;
 
 fn load(ctx: &Ctx) -> Result<Catalog, String> {
     crate::load(&ctx.project, ctx.config.as_deref())
@@ -25,8 +26,29 @@ fn page(rows: Vec<Value>, offset: usize, limit: usize) -> Value {
     json!({ "total": rows.len(), "offset": offset, "items": items })
 }
 
+type ToolsCache = Mutex<Option<(String, Vec<kiln_core::tools::Tool>)>>;
+static TOOLS: ToolsCache = Mutex::new(None);
+
+/// Detected external tools, probed once per process for the same configured programs.
+pub fn tools(cfg: &kiln_core::Config) -> Vec<kiln_core::tools::Tool> {
+    let t = &cfg.tools;
+    let key = [&t.blender, &t.godot, &t.gltf_validator, &t.gltf_transform]
+        .map(|s| s.as_str())
+        .join("\u{1f}");
+    let mut cache = TOOLS.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((k, found)) = cache.as_ref()
+        && *k == key
+    {
+        return found.clone();
+    }
+    let found = kiln_core::tools::detect(cfg);
+    *cache = Some((key, found.clone()));
+    found
+}
+
 pub fn status(ctx: &Ctx) -> Result<Value, String> {
     let cat = load(ctx)?;
+    let cfg = crate::production::config(&ctx.project, ctx.config.as_deref())?;
     let c = kiln_core::context::load(&ctx.context_file)?;
     let missing = c.missing(&ctx.layers);
     let findings = counts(&cat);
@@ -56,6 +78,7 @@ pub fn status(ctx: &Ctx) -> Result<Value, String> {
         "findings": findings,
         "context": { "claims": c.claims.len(), "open_questions": c.questions.iter().filter(|q| q.status == "open").count(), "missing": missing },
         "next": next,
+        "tools": tools(&cfg),
     }))
 }
 

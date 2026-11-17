@@ -2,6 +2,7 @@
 //!
 //!   kiln index  --project DIR [--config FILE] [--out FILE]   catalog as JSON
 //!   kiln check  --project DIR [--config FILE]                findings; exit 1 on errors
+//!   kiln tools  --project DIR [--config FILE]                external tools found, with their versions
 //!   kiln mcp    --project DIR [--config FILE]                MCP over stdio, for Claude Code
 //!   kiln serve  --project DIR [--config FILE] [--port 4330] [--ui-dir DIR]  the graph at http://127.0.0.1:PORT (--ui-dir: read the new UI from disk)
 //!   kiln build  --project DIR [--config FILE] --asset ID     assemble an asset in Blender
@@ -17,6 +18,7 @@ mod mcp;
 mod ops;
 mod production;
 mod review;
+mod run;
 mod serve;
 
 use kiln_core::{Catalog, Config, Severity};
@@ -68,7 +70,7 @@ fn parse() -> Result<Args, String> {
     Ok(a)
 }
 
-const USAGE: &str = "uso: kiln <index|check|mcp|serve|build|paint|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--ui-dir DIR] [--asset ID] [--variant ID] [--set NAME]";
+const USAGE: &str = "uso: kiln <index|check|tools|mcp|serve|build|paint|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--ui-dir DIR] [--asset ID] [--variant ID] [--set NAME]";
 
 pub fn load(
     project: &std::path::Path,
@@ -136,6 +138,22 @@ fn main() -> ExitCode {
                 } else {
                     ExitCode::SUCCESS
                 })
+            }
+            "tools" => {
+                let cfg = production::config(&args.project, args.config.as_deref())?;
+                let found = ops::read::tools(&cfg);
+                let w = found.iter().map(|t| t.name.len()).max().unwrap_or(0);
+                for t in &found {
+                    let state = match (t.found, t.ok) {
+                        (false, _) => "ausente",
+                        (true, true) => "ok",
+                        (true, false) => "no compatible",
+                    };
+                    let version = t.version.as_deref().unwrap_or("-");
+                    let line = format!("{:<w$}  {:<10}  {:<13}  {}", t.name, version, state, t.note.as_deref().unwrap_or(""));
+                    println!("{}", line.trim_end());
+                }
+                Ok(ExitCode::SUCCESS)
             }
             "mcp" => mcp::run(args.project.clone(), args.config.clone()).map(|_| ExitCode::SUCCESS),
             "serve" => serve::run(args.project.clone(), args.config.clone(), args.port, args.ui_dir.clone())

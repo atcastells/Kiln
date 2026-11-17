@@ -5,7 +5,6 @@
 use kiln_core::{Config, build, godot};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 const PAINT: &str = include_str!("../blender/paint.py");
 const SPLIT: &str = include_str!("../blender/split.py");
@@ -114,27 +113,15 @@ fn build_one(
 
 /// Runs a Kiln script in Blender on one JSON file; `made` must exist after.
 fn blender(cfg: &Config, script: &Path, job: &Path, made: &Path) -> Result<String, String> {
-    let mut cmd = Command::new(&cfg.tools.blender);
-    if is_python(&cfg.tools.blender) {
-        cmd.arg(script).arg(job);
-    } else {
-        cmd.args(["--background", "--factory-startup", "--python"])
-            .arg(script)
-            .arg("--")
-            .arg(job);
+    let work = job.parent().unwrap_or(Path::new("."));
+    let name = script
+        .file_stem()
+        .map_or("blender".into(), |n| n.to_string_lossy().into_owned());
+    let out = crate::run::blender(cfg, script, &[job], work, &name)?;
+    if !out.success() || !made.exists() {
+        return Err(out.failure("Blender falló"));
     }
-    let out = cmd
-        .output()
-        .map_err(|e| format!("no se puede lanzar {}: {e}", cfg.tools.blender))?;
-    if !out.status.success() || !made.exists() {
-        let err = String::from_utf8_lossy(&out.stderr);
-        let tail: Vec<&str> = err.lines().rev().take(6).collect();
-        return Err(format!(
-            "Blender falló: {}",
-            tail.into_iter().rev().collect::<Vec<_>>().join(" | ")
-        ));
-    }
-    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    Ok(out.stdout)
 }
 
 /// The file names of an asset or of one of its colour variants.
@@ -217,12 +204,13 @@ fn link_godot(project: &Path, cfg: &Config, glb: &Path, materials: &Path, say: &
         let import = PathBuf::from(format!("{}.import", glb.display()));
         if !import.exists() {
             say(format!("Godot importa el GLB por primera vez ({})", cfg.tools.godot));
-            let _ = Command::new(&cfg.tools.godot)
-                .args(["--headless", "--path"])
-                .arg(&gp)
-                .arg("--import")
-                .output()
-                .map_err(|e| format!("no se puede lanzar {}: {e}", cfg.tools.godot))?;
+            let work = glb.parent().unwrap_or(&gp).to_path_buf();
+            let _ = crate::run::godot(
+                cfg,
+                vec!["--path".into(), gp.clone().into(), "--import".into()],
+                &work,
+                "godot-import",
+            )?;
         }
         let text = std::fs::read_to_string(&import)
             .map_err(|_| "Godot no ha escrito el .import del GLB".to_string())?;
@@ -238,12 +226,6 @@ fn link_godot(project: &Path, cfg: &Config, glb: &Path, materials: &Path, say: &
         Ok(n) => say(format!("Godot: {n} materiales vinculados en el .import")),
         Err(e) => say(format!("Godot: materiales sin vincular: {e}")),
     }
-}
-
-fn is_python(tool: &str) -> bool {
-    Path::new(tool)
-        .file_name()
-        .is_some_and(|n| n.to_string_lossy().starts_with("python"))
 }
 
 /// Has Godot measure and export every piece only it can read.
@@ -282,22 +264,24 @@ pub fn measure(
         cfg.tools.godot
     ));
     let abs = |p: &Path| std::fs::canonicalize(p).unwrap_or(p.to_path_buf());
-    let status = Command::new(&cfg.tools.godot)
-        .arg("--headless")
-        .arg("--path")
-        .arg(project.join(gp))
-        .arg("--script")
-        .arg(abs(&script))
-        .arg("--")
-        .arg(abs(&req_file))
-        .arg(abs(&dir).join("pieces.json"))
-        .output()
-        .map_err(|e| format!("no se puede lanzar {}: {e}", cfg.tools.godot))?;
+    let status = crate::run::godot(
+        &cfg,
+        vec![
+            "--path".into(),
+            project.join(gp).into(),
+            "--script".into(),
+            abs(&script).into(),
+            "--".into(),
+            abs(&req_file).into(),
+            abs(&dir).join("pieces.json").into(),
+        ],
+        &abs(&dir),
+        "measure",
+    )?;
     if !out.exists() {
-        let err = String::from_utf8_lossy(&status.stderr);
         return Err(format!(
             "Godot no escribió las medidas: {}",
-            err.lines().last().unwrap_or("")
+            status.stderr.lines().last().unwrap_or("")
         ));
     }
     say(format!("Medidas en {}", out.display()));

@@ -2,6 +2,7 @@
 //! the catalog of what the project already has (pieces, materials) with the
 //! findings of the checks. No engine is needed to read it.
 
+pub mod asset;
 pub mod bindings;
 pub mod build;
 pub mod catalog;
@@ -17,7 +18,9 @@ pub mod new_game;
 pub mod review;
 pub mod sources;
 pub mod spec;
+pub mod tools;
 pub mod tree;
+pub mod validate;
 pub mod zones;
 
 pub use catalog::{Catalog, Finding, Kit, Material, Piece, Severity};
@@ -49,6 +52,7 @@ pub fn open_with(project: &Path, config: Config) -> Result<Catalog, String> {
             .sort_by(|a, b| b.severity.cmp(&a.severity).then(a.subject.cmp(&b.subject)));
     }
     catalog.builds = build::reports(project, &config, &catalog.specs);
+    check::anchors(&config, &mut catalog);
     let specs = std::mem::take(&mut catalog.specs);
     spec::nesting(&specs, &mut catalog);
     catalog.specs = specs;

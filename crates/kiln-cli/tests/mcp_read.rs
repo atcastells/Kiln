@@ -16,6 +16,26 @@ fn tools_list_has_the_read_tools_as_read_only() {
 }
 
 #[test]
+fn status_lists_the_tools_and_marks_a_missing_one_absent() {
+    let p = temp_project("");
+    let file = p.path().join("kiln.toml");
+    let toml = std::fs::read_to_string(&file).unwrap().replace(
+        "[tools]\n",
+        "[tools]\nblender = \"/nonexistent/kiln-no-blender\"\ngodot = \"/nonexistent/kiln-no-godot\"\n\
+         gltf_validator = \"/nonexistent/kiln-no-validator\"\ngltf_transform = \"/nonexistent/kiln-no-transform\"\n",
+    );
+    std::fs::write(&file, toml).unwrap();
+    let mut m = Mcp::start(p.path());
+    let r = m.call("status", json!({}));
+    assert!(!r.is_error, "{}", r.text);
+    let j = r.json();
+    let tools = j["tools"].as_array().unwrap_or_else(|| panic!("no tools: {j}"));
+    let names: Vec<&str> = tools.iter().map(|t| t["name"].as_str().unwrap()).collect();
+    assert_eq!(names, ["blender", "godot", "gltf_validator", "gltf-transform", "claude", "curl"]);
+    assert_eq!((tools[0]["found"].clone(), tools[0]["ok"].clone()), (json!(false), json!(false)), "{}", tools[0]);
+}
+
+#[test]
 fn catalog_pages_and_reports_total() {
     let p = temp_project("");
     let mut m = Mcp::start(p.path());
