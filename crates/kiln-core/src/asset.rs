@@ -205,6 +205,27 @@ pub fn contract(b: &Built) -> Result<Contract, String> {
     })
 }
 
+/// The pieces of a written contract whose source file is no longer the one
+/// the asset was built from: changed since, or gone. Keys, sorted.
+pub fn changed_pieces(root: &std::path::Path, contract: &serde_json::Value) -> Vec<String> {
+    let mut out: Vec<String> = contract["source"]["pieces"]
+        .as_array()
+        .into_iter()
+        .flatten()
+        .filter_map(|p| {
+            let (key, file, sha) = (
+                p["key"].as_str()?,
+                p["file"].as_str()?,
+                p["sha256"].as_str()?,
+            );
+            let now = sha256_file(&root.join(file)).ok();
+            (now.as_deref() != Some(sha)).then(|| key.to_string())
+        })
+        .collect();
+    out.sort();
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -418,5 +439,24 @@ from = "child"
         assert_eq!(sha256_file(&p).unwrap().len(), 64);
         let err = sha256_file(std::path::Path::new("/no/such/file")).unwrap_err();
         assert!(err.starts_with("no se puede leer /no/such/file"));
+    }
+
+    #[test]
+    fn changed_pieces_names_the_sources_that_are_no_longer_the_built_ones() {
+        let root = std::env::temp_dir().join(format!("kiln-asset-changed-{}", std::process::id()));
+        std::fs::create_dir_all(root.join("kits/k")).unwrap();
+        std::fs::write(root.join("kits/k/a.blend"), b"one").unwrap();
+        std::fs::write(root.join("kits/k/b.glb"), b"two").unwrap();
+        let contract = serde_json::json!({ "source": { "pieces": [
+            { "key": "k/a", "file": "kits/k/a.blend", "sha256": sha256_hex(b"one") },
+            { "key": "k/b", "file": "kits/k/b.glb", "sha256": sha256_hex(b"two") },
+            { "key": "k/gone", "file": "kits/k/gone.glb", "sha256": sha256_hex(b"x") },
+            { "key": "k/unhashed", "file": null, "sha256": null },
+        ] } });
+        assert_eq!(changed_pieces(&root, &contract), ["k/gone"]);
+        std::fs::write(root.join("kits/k/a.blend"), b"one, retouched").unwrap();
+        assert_eq!(changed_pieces(&root, &contract), ["k/a", "k/gone"]);
+        assert!(changed_pieces(&root, &serde_json::json!({})).is_empty());
+        std::fs::remove_dir_all(root).unwrap();
     }
 }

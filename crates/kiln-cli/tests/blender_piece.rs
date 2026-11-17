@@ -128,4 +128,15 @@ fn a_blend_piece_is_exported_measured_and_tracked() {
         (report["size_m"][0].as_f64().unwrap() - 3.0).abs() < 0.01,
         "{report}"
     );
+
+    // a .blend retouched after the build makes the asset stale, and it cannot
+    // be published until it is built and verified again
+    let stale = |project: &Path| -> serde_json::Value {
+        let out = kiln(project, &["index"]);
+        let cat: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
+        cat["builds"]["slab_probe"]["stale"].clone()
+    };
+    assert_eq!(stale(p.path()), serde_json::json!([]));
+    make_blend(&blend, 4.0);
+    assert_eq!(stale(p.path()), serde_json::json!(["harbor/slab"]));
 }

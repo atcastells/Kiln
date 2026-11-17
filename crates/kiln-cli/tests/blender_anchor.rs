@@ -79,4 +79,27 @@ fn anchors_reach_the_glb_as_empty_nodes_in_place() {
     let report: serde_json::Value =
         serde_json::from_str(&p.read("kiln/build/anchor_probe/report.json")).unwrap();
     assert!(report["size_m"][1].as_f64().unwrap() < 1.0, "{report}");
+
+    // the anchors survive Godot's import: the asset verifies
+    let out = Command::new(env!("CARGO_BIN_EXE_kiln"))
+        .args(["verify", "--asset", "anchor_probe", "--project"])
+        .arg(p.path())
+        .output()
+        .expect("kiln verify");
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report: serde_json::Value =
+        serde_json::from_str(&p.read("kiln/build/anchor_probe/validation.json")).unwrap();
+    assert_eq!(report["valid"], true, "{report}");
+    let passed = |name: &str| {
+        report["checks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .any(|c| c["name"] == name && c["status"] == "passed")
+    };
+    assert!(passed("kiln") && passed("godot_import"), "{report}");
 }

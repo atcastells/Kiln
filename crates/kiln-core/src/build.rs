@@ -376,7 +376,7 @@ fn mark_stale(
             .map(String::from)
             .collect();
         if let Some(r) = reports.get_mut(&id) {
-            r.stale = stale;
+            r.stale.extend(stale);
         }
     }
 }
@@ -419,6 +419,12 @@ pub fn reports(root: &Path, config: &Config, specs: &[Spec]) -> BTreeMap<String,
             let text = std::fs::read_to_string(dir.join("report.json")).ok()?;
             let mut r: Report = serde_json::from_str(&text).ok()?;
             r.glb = rel(root, &dir.join(format!("{}.glb", s.asset.id)));
+            // a piece retouched after the build (a `.blend` saved again)
+            r.stale = std::fs::read_to_string(dir.join("asset.json"))
+                .ok()
+                .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+                .map(|c| crate::asset::changed_pieces(root, &c))
+                .unwrap_or_default();
             r.materials = std::fs::read_to_string(dir.join("materials.json"))
                 .ok()
                 .and_then(|t| serde_json::from_str(&t).ok())

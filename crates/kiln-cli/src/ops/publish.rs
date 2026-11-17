@@ -142,6 +142,13 @@ pub fn publish_files(
         "el contrato de «{id}» no cuadra con la carpeta de build: monta y verifica de nuevo"
     );
     let contract = read_json(&build.join("asset.json"), &rebuild)?;
+    let changed = kiln_core::asset::changed_pieces(project, &contract);
+    if !changed.is_empty() {
+        return Err(format!(
+            "«{id}» se montó con otra versión de {}: monta y verifica de nuevo",
+            changed.join(", ")
+        ));
+    }
     let outputs = contract["outputs"]
         .as_array()
         .filter(|o| !o.is_empty())
@@ -424,6 +431,28 @@ mod tests {
                 .symlink_metadata()
                 .unwrap()
                 .is_symlink()
+        );
+    }
+
+    #[test]
+    fn refuses_a_build_whose_piece_changed_since() {
+        let (p, c) = (project(), cfg(Some("game/assets")));
+        make_build(&p, &c, "crate", &[(None, b"main")]);
+        std::fs::create_dir_all(p.0.join("kits/k")).unwrap();
+        std::fs::write(p.0.join("kits/k/side.blend"), b"first").unwrap();
+        let file = build_dir(&p, &c, "crate").join("asset.json");
+        let mut contract: Value = serde_json::from_slice(&std::fs::read(&file).unwrap()).unwrap();
+        contract["source"] = json!({ "pieces": [{
+            "key": "k/side", "file": "kits/k/side.blend",
+            "sha256": kiln_core::asset::sha256_hex(b"first"),
+        }] });
+        std::fs::write(&file, contract.to_string()).unwrap();
+        assert!(publish_files(&p.0, &c, "crate").is_ok());
+        std::fs::write(p.0.join("kits/k/side.blend"), b"retouched").unwrap();
+        let e = publish_files(&p.0, &c, "crate").unwrap_err();
+        assert!(
+            e.contains("k/side") && e.contains("monta y verifica de nuevo"),
+            "{e}"
         );
     }
 }
