@@ -352,6 +352,8 @@ pub struct Report {
     pub asset: String,
     pub glb_sha256: String,
     pub structure_sha256: String,
+    /// File name -> sha256 of every GLB the verdict stands for (base and variants).
+    pub outputs: std::collections::BTreeMap<String, String>,
     pub valid: bool,
     pub checks: Vec<Check>,
     pub findings: Vec<Finding>,
@@ -443,6 +445,7 @@ impl Report {
             asset: asset.into(),
             glb_sha256,
             structure_sha256,
+            outputs: Default::default(),
             valid: checks.iter().all(|c| c.status != "failed"),
             checks,
             findings,

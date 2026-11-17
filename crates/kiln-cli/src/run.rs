@@ -55,8 +55,15 @@ pub fn is_python(tool: &str) -> bool {
 }
 
 fn tool(cfg: &Config, program: &str, args: Vec<OsString>, work: &Path, name: &str) -> Run {
+    // the tool runs from `work`: a relative path is resolved here, as before
+    let given = Path::new(program);
+    let program = if given.components().count() > 1 && given.is_relative() {
+        std::path::absolute(given).map_or(program.to_string(), |p| p.to_string_lossy().into_owned())
+    } else {
+        program.to_string()
+    };
     Run {
-        program: program.to_string(),
+        program,
         args,
         cwd: work.to_path_buf(),
         timeout: Duration::from_secs(cfg.tools.timeout_s),

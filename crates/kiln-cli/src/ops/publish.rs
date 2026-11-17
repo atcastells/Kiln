@@ -19,7 +19,9 @@ fn read_json(path: &Path, missing: &str) -> Result<Value, String> {
     serde_json::from_slice(&bytes).map_err(|e| format!("{} no es JSON válido: {e}", path.display()))
 }
 
-/// Publishes the asset `id`: copies what was verified and has Godot import it.
+/// Publishes the asset `id`: copies what was verified, has Godot import it
+/// and only then writes the contract with its version. If Godot does not
+/// import it, the contract of the previous version stays.
 pub fn publish_asset(
     project: &Path,
     config_file: Option<&Path>,
@@ -27,25 +29,29 @@ pub fn publish_asset(
     mut say: impl FnMut(String),
 ) -> Result<Published, String> {
     let cfg = crate::production::config(project, config_file)?;
-    let done = publish_files(project, &cfg, id)?;
+    let staged = stage(project, &cfg, id)?;
+    say(format!("«{id}» copiado a {}", staged.done.dir));
+    import_in_godot(project, &cfg, &staged, &mut say)?;
+    let done = commit(staged)?;
     say(format!(
         "«{id}» publicado en {} (versión {}{})",
         done.dir,
         done.version,
         if done.changed { "" } else { ", sin cambios" }
     ));
-    import_in_godot(project, &cfg, &done, &mut say)?;
     Ok(done)
 }
 
-/// Godot imports what was published when it lies inside its project; the
-/// import is judged by the `.import` file of each GLB.
+/// Godot imports what was copied when it lies inside its project. The
+/// `.import` of each GLB is removed first, so finding it afterwards means
+/// this run wrote it.
 fn import_in_godot(
     project: &Path,
     cfg: &kiln_core::Config,
-    done: &Published,
+    staged: &Staged,
     say: &mut dyn FnMut(String),
 ) -> Result<(), String> {
+    let done = &staged.done;
     let Some(gp) = &cfg.tools.godot_project else {
         say("Sin [tools] godot_project: Godot no importa lo publicado".into());
         return Ok(());
@@ -73,6 +79,9 @@ fn import_in_godot(
         ));
         return Ok(());
     }
+    for (f, _) in &staged.outputs {
+        let _ = std::fs::remove_file(dest.join(format!("{f}.import")));
+    }
     say(format!("Godot importa lo publicado ({})", cfg.tools.godot));
     let build = kiln_core::build::out_dir(project, cfg, &done.asset);
     let out = crate::run::godot(
@@ -81,16 +90,16 @@ fn import_in_godot(
         &build,
         "godot-publish",
     )?;
-    for f in &done.files {
+    for (f, variant) in &staged.outputs {
         if out.timed_out || !dest.join(format!("{f}.import")).exists() {
             return Err(format!(
-                "publicado en {}, pero Godot no importó {f}: {}",
+                "copiado a {}, pero Godot no importó {f}: {} (la versión publicada no cambia)",
                 done.dir,
                 out.error_tail(2)
             ));
         }
-        let materials = match f.strip_suffix(".glb").and_then(|n| n.split_once("--")) {
-            Some((_, variant)) => format!("materials--{variant}.json"),
+        let materials = match variant {
+            Some(v) => format!("materials--{v}.json"),
             None => "materials.json".into(),
         };
         crate::production::link_godot(project, cfg, &dest.join(f), &build.join(materials), say);
@@ -98,12 +107,38 @@ fn import_in_godot(
     Ok(())
 }
 
-/// Copies a verified asset to `[publish] dir`/<id>/ for the game to use.
+/// What `stage` copied, waiting for its contract to be written.
+struct Staged {
+    done: Published,
+    dest: std::path::PathBuf,
+    /// The contract to write, with its version.
+    contract: String,
+    /// (file name, variant) of every GLB copied.
+    outputs: Vec<(String, Option<String>)>,
+}
+
+/// Copies a verified asset to `[publish] dir`/<id>/ and writes its contract,
+/// without Godot.
+#[cfg(test)]
 pub fn publish_files(
     project: &Path,
     cfg: &kiln_core::Config,
     id: &str,
 ) -> Result<Published, String> {
+    commit(stage(project, cfg, id)?)
+}
+
+/// Writes the contract of what was staged: from here on it is published.
+fn commit(staged: Staged) -> Result<Published, String> {
+    let file = staged.dest.join("asset.json");
+    let _ = std::fs::remove_file(&file);
+    std::fs::write(&file, &staged.contract)
+        .map_err(|e| format!("no se puede escribir asset.json: {e}"))?;
+    Ok(staged.done)
+}
+
+/// Checks that the build is the verified one and copies its GLBs.
+fn stage(project: &Path, cfg: &kiln_core::Config, id: &str) -> Result<Staged, String> {
     super::check_id("el asset", id)?;
     let dir = cfg
         .publish
@@ -130,13 +165,7 @@ pub fn publish_files(
             "la verificación de «{id}» no pasó: corrige y vuelve a verificar"
         ));
     }
-    let main_sha =
-        kiln_core::asset::sha256_file(&build.join(format!("{id}.glb"))).unwrap_or_default();
-    if validation["glb_sha256"].as_str() != Some(main_sha.as_str()) {
-        return Err(format!(
-            "el GLB de «{id}» cambió después de verificarlo: vuelve a verificar"
-        ));
-    }
+    let reverify = format!("el GLB de «{id}» cambió después de verificarlo: vuelve a verificar");
 
     let rebuild = format!(
         "el contrato de «{id}» no cuadra con la carpeta de build: monta y verifica de nuevo"
@@ -149,22 +178,27 @@ pub fn publish_files(
             changed.join(", ")
         ));
     }
-    let outputs = contract["outputs"]
+    let listed = contract["outputs"]
         .as_array()
         .filter(|o| !o.is_empty())
         .ok_or(&rebuild)?;
-    let mut names = Vec::new();
-    for o in outputs {
+    let mut outputs = Vec::new();
+    for o in listed {
         let name = o["file"].as_str().ok_or(&rebuild)?;
         if Path::new(name).components().count() != 1 || !name.ends_with(".glb") {
             return Err(rebuild);
         }
         let sha = kiln_core::asset::sha256_file(&build.join(name)).map_err(|_| rebuild.clone())?;
+        // every file must be the one the verification saw, the variants too
+        if validation["outputs"][name].as_str() != Some(sha.as_str()) {
+            return Err(reverify);
+        }
         if o["sha256"].as_str() != Some(sha.as_str()) {
             return Err(rebuild);
         }
-        names.push(name.to_string());
+        outputs.push((name.to_string(), o["variant"].as_str().map(String::from)));
     }
+    let names: Vec<String> = outputs.iter().map(|(n, _)| n.clone()).collect();
 
     let dest = project.join(dir_path);
     let root = std::fs::canonicalize(project).map_err(|e| format!("proyecto: {e}"))?;
@@ -200,13 +234,6 @@ pub fn publish_files(
         std::fs::copy(build.join(name), dest.join(name))
             .map_err(|e| format!("no se puede copiar {name}: {e}"))?;
     }
-    let mut published = contract.clone();
-    published["version"] = json!(version);
-    published["validation"] = json!({ "valid": true, "checks": validation["checks"] });
-    let text = serde_json::to_string_pretty(&published).map_err(|e| e.to_string())?;
-    let _ = std::fs::remove_file(dest.join("asset.json"));
-    std::fs::write(dest.join("asset.json"), text)
-        .map_err(|e| format!("no se puede escribir asset.json: {e}"))?;
     for e in std::fs::read_dir(&dest)
         .map_err(|e| e.to_string())?
         .flatten()
@@ -216,13 +243,21 @@ pub fn publish_files(
             let _ = std::fs::remove_file(e.path());
         }
     }
+    let mut published = contract.clone();
+    published["version"] = json!(version);
+    published["validation"] = json!({ "valid": true, "checks": validation["checks"] });
 
-    Ok(Published {
-        asset: id.to_string(),
-        dir: super::rel(project, &dest),
-        version,
-        changed,
-        files: names,
+    Ok(Staged {
+        done: Published {
+            asset: id.to_string(),
+            dir: super::rel(project, &dest),
+            version,
+            changed,
+            files: names,
+        },
+        contract: serde_json::to_string_pretty(&published).map_err(|e| e.to_string())?,
+        dest,
+        outputs,
     })
 }
 
@@ -284,8 +319,12 @@ mod tests {
         }
         let asset = json!({ "id": id, "outputs": outputs });
         std::fs::write(dir.join("asset.json"), asset.to_string()).unwrap();
+        let verified: serde_json::Map<String, Value> = outputs
+            .iter()
+            .map(|o| (o["file"].as_str().unwrap().to_string(), o["sha256"].clone()))
+            .collect();
         let validation = json!({
-            "asset": id, "glb_sha256": main_sha, "structure_sha256": "s",
+            "asset": id, "glb_sha256": main_sha, "structure_sha256": "s", "outputs": verified,
             "valid": true, "checks": [{ "name": "tris", "ok": true }], "findings": []
         });
         std::fs::write(dir.join("validation.json"), validation.to_string()).unwrap();
@@ -453,6 +492,50 @@ mod tests {
         assert!(
             e.contains("k/side") && e.contains("monta y verifica de nuevo"),
             "{e}"
+        );
+    }
+
+    #[test]
+    fn refuses_a_variant_painted_again_after_verifying() {
+        let (p, c) = (project(), cfg(Some("game/assets")));
+        make_build(&p, &c, "crate", &[(None, b"main"), (Some("red"), b"red")]);
+        // what `paint --variant` does: a new file and a contract that follows it
+        let dir = build_dir(&p, &c, "crate");
+        std::fs::write(dir.join("crate--red.glb"), b"red, repainted").unwrap();
+        let mut contract = read_json(&dir.join("asset.json"));
+        contract["outputs"][1]["sha256"] =
+            json!(kiln_core::asset::sha256_file(&dir.join("crate--red.glb")).unwrap());
+        std::fs::write(dir.join("asset.json"), contract.to_string()).unwrap();
+        let e = publish_files(&p.0, &c, "crate").unwrap_err();
+        assert!(e.contains("cambió después de verificarlo"), "{e}");
+        assert!(!dest(&p, "crate").join("crate--red.glb").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_failed_godot_import_leaves_the_published_version_as_it_was() {
+        use std::os::unix::fs::PermissionsExt;
+        let p = project();
+        let fake = p.0.join("fake-godot");
+        std::fs::write(&fake, "#!/bin/sh\nexit 1\n").unwrap();
+        std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let toml = format!(
+            "[project]\nname = \"t\"\n[publish]\ndir = \"game/assets\"\n[tools]\ngodot = \"{}\"\ngodot_project = \"game\"\n",
+            fake.display()
+        );
+        std::fs::write(p.0.join("kiln.toml"), &toml).unwrap();
+        let c = kiln_core::Config::parse(&toml).unwrap();
+        std::fs::create_dir_all(p.0.join("game")).unwrap();
+        std::fs::write(p.0.join("game/project.godot"), "config_version=5\n").unwrap();
+        make_build(&p, &c, "crate", &[(None, b"main")]);
+        // an import left by an earlier publish must not count for this one
+        std::fs::create_dir_all(dest(&p, "crate")).unwrap();
+        std::fs::write(dest(&p, "crate").join("crate.glb.import"), b"old").unwrap();
+        let e = publish_asset(&p.0, None, "crate", |_| {}).unwrap_err();
+        assert!(e.contains("Godot no importó crate.glb"), "{e}");
+        assert!(
+            !dest(&p, "crate").join("asset.json").exists(),
+            "no contract, no version"
         );
     }
 }

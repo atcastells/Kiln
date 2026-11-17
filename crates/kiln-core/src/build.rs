@@ -103,6 +103,10 @@ pub struct Report {
     /// are to be assembled again themselves: it is to be assembled again.
     #[serde(default, skip_deserializing)]
     pub stale: Vec<String>,
+    /// The pieces (`kit/piece`) whose source changed since it was assembled
+    /// (a `.blend` saved again): it is to be assembled again.
+    #[serde(default, skip_deserializing, skip_serializing_if = "Vec::is_empty")]
+    pub changed: Vec<String>,
     /// `part/zone` -> the palette key it wears (none: the model's own); set
     /// by Kiln when read, from materials.json.
     #[serde(default)]
@@ -371,12 +375,14 @@ fn mark_stale(
             .into_iter()
             .filter(|c| {
                 built(c).is_none_or(|t| t > at)
-                    || reports.get(*c).is_some_and(|r| !r.stale.is_empty())
+                    || reports
+                        .get(*c)
+                        .is_some_and(|r| !r.stale.is_empty() || !r.changed.is_empty())
             })
             .map(String::from)
             .collect();
         if let Some(r) = reports.get_mut(&id) {
-            r.stale.extend(stale);
+            r.stale = stale;
         }
     }
 }
@@ -420,7 +426,7 @@ pub fn reports(root: &Path, config: &Config, specs: &[Spec]) -> BTreeMap<String,
             let mut r: Report = serde_json::from_str(&text).ok()?;
             r.glb = rel(root, &dir.join(format!("{}.glb", s.asset.id)));
             // a piece retouched after the build (a `.blend` saved again)
-            r.stale = std::fs::read_to_string(dir.join("asset.json"))
+            r.changed = std::fs::read_to_string(dir.join("asset.json"))
                 .ok()
                 .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
                 .map(|c| crate::asset::changed_pieces(root, &c))

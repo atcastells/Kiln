@@ -75,7 +75,7 @@ cuando esta cierre y estén resueltas D8 y D9.
 | T16 | Informe de verificación: estructura de `validation.json`, veredicto, y lectura del informe de `gltf_validator` (P2) | `crates/kiln-core/src/validate.rs` | Unit: errores → no válido; avisos → válido; validador ausente → válido y consta | R7 | implementer | T11 | 2m/250k | done |
 | T17 | `import_check.gd` y la operación `verify`: R5, `gltf_validator` si está, y Godot cargando el GLB en un proyecto temporal de la caché | `crates/kiln-cli/godot/import_check.gd`, `crates/kiln-cli/src/ops/production.rs`, `crates/kiln-cli/tests/godot_verify.rs` | Ignorado, con Godot: un GLB bueno pasa; uno truncado falla con el motivo | R7 | main | T15, T16 | 7m/3M | done (cause: Godot sin `project.godot` no termina: el plazo de 600 s lo cortó y ahora se comprueba antes; el módulo es `src/verify.rs`) |
 | T18 | Publicar, la parte de ficheros: solo con `validation.json` válido y del GLB actual; copia GLB, variantes y `asset.json` a `[publish] dir`/`<id>/`; la versión sube solo si cambia el sha256; destino confinado al proyecto | `crates/kiln-cli/src/ops/publish.rs`, `crates/kiln-cli/src/ops/mod.rs` | Unit: sin validación no publica; GLB cambiado después no publica; dos veces lo mismo no sube la versión; `dir = "../fuera"` se rechaza | R9 | implementer | T16 | 3m/350k | done |
-| T19 | `verify` y `publish` como trabajos MCP y subcomandos; `publish` hace importar a Godot y juzga el resultado | `crates/kiln-cli/src/mcp/production.rs`, `crates/kiln-cli/src/main.rs`, `crates/kiln-cli/src/ops/publish.rs`, `crates/kiln-cli/tests/mcp_production.rs`, `crates/kiln-cli/tests/coverage.rs` | Tests MCP: las dos herramientas están, con sus anotaciones, y rechazan ids no planos; cobertura en verde | R7, R9, R10 | main | T17, T18 | 6m/3M | done (cause: none; la carpeta publicada no recibe ficheros de trabajo) |
+| T19 | `verify` y `publish` como trabajos MCP y subcomandos; `publish` hace importar a Godot y juzga el resultado | `crates/kiln-cli/src/mcp/production.rs`, `crates/kiln-cli/src/main.rs`, `crates/kiln-cli/src/ops/publish.rs`, `crates/kiln-cli/tests/mcp_production.rs`, `crates/kiln-cli/tests/coverage.rs` | Tests MCP: las dos herramientas están, con sus anotaciones, y rechazan ids no planos; cobertura en verde | R7, R9, R10 | main | T17, T18 | 6m/3M | done (cause: none; la carpeta publicada no recibe ficheros de trabajo; los tests van en `mcp_guards.rs`: `coverage.rs` cubre rutas de la página y aquí no hay nuevas) |
 | T20 | README: entrega K006 (herramientas, anclajes, piezas `.blend`, verificar, contrato, publicar, tests ignorados) y tabla MCP | `README.md` | Revisión | R10 | implementer | T19 | 2m/250k | done (hecho en la sesión principal) |
 | T21 | Regresión y recorrido: hallazgos de `examples` antes (guardados en T0) y después; batería, Clippy, ignorados; recorrido de «Done means» en una copia de `examples`, por CLI y por MCP | — (scratchpad) | Lo de «Done means» | todos | main | T19 | 8m/3M | done (cause: none; `examples` da la misma salida de `index` y `check` que antes; recorrido MCP en `e2e-a.md`) |
 | T22 | Verificación: build, batería, el recorrido, y dos flujos de al lado: `kiln review` sin `claude` (hojas y medidas) y `content-manifest` con Godot | — | Informe del verifier | todos | verifier | T21, T20 | 5m/1.3M | done (ámbar: 2 importantes y 1 no confirmado, corregidos con test: enlaces de fichero al publicar, plazo con procesos nietos, caché de verificación fuera del proyecto; 4 nits, 3 atendidos) |
@@ -145,7 +145,34 @@ cargo clippy --workspace --all-targets -- -D warnings
 
 ## Review
 
-Filled in Deploy. A plan is not closed while this section is empty.
+Tres pasadas independientes sobre `main...HEAD` el 2026-11-17, más el
+verificador de T22. Todo lo importante está corregido con su test o anotado
+como desviación en `spec.md`; las correcciones posteriores a las pasadas no
+las ha visto otro revisor.
+
+- **verifier (T22)**: ámbar, 2 importantes. Corregidos: publicar seguía enlaces
+  de fichero; el plazo se alargaba con procesos nietos. También la carpeta de
+  prueba de la verificación sin confinar.
+- **bugs**: 3 importantes, ninguno demostrado por ejecución (se le denegó).
+  Corregidos: la importación en Godot se juzgaba por un `.import` que podía
+  ser de antes; la versión subía antes de juzgarla; las variantes quedaban
+  fuera del hash verificado. Nits corregidos: materiales de la variante por
+  el contrato y no por el nombre; las piezas cambiadas van en `changed`, no en
+  `stale`; `kiln godot` dos veces en un proyecto solo con `.blend`; ruta
+  relativa de la herramienta. Sin tocar: el hash con nombres de nodo
+  repetidos o nodos con `matrix`; `not_measured` redundante en un `.blend`.
+- **security**: 3 importantes, demostrados. Corregidos: una ruta de
+  `asset.json` como `/dev/zero` colgaba cualquier lectura; un `.blend` que es
+  un enlace hacia fuera se abría. Documentado como límite: importar en el
+  proyecto del juego ejecuta sus plugins de editor (ya pasaba en `main`).
+  Sin tocar: `build` y `cache` sin confinar (como en `main`); rutas absolutas
+  en los mensajes de error; `validation.json` no va firmado.
+- **conformance**: sin bloqueos. R1, R5 y R9 cumplen en parte; las
+  desviaciones están ahora en `spec.md` y en el README. `audit.md` describe
+  `main` y no se ha actualizado.
+
+Vio una vez un fallo suelto en `routes::invalid_posts_are_400_with_their_message`
+en una pasada en paralelo; no se repitió y esta rama no toca ese test.
 
 ## Estimate vs actual
 

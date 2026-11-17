@@ -121,7 +121,7 @@ impl Kiln {
         }
     }
 
-    /// Publica un asset verificado en `[publish] dir`/<asset>/ para que el juego lo use: el GLB, sus variantes y el contrato `asset.json` con su versión. Solo publica si la última verificación pasó y corresponde al GLB actual. Sustituye lo publicado antes. Devuelve un trabajo; sigue su avance llamando a `job`.
+    /// Publica un asset verificado en `[publish] dir`/<asset>/ para que el juego lo use: el GLB, sus variantes y el contrato `asset.json` con su versión. Solo publica si la última verificación pasó y corresponde al GLB actual. Sustituye lo publicado antes. Si la carpeta está dentro del proyecto de Godot, Godot la importa abriendo ese proyecto, con los plugins de editor que el proyecto tenga activados. Devuelve un trabajo; sigue su avance llamando a `job`.
     #[tool(annotations(read_only_hint = false, destructive_hint = true))]
     async fn publish(&self, Parameters(a): Parameters<AssetArgs>) -> Reply {
         if let Err(e) = ops::check_id("el asset", &a.asset) {

@@ -66,13 +66,16 @@ pub fn verify_asset(
             &subject, &info, &structure, &expected,
         ));
     }
+    let mut outputs = BTreeMap::from([(format!("{id}.glb"), kiln_core::asset::sha256_hex(&bytes))]);
     // the colour variants are the same assembly: only the file itself is checked
     for v in spec
         .variants
         .iter()
         .filter(|v| kiln_core::spec::plain_id(&v.id))
     {
-        if let Ok(bytes) = std::fs::read(dir.join(format!("{id}--{}.glb", v.id))) {
+        let name = format!("{id}--{}.glb", v.id);
+        if let Ok(bytes) = std::fs::read(dir.join(&name)) {
+            outputs.insert(name, kiln_core::asset::sha256_hex(&bytes));
             findings.extend(validate::glb_findings(
                 &format!("{subject}--{}", v.id),
                 &bytes,
@@ -94,13 +97,14 @@ pub fn verify_asset(
         findings.extend(found);
     }
 
-    let report = Report::new(
+    let mut report = Report::new(
         id,
         kiln_core::asset::sha256_hex(&bytes),
         structure_hash,
         checks,
         findings,
     );
+    report.outputs = outputs;
     let out = dir.join("validation.json");
     let text = serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?;
     std::fs::write(&out, text).map_err(|e| e.to_string())?;
@@ -185,6 +189,11 @@ fn scratch_dir(project: &Path, cfg: &Config, id: &str) -> Result<PathBuf, String
     }
     let root = std::fs::canonicalize(project).map_err(|e| e.to_string())?;
     let parent = project.join(cache).join("verify");
+    // a link on the way that leads out is refused before anything is created
+    let standing = parent.ancestors().find(|a| a.exists()).unwrap_or(project);
+    if !std::fs::canonicalize(standing).is_ok_and(|a| a.starts_with(&root)) {
+        return Err(outside());
+    }
     std::fs::create_dir_all(&parent).map_err(|e| e.to_string())?;
     let parent = std::fs::canonicalize(&parent).map_err(|e| e.to_string())?;
     if !parent.starts_with(&root) {

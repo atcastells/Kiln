@@ -11,10 +11,51 @@ pub fn sha256_hex(bytes: &[u8]) -> String {
         .collect()
 }
 
+/// Only regular files are read (never a device or a pipe), and in pieces, so
+/// a large file does not have to fit in memory.
 pub fn sha256_file(path: &std::path::Path) -> Result<String, String> {
-    let bytes =
-        std::fs::read(path).map_err(|e| format!("no se puede leer {}: {e}", path.display()))?;
-    Ok(sha256_hex(&bytes))
+    use sha2::Digest;
+    use std::io::Read;
+    let unreadable =
+        |e: &dyn std::fmt::Display| format!("no se puede leer {}: {e}", path.display());
+    let mut file = std::fs::File::open(path).map_err(|e| unreadable(&e))?;
+    if !file.metadata().map_err(|e| unreadable(&e))?.is_file() {
+        return Err(unreadable(&"no es un fichero"));
+    }
+    let mut hasher = sha2::Sha256::new();
+    let mut chunk = vec![0u8; 1 << 16];
+    loop {
+        let n = file.read(&mut chunk).map_err(|e| unreadable(&e))?;
+        if n == 0 {
+            break;
+        }
+        hasher.update(&chunk[..n]);
+    }
+    Ok(hasher
+        .finalize()
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect())
+}
+
+/// The sha256 of a file of the project, named relative to its root. Nothing
+/// when the name leaves the project (absolute, `..`, or a link that leads
+/// out) or is not a regular file: such names come from files of the project
+/// that anyone may have written.
+pub fn sha256_inside(root: &std::path::Path, file: &str) -> Option<String> {
+    let rel = std::path::Path::new(file);
+    if rel.is_absolute()
+        || rel
+            .components()
+            .any(|c| c == std::path::Component::ParentDir)
+    {
+        return None;
+    }
+    let real = std::fs::canonicalize(root.join(rel)).ok()?;
+    if !real.starts_with(std::fs::canonicalize(root).ok()?) {
+        return None;
+    }
+    sha256_file(&real).ok()
 }
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -218,7 +259,7 @@ pub fn changed_pieces(root: &std::path::Path, contract: &serde_json::Value) -> V
                 p["file"].as_str()?,
                 p["sha256"].as_str()?,
             );
-            let now = sha256_file(&root.join(file)).ok();
+            let now = sha256_inside(root, file);
             (now.as_deref() != Some(sha)).then(|| key.to_string())
         })
         .collect();
@@ -458,5 +499,30 @@ from = "child"
         assert_eq!(changed_pieces(&root, &contract), ["k/a", "k/gone"]);
         assert!(changed_pieces(&root, &serde_json::json!({})).is_empty());
         std::fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn hashing_stays_inside_the_project_and_on_regular_files() {
+        let base = std::env::temp_dir().join(format!("kiln-asset-inside-{}", std::process::id()));
+        let (root, out) = (base.join("game"), base.join("out"));
+        std::fs::create_dir_all(root.join("kits")).unwrap();
+        std::fs::create_dir_all(&out).unwrap();
+        std::fs::write(root.join("kits/a.glb"), b"abc").unwrap();
+        std::fs::write(out.join("secret"), b"abc").unwrap();
+        std::os::unix::fs::symlink(out.join("secret"), root.join("kits/link.blend")).unwrap();
+        std::os::unix::fs::symlink("/dev/zero", root.join("kits/zero.blend")).unwrap();
+        assert_eq!(sha256_inside(&root, "kits/a.glb"), Some(sha256_hex(b"abc")));
+        assert_eq!(sha256_inside(&root, "kits/link.blend"), None);
+        assert_eq!(sha256_inside(&root, "kits/zero.blend"), None);
+        assert_eq!(sha256_inside(&root, "/dev/zero"), None);
+        assert_eq!(sha256_inside(&root, "../out/secret"), None);
+        assert!(sha256_file(std::path::Path::new("/dev/zero")).is_err());
+        // a contract that names such files is answered at once, as changed
+        let contract = serde_json::json!({ "source": { "pieces": [
+            { "key": "k/zero", "file": "/dev/zero", "sha256": "00" },
+        ] } });
+        assert_eq!(changed_pieces(&root, &contract), ["k/zero"]);
+        std::fs::remove_dir_all(base).unwrap();
     }
 }

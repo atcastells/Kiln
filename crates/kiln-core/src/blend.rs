@@ -46,7 +46,7 @@ pub fn requests(root: &Path, config: &Config, cat: &Catalog) -> Vec<Request> {
         .filter(|p| is_blend(p))
         .filter_map(|p| {
             let blend = root.join(p.file.as_ref()?);
-            let sha256 = crate::asset::sha256_file(&blend).ok()?;
+            let sha256 = crate::asset::sha256_inside(root, p.file.as_ref()?)?;
             if fresh(&dir, entries.get(&p.key), &sha256).is_some() {
                 return None;
             }
@@ -102,7 +102,18 @@ pub fn apply(root: &Path, config: &Config, cat: &mut Catalog) {
         let sha = p
             .file
             .as_ref()
-            .and_then(|f| crate::asset::sha256_file(&root.join(f)).ok());
+            .and_then(|f| crate::asset::sha256_inside(root, f));
+        if sha.is_none() {
+            cat.findings.push(Finding {
+                severity: Severity::Warn,
+                subject: p.key.clone(),
+                code: "blend_outside".into(),
+                message: "el .blend no es un fichero del proyecto (¿un enlace que sale fuera?): \
+                          Kiln no lo abre ni lo exporta"
+                    .into(),
+            });
+            continue;
+        }
         let glb = sha
             .as_deref()
             .and_then(|s| fresh(&dir, entries.get(&p.key), s));
@@ -263,5 +274,29 @@ mod tests {
         assert_eq!(serde_json::to_string(&cat).unwrap(), before);
         assert!(requests(&root, &cfg, &cat).is_empty());
         let _ = std::fs::remove_dir_all(&root);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_blend_that_links_out_of_the_project_is_not_opened() {
+        let base = std::env::temp_dir().join(format!("kiln-blend-outside-{}", std::process::id()));
+        let root = base.join("game");
+        std::fs::create_dir_all(root.join("kits/k")).unwrap();
+        std::fs::write(base.join("secret.blend"), b"x").unwrap();
+        std::os::unix::fs::symlink(base.join("secret.blend"), root.join("kits/k/door.blend"))
+            .unwrap();
+        std::os::unix::fs::symlink("/dev/zero", root.join("kits/k/zero.blend")).unwrap();
+        let config =
+            Config::parse("[project]\nname = \"t\"\n[assets]\nkits = [\"kits\"]\n").unwrap();
+        let mut cat = crate::catalog::index(&root, &config);
+        assert!(requests(&root, &config, &cat).is_empty());
+        apply(&root, &config, &mut cat);
+        let codes: Vec<&str> = cat.findings.iter().map(|f| f.code.as_str()).collect();
+        assert_eq!(
+            codes.iter().filter(|c| **c == "blend_outside").count(),
+            2,
+            "{codes:?}"
+        );
+        std::fs::remove_dir_all(base).unwrap();
     }
 }

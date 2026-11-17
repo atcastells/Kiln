@@ -134,9 +134,9 @@ fn a_blend_piece_is_exported_measured_and_tracked() {
     let stale = |project: &Path| -> serde_json::Value {
         let out = kiln(project, &["index"]);
         let cat: serde_json::Value = serde_json::from_slice(&out.stdout).unwrap();
-        cat["builds"]["slab_probe"]["stale"].clone()
+        cat["builds"]["slab_probe"]["changed"].clone()
     };
-    assert_eq!(stale(p.path()), serde_json::json!([]));
+    assert_eq!(stale(p.path()), serde_json::Value::Null);
     make_blend(&blend, 4.0);
     assert_eq!(stale(p.path()), serde_json::json!(["harbor/slab"]));
 }

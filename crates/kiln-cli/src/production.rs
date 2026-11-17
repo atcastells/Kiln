@@ -36,7 +36,10 @@ pub fn build_asset(
     for c in &order[..order.len() - 1] {
         let spec = cat.specs.iter().find(|s| &s.asset.id == c);
         let fresh = build::child_glb(project, &cfg, c, None).is_some()
-            && cat.builds.get(c).is_some_and(|r| r.stale.is_empty())
+            && cat
+                .builds
+                .get(c)
+                .is_some_and(|r| r.stale.is_empty() && r.changed.is_empty())
             && !spec.is_some_and(|s| {
                 kiln_core::spec::made_of(s)
                     .iter()
@@ -301,7 +304,7 @@ pub fn measure(
     let exported = export_blends(project, &cfg, &cat, None, &mut say)?;
     let gp = match cfg.tools.godot_project.as_ref() {
         Some(gp) => gp,
-        None if exported > 0 => return Ok(exported),
+        None if cat.pieces.iter().any(|p| p.format == "blend") => return Ok(exported),
         None => {
             return Err(
                 "falta [tools] godot_project en kiln.toml (la carpeta con project.godot)".into(),

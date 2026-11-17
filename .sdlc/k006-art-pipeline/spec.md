@@ -87,6 +87,36 @@ anclajes) y un paso de publicar. Este spec añade solo eso.
 | R13 | **La puerta en ASTRA.** `door.tscn` conserva la raíz `StaticBody3D`, `set_state(open, restricted)` y los hijos `mesh`, `shape` y `ray`. `mesh` pasa a contener la hoja publicada: se oculta al abrir, como hoy exige `reconcile_test.gd:21,31`. El marco es un hijo nuevo que no se oculta; su variante restringida, otro que se muestra en su lugar. La colisión no cambia. No cambia nada bajo `crates/` ni `protocol/` | K2-06 | `cargo test --workspace` y `scripts/godot_station.sh` de ASTRA igual que su línea base, medida antes de tocar; `git diff --stat -- crates protocol` vacío |
 | R14 | **Modificación y capturas.** Un cambio en un `.blend` o en la ficha se monta, verifica y publica sin tocar `door.tscn`, y sube la versión. Capturas con ventana: cerrada, abierta y restringida, antes y después del cambio | K2-09; «Una modificación artística…» | Capturas en `.sdlc/k006-art-pipeline/shots/` y tu revisión |
 
+## Desviaciones de la entrega A (2026-11-17)
+
+Lo construido se aparta de la letra de arriba en estos puntos. Pendientes de
+tu visto bueno junto con el PR.
+
+- **R1.** `status` dice solo qué herramientas están, sin versión y sin
+  ejecutarlas: es una lectura, y las rutas de `[tools]` las pone el proyecto.
+  Las versiones las dan la herramienta MCP `tools` (nueva, no prevista) y
+  `kiln tools`.
+- **R2.** Al vencer el plazo se corta la herramienta; un proceso que ella
+  hubiera lanzado puede seguir vivo. Kiln no lo espera.
+- **R5.** «Medidas que no cuadran con la ficha» compara el GLB con las medidas
+  que dio Blender al montar: la ficha no tiene medida de conjunto. Las piezas
+  pendientes y los materiales fuera de la paleta son avisos, no errores: un
+  asset con cajas sustitutas se verifica y se publica.
+- **R7.** Las tres comprobaciones se hacen sobre el GLB base. Las variantes
+  pasan la de fichero y quedan atadas a la verificación por su sha256.
+- **R8.** La procedencia de una pieza es su fichero, formato, licencias y
+  crédito; no lleva la URL de origen. De las piezas que son otro asset solo
+  consta el id.
+- **R9.** Si Godot no importa lo copiado, los GLB quedan en la carpeta pero el
+  contrato y la versión no cambian. Importar ahí abre el proyecto del juego, y
+  Godot ejecuta sus plugins de editor: «solo scripts de Kiln» vale para la
+  verificación, no para esta importación (ya pasaba al vincular materiales).
+- **Seguridad.** `[tools] build` y `[tools] cache` siguen sin confinarse al
+  proyecto, como en `main`; sí lo están `[publish] dir`, la carpeta de prueba
+  de la verificación, los `.blend` y las rutas leídas de `asset.json`.
+- **Ficheros.** Las piezas `.blend` viven en `kiln-core/src/blend.rs` y la
+  verificación en `kiln-cli/src/verify.rs`.
+
 ## Design
 
 - **Módulos nuevos en `kiln-core`**: `tools.rs` (detección y versiones),

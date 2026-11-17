@@ -551,7 +551,15 @@ son equivalentes aunque los ficheros no fueran idénticos byte a byte.
 corresponde al GLB de ahora (por sha256). Copia el GLB, sus variantes y el
 contrato a la carpeta de `[publish]`, con la versión de producción, que sube
 cuando cambia lo publicado. Si esa carpeta está dentro del proyecto de Godot,
-Godot la importa y Kiln comprueba que cada GLB tiene su `.import`.
+Godot la importa y Kiln comprueba que cada GLB tiene su `.import`; el
+contrato con la versión nueva se escribe solo después. Si Godot no importa,
+los GLB quedan copiados pero la versión publicada no cambia.
+
+Los avisos no impiden publicar: un asset con piezas pendientes (cajas en lugar
+de un modelo) o con materiales fuera de la paleta se verifica y se publica, y
+los avisos constan en el informe. Las variantes de color pasan la comprobación
+del fichero, no las tres; todas quedan atadas a la verificación por su sha256,
+así que volver a pintar una variante obliga a verificar otra vez.
 
 ```toml
 [publish]
@@ -561,7 +569,17 @@ dir = "godot/assets"    # dentro del proyecto; cada asset va a <dir>/<id>/
 Los tests que lanzan Blender o Godot de verdad se ejecutan a mano, con las
 herramientas en el `PATH`: `cargo test -p kiln-cli -- --ignored`.
 
-Límites: Kiln no ejecuta scripts del proyecto ni del cliente; un retoque a
+Límites: importar en el proyecto de Godot del juego (al publicar, y al
+montar si `[materials] godot` vincula materiales) abre ese proyecto, y Godot
+ejecuta los plugins de editor y los scripts `@tool` que tenga activados: hazlo
+solo con proyectos de confianza. La verificación no tiene ese problema: importa
+en un proyecto de prueba vacío. `[tools] build` y `[tools] cache` los fija
+`kiln.toml` y Kiln escribe ahí sin comprobar que queden dentro del proyecto,
+como antes de esta entrega. Si una herramienta vence su plazo, Kiln la corta y
+sigue, pero un proceso que ella hubiera lanzado puede seguir vivo. Un `.blend`
+que no sea un fichero del propio proyecto (un enlace que sale fuera) no se
+abre: sale con el aviso `blend_outside`. Kiln no ejecuta scripts del proyecto
+ni del cliente; un retoque a
 mano en el `.blend` del montaje se pierde al volver a montar (la fuente son
 los `.blend` de las piezas y la ficha); no optimiza GLB; la página web no
 tiene botones para verificar ni publicar.
