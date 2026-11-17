@@ -11,7 +11,8 @@ use std::time::Instant;
 fn a_hung_blender_is_cut_at_the_timeout_and_logged() {
     let p = temp_project("");
     let fake = p.path().join("fake-blender");
-    std::fs::write(&fake, "#!/bin/sh\necho started\nexec sleep 30\n").unwrap();
+    // no `exec`: the sleep outlives the killed shell and keeps its pipes open
+    std::fs::write(&fake, "#!/bin/sh\necho started\nsleep 8\n").unwrap();
     std::fs::set_permissions(&fake, std::fs::Permissions::from_mode(0o755)).unwrap();
     let toml = p.read("kiln.toml").replace(
         "[tools]\n",
@@ -27,7 +28,7 @@ fn a_hung_blender_is_cut_at_the_timeout_and_logged() {
         .expect("kiln build");
     let err = String::from_utf8_lossy(&out.stderr);
     assert!(!out.status.success(), "{err}");
-    assert!(started.elapsed().as_secs() < 15, "no se cortó a tiempo");
+    assert!(started.elapsed().as_secs() < 6, "no se cortó a tiempo");
     assert!(err.contains("superó el plazo de 1 s"), "{err}");
     let log = p.read("kiln/build/hoist/.kiln/logs/assemble.log");
     assert!(log.contains("exit: timeout") && log.contains("started"), "{log}");

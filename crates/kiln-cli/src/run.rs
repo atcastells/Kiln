@@ -111,12 +111,40 @@ pub fn godot(cfg: &Config, args: Vec<OsString>, work: &Path, name: &str) -> Resu
     run(&tool(cfg, &cfg.tools.godot, all, work, name))
 }
 
-fn drain<R: std::io::Read + Send + 'static>(mut src: R) -> std::thread::JoinHandle<String> {
-    std::thread::spawn(move || {
-        let mut buf = Vec::new();
-        let _ = src.read_to_end(&mut buf);
-        String::from_utf8_lossy(&buf).into_owned()
-    })
+/// What a pipe has given so far, filled by a thread that reads it to its end.
+type Drained = std::sync::Arc<std::sync::Mutex<Vec<u8>>>;
+
+fn drain<R: std::io::Read + Send + 'static>(mut src: R) -> (Drained, std::thread::JoinHandle<()>) {
+    let buf: Drained = Default::default();
+    let sink = buf.clone();
+    let reader = std::thread::spawn(move || {
+        let mut chunk = [0u8; 8192];
+        while let Ok(n) = src.read(&mut chunk) {
+            if n == 0 {
+                break;
+            }
+            sink.lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .extend_from_slice(&chunk[..n]);
+        }
+    });
+    (buf, reader)
+}
+
+/// The text read so far. After a timeout the reader is given a moment and
+/// then left behind: a process the tool started may keep the pipe open long
+/// after the tool itself was killed, and the timeout must not wait for it.
+fn collected(drained: (Drained, std::thread::JoinHandle<()>), timed_out: bool) -> String {
+    let (buf, reader) = drained;
+    if timed_out {
+        let limit = std::time::Instant::now() + Duration::from_millis(500);
+        while !reader.is_finished() && std::time::Instant::now() < limit {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+    } else {
+        let _ = reader.join();
+    }
+    String::from_utf8_lossy(&buf.lock().unwrap_or_else(|e| e.into_inner())).into_owned()
 }
 
 pub fn run(r: &Run) -> Result<Output, String> {
@@ -151,8 +179,8 @@ pub fn run(r: &Run) -> Result<Output, String> {
         code: status,
         timed_out,
         duration_ms: started.elapsed().as_millis(),
-        stdout: out_t.join().unwrap_or_default(),
-        stderr: err_t.join().unwrap_or_default(),
+        stdout: collected(out_t, timed_out),
+        stderr: collected(err_t, timed_out),
         log: r.log.clone(),
         timeout_s: r.timeout.as_secs(),
     };
@@ -255,5 +283,28 @@ mod tests {
         let e = run(&r).unwrap_err();
         assert!(e.starts_with("no se puede lanzar"), "{e}");
         let _ = std::fs::remove_dir_all(d);
+    }
+
+    #[test]
+    fn a_grandchild_holding_the_pipes_does_not_stretch_the_timeout() {
+        let dir = std::env::temp_dir().join(format!("kiln-run-grandchild-{}", std::process::id()));
+        let started = std::time::Instant::now();
+        let out = run(&Run {
+            program: "sh".into(),
+            // `sh` forks `sleep`, which keeps stdout open after `sh` is killed
+            args: vec!["-c".into(), "echo before; sleep 6; echo after".into()],
+            cwd: dir.clone(),
+            timeout: Duration::from_millis(300),
+            log: None,
+        })
+        .unwrap();
+        assert!(out.timed_out);
+        assert!(
+            started.elapsed() < Duration::from_secs(4),
+            "{:?}",
+            started.elapsed()
+        );
+        assert!(out.stdout.contains("before"), "{:?}", out.stdout);
+        let _ = std::fs::remove_dir_all(dir);
     }
 }

@@ -177,7 +177,7 @@ pub struct Tools {
     /// The Khronos glTF Validator; optional, used by `verify` when found.
     #[serde(default = "default_gltf_validator")]
     pub gltf_validator: String,
-    /// glTF-Transform; only reported, never run.
+    /// glTF-Transform; `kiln tools` reports its version, nothing else uses it.
     #[serde(default = "default_gltf_transform")]
     pub gltf_transform: String,
 }

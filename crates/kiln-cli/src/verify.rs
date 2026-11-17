@@ -66,6 +66,19 @@ pub fn verify_asset(
             &subject, &info, &structure, &expected,
         ));
     }
+    // the colour variants are the same assembly: only the file itself is checked
+    for v in spec
+        .variants
+        .iter()
+        .filter(|v| kiln_core::spec::plain_id(&v.id))
+    {
+        if let Ok(bytes) = std::fs::read(dir.join(format!("{id}--{}.glb", v.id))) {
+            findings.extend(validate::glb_findings(
+                &format!("{subject}--{}", v.id),
+                &bytes,
+            ));
+        }
+    }
     let mut checks = vec![Check::own(&findings)];
     if readable {
         let (check, found) = khronos(&cfg, &dir, &file, &subject, &mut say)?;
@@ -151,6 +164,42 @@ fn khronos(
     Ok(validate::khronos(subject, &report))
 }
 
+/// An empty folder for the scratch project, `<cache>/verify/<id>`. The cache
+/// is set by `kiln.toml`: it must lie inside the project before anything in
+/// it is deleted.
+fn scratch_dir(project: &Path, cfg: &Config, id: &str) -> Result<PathBuf, String> {
+    crate::ops::check_id("el asset", id)?;
+    let outside = || {
+        format!(
+            "[tools] cache «{}» debe quedar dentro del proyecto",
+            cfg.tools.cache
+        )
+    };
+    let cache = Path::new(&cfg.tools.cache);
+    if cache.is_absolute()
+        || cache
+            .components()
+            .any(|c| c == std::path::Component::ParentDir)
+    {
+        return Err(outside());
+    }
+    let root = std::fs::canonicalize(project).map_err(|e| e.to_string())?;
+    let parent = project.join(cache).join("verify");
+    std::fs::create_dir_all(&parent).map_err(|e| e.to_string())?;
+    let parent = std::fs::canonicalize(&parent).map_err(|e| e.to_string())?;
+    if !parent.starts_with(&root) {
+        return Err(outside());
+    }
+    let scratch = parent.join(id);
+    if scratch.symlink_metadata().is_ok_and(|m| m.is_symlink()) {
+        std::fs::remove_file(&scratch).map_err(|e| e.to_string())?;
+    } else if scratch.exists() {
+        std::fs::remove_dir_all(&scratch).map_err(|e| e.to_string())?;
+    }
+    std::fs::create_dir_all(&scratch).map_err(|e| e.to_string())?;
+    Ok(scratch)
+}
+
 /// Godot imports the GLB into a scratch project of the cache and instances it.
 fn godot_import(
     project: &Path,
@@ -170,10 +219,7 @@ fn godot_import(
             Vec::new(),
         ));
     }
-    let scratch = project.join(&cfg.tools.cache).join("verify").join(id);
-    let _ = std::fs::remove_dir_all(&scratch);
-    std::fs::create_dir_all(&scratch).map_err(|e| e.to_string())?;
-    let scratch = std::fs::canonicalize(&scratch).map_err(|e| e.to_string())?;
+    let scratch = scratch_dir(project, cfg, id)?;
     let (script, result) = (scratch.join("import_check.gd"), scratch.join("out.json"));
     std::fs::write(scratch.join("project.godot"), SCRATCH_PROJECT).map_err(|e| e.to_string())?;
     std::fs::write(&script, IMPORT_CHECK).map_err(|e| e.to_string())?;
@@ -248,4 +294,39 @@ fn godot_import(
         )),
     };
     Ok((check, findings))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_scratch_project_stays_inside_the_project() {
+        let base = std::env::temp_dir().join(format!("kiln-verify-scratch-{}", std::process::id()));
+        let (project, outside) = (base.join("game"), base.join("outside/verify/door"));
+        std::fs::create_dir_all(&project).unwrap();
+        std::fs::create_dir_all(&outside).unwrap();
+        std::fs::write(outside.join("keep.txt"), "x").unwrap();
+        let project = std::fs::canonicalize(&project).unwrap();
+        let cfg = |cache: &str| {
+            Config::parse(&format!(
+                "[project]\nname = \"t\"\n[tools]\ncache = \"{cache}\"\n"
+            ))
+            .unwrap()
+        };
+        assert!(scratch_dir(&project, &cfg("../outside"), "door").is_err());
+        assert!(
+            outside.join("keep.txt").exists(),
+            "nothing outside is deleted"
+        );
+        let inside = scratch_dir(&project, &cfg("kiln/cache"), "door").unwrap();
+        assert!(inside.starts_with(&project) && inside.is_dir());
+        std::fs::write(inside.join("old.txt"), "x").unwrap();
+        let again = scratch_dir(&project, &cfg("kiln/cache"), "door").unwrap();
+        assert!(
+            !again.join("old.txt").exists(),
+            "the scratch project starts empty"
+        );
+        std::fs::remove_dir_all(base).unwrap();
+    }
 }

@@ -187,7 +187,9 @@ pub fn publish_files(
         old_version
     };
 
+    // what is there is removed first, so a link is replaced and never followed
     for name in &names {
+        let _ = std::fs::remove_file(dest.join(name));
         std::fs::copy(build.join(name), dest.join(name))
             .map_err(|e| format!("no se puede copiar {name}: {e}"))?;
     }
@@ -195,6 +197,7 @@ pub fn publish_files(
     published["version"] = json!(version);
     published["validation"] = json!({ "valid": true, "checks": validation["checks"] });
     let text = serde_json::to_string_pretty(&published).map_err(|e| e.to_string())?;
+    let _ = std::fs::remove_file(dest.join("asset.json"));
     std::fs::write(dest.join("asset.json"), text)
         .map_err(|e| format!("no se puede escribir asset.json: {e}"))?;
     for e in std::fs::read_dir(&dest)
@@ -398,5 +401,29 @@ mod tests {
         assert!(!dest(&p, "crate").join("crate--red.glb").exists());
         assert!(dest(&p, "crate").join("crate.glb").exists());
         assert!(dest(&p, "crate").join("notes.txt").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn a_file_link_in_the_destination_is_replaced_not_followed() {
+        let (p, c) = (project(), cfg(Some("game/assets")));
+        let out = project();
+        make_build(&p, &c, "crate", &[(None, b"main")]);
+        let d = dest(&p, "crate");
+        std::fs::create_dir_all(&d).unwrap();
+        let (victim, fresh) = (out.0.join("victim.txt"), out.0.join("fresh.txt"));
+        std::fs::write(&victim, b"untouched").unwrap();
+        std::os::unix::fs::symlink(&victim, d.join("crate.glb")).unwrap();
+        std::os::unix::fs::symlink(&fresh, d.join("asset.json")).unwrap();
+        publish_files(&p.0, &c, "crate").unwrap();
+        assert_eq!(std::fs::read(&victim).unwrap(), b"untouched");
+        assert!(!fresh.exists());
+        assert_eq!(std::fs::read(d.join("crate.glb")).unwrap(), b"main");
+        assert!(
+            !d.join("asset.json")
+                .symlink_metadata()
+                .unwrap()
+                .is_symlink()
+        );
     }
 }

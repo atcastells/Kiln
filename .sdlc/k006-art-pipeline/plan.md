@@ -77,8 +77,8 @@ cuando esta cierre y estén resueltas D8 y D9.
 | T18 | Publicar, la parte de ficheros: solo con `validation.json` válido y del GLB actual; copia GLB, variantes y `asset.json` a `[publish] dir`/`<id>/`; la versión sube solo si cambia el sha256; destino confinado al proyecto | `crates/kiln-cli/src/ops/publish.rs`, `crates/kiln-cli/src/ops/mod.rs` | Unit: sin validación no publica; GLB cambiado después no publica; dos veces lo mismo no sube la versión; `dir = "../fuera"` se rechaza | R9 | implementer | T16 | 3m/350k | done |
 | T19 | `verify` y `publish` como trabajos MCP y subcomandos; `publish` hace importar a Godot y juzga el resultado | `crates/kiln-cli/src/mcp/production.rs`, `crates/kiln-cli/src/main.rs`, `crates/kiln-cli/src/ops/publish.rs`, `crates/kiln-cli/tests/mcp_production.rs`, `crates/kiln-cli/tests/coverage.rs` | Tests MCP: las dos herramientas están, con sus anotaciones, y rechazan ids no planos; cobertura en verde | R7, R9, R10 | main | T17, T18 | 6m/3M | done (cause: none; la carpeta publicada no recibe ficheros de trabajo) |
 | T20 | README: entrega K006 (herramientas, anclajes, piezas `.blend`, verificar, contrato, publicar, tests ignorados) y tabla MCP | `README.md` | Revisión | R10 | implementer | T19 | 2m/250k | done (hecho en la sesión principal) |
-| T21 | Regresión y recorrido: hallazgos de `examples` antes (guardados en T0) y después; batería, Clippy, ignorados; recorrido de «Done means» en una copia de `examples`, por CLI y por MCP | — (scratchpad) | Lo de «Done means» | todos | main | T19 | 8m/3M | pending |
-| T22 | Verificación: build, batería, el recorrido, y dos flujos de al lado: `kiln review` sin `claude` (hojas y medidas) y `content-manifest` con Godot | — | Informe del verifier | todos | verifier | T21, T20 | 5m/1.3M | pending |
+| T21 | Regresión y recorrido: hallazgos de `examples` antes (guardados en T0) y después; batería, Clippy, ignorados; recorrido de «Done means» en una copia de `examples`, por CLI y por MCP | — (scratchpad) | Lo de «Done means» | todos | main | T19 | 8m/3M | done (cause: none; `examples` da la misma salida de `index` y `check` que antes; recorrido MCP en `e2e-a.md`) |
+| T22 | Verificación: build, batería, el recorrido, y dos flujos de al lado: `kiln review` sin `claude` (hojas y medidas) y `content-manifest` con Godot | — | Informe del verifier | todos | verifier | T21, T20 | 5m/1.3M | done (ámbar: 2 importantes y 1 no confirmado, corregidos con test: enlaces de fichero al publicar, plazo con procesos nietos, caché de verificación fuera del proyecto; 4 nits, 3 atendidos) |
 
 ## Schedule
 
@@ -153,6 +153,21 @@ Filled at Build close from `.sdlc/k006-art-pipeline/actuals.jsonl`.
 
 | # | Runs on | Est | Actual | Deviation | Cause |
 |---|---------|-----|--------|-----------|-------|
+| T1 | implementer | 2m/250k | 0.6m/109k | -70 % / -56 % | none |
+| T2 | implementer | 2m/250k | 0.6m/64k | -70 % / -74 % | none |
+| T4 | implementer | 2m/250k | 0.5m/103k | -75 % / -59 % | none |
+| T3 | implementer | 2m/250k | 0.7m/185k | -65 % / -26 % | none significant |
+| T7 | implementer | 2m/250k | 0.5m/70k | -75 % / -72 % | none |
+| T5 | implementer | 2m/250k | 0.7m/195k | -65 % / -22 % | none |
+| T9 | implementer | 2m/250k | 0.7m/235k | -65 % / -6 % | none |
+| T8 | implementer | 3m/350k | 1m/249k | -67 % / -29 % | none beyond clippy fixes (collapsible `if`, `is_multiple_of`, a type a |
+| T11 | implementer | 3m/350k | 0.6m/177k | -80 % / -49 % | none |
+| T12 | implementer | 3m/350k | 1m/345k | -67 % / -1 % | none |
+| T16 | implementer | 2m/250k | 0.5m/74k | -75 % / -70 % | none |
+| T14 | implementer | 3m/350k | 0.9m/224k | -70 % / -36 % | none |
+| T18 | implementer | 3m/350k | 1m/121k | -67 % / -65 % | none significant |
+
+Las tareas delegadas salieron entre un 50 % y un 75 % por debajo del tiempo estimado, sin causa especial: la tabla de partida sigue alta para este repo. Las tareas de `main` (T0, T6, T10, T13, T15, T17, T19, T21) no tienen medida del hook: no pasé cada una por «in progress» antes de cerrarla. T17 se alargó diez minutos por un Godot que no terminaba (carpeta sin `project.godot`).
 
 ## Outside this plan
 

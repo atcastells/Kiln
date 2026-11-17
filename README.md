@@ -480,7 +480,8 @@ kiln publish --project ../mi-juego --asset door    # lo copia al juego, si la ve
 ```
 
 Por MCP son `tools`, `build`, `verify` y `publish`; `spec_get` devuelve el
-contrato y el último informe.
+contrato y el último informe. `tools` ejecuta los programas de `[tools]` con
+`--version`, por eso no es de solo lectura; `status` no ejecuta ninguno.
 
 **Herramientas.** `kiln tools` ejecuta cada una con `--version`: Blender (probado
 desde la 5.0), Godot (desde la 4.7), el glTF Validator de Khronos,
