@@ -11,6 +11,7 @@ const SPLIT: &str = include_str!("../blender/split.py");
 const REPAINT: &str = include_str!("../blender/repaint.py");
 const ASSEMBLE: &str = include_str!("../blender/assemble.py");
 const MEASURE: &str = include_str!("../godot/measure.gd");
+const EXPORT_PIECE: &str = include_str!("../blender/export_piece.py");
 
 pub fn config(project: &Path, config: Option<&Path>) -> Result<Config, String> {
     match config {
@@ -57,7 +58,19 @@ fn build_one(
     mut say: impl FnMut(String),
 ) -> Result<PathBuf, String> {
     let cfg = config(project, config_file)?;
-    let cat = crate::load(project, config_file)?;
+    let mut cat = crate::load(project, config_file)?;
+    let used: Vec<String> = cat
+        .specs
+        .iter()
+        .find(|s| s.asset.id == id)
+        .ok_or(format!("no hay ficha con id «{id}»"))?
+        .parts
+        .iter()
+        .filter_map(|p| p.source.from.clone())
+        .collect();
+    if export_blends(project, &cfg, &cat, Some(&used), &mut say)? > 0 {
+        cat = crate::load(project, config_file)?;
+    }
     let spec = cat
         .specs
         .iter()
@@ -235,16 +248,21 @@ pub fn measure(
     mut say: impl FnMut(String),
 ) -> Result<usize, String> {
     let cfg = config(project, config_file)?;
-    let gp = cfg
-        .tools
-        .godot_project
-        .as_ref()
-        .ok_or("falta [tools] godot_project en kiln.toml (la carpeta con project.godot)")?;
     let cat = kiln_core::catalog::index(project, &cfg);
+    let exported = export_blends(project, &cfg, &cat, None, &mut say)?;
+    let gp = match cfg.tools.godot_project.as_ref() {
+        Some(gp) => gp,
+        None if exported > 0 => return Ok(exported),
+        None => {
+            return Err(
+                "falta [tools] godot_project en kiln.toml (la carpeta con project.godot)".into(),
+            );
+        }
+    };
     let reqs = godot::requests(project, &cfg, &cat);
     if reqs.is_empty() {
         say("No hay piezas que solo lea Godot".into());
-        return Ok(0);
+        return Ok(exported);
     }
     let out = godot::cache_file(project, &cfg);
     let dir = out.parent().unwrap_or(project).to_path_buf();
@@ -285,5 +303,40 @@ pub fn measure(
         ));
     }
     say(format!("Medidas en {}", out.display()));
+    Ok(reqs.len() + exported)
+}
+
+/// Has Blender export the `.blend` pieces that are not exported or changed
+/// since; with `only`, just those keys. Returns how many it exported.
+fn export_blends(
+    project: &Path,
+    cfg: &Config,
+    cat: &kiln_core::Catalog,
+    only: Option<&[String]>,
+    say: &mut dyn FnMut(String),
+) -> Result<usize, String> {
+    let reqs: Vec<_> = kiln_core::blend::requests(project, cfg, cat)
+        .into_iter()
+        .filter(|r| only.is_none_or(|keys| keys.contains(&r.key)))
+        .collect();
+    if reqs.is_empty() {
+        return Ok(0);
+    }
+    let cache = kiln_core::blend::cache_file(project, cfg);
+    let dir = cache.parent().unwrap_or(project).to_path_buf();
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let script = dir.join("export_piece.py");
+    std::fs::write(&script, EXPORT_PIECE).map_err(|e| e.to_string())?;
+    for r in &reqs {
+        say(format!("Blender exporta {} ({})", r.key, cfg.tools.blender));
+        let glb = Path::new(&r.glb);
+        let _ = std::fs::remove_file(glb);
+        let name = format!("export-{}", r.key.replace('/', "__"));
+        let out = crate::run::blender(cfg, &script, &[Path::new(&r.blend), glb], &dir, &name)?;
+        if !out.success() || !glb.exists() {
+            return Err(out.failure(&format!("Blender no pudo exportar {}", r.key)));
+        }
+        kiln_core::blend::record(project, cfg, r)?;
+    }
     Ok(reqs.len())
 }

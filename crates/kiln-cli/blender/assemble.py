@@ -177,12 +177,27 @@ def build(item, cache):
     return o
 
 
+def anchor(a):
+    """An empty where the asset joins something else; glTF axes in, Blender axes out."""
+    o = bpy.data.objects.new(a["name"], None)
+    o.empty_display_size = 0.2
+    x, y, z = a["at"]
+    o.location = Vector((x, -z, y))
+    rx, ry, rz = (math.radians(d) for d in a["turn"])
+    o.rotation_mode = "XYZ"
+    o.rotation_euler = Euler((rx, -rz, ry), "XYZ")
+    collection("anchors").objects.link(o)
+    return o
+
+
 def main():
     plan = json.load(open(plan_path(), encoding="utf-8"))
     bpy.ops.wm.read_factory_settings(use_empty=True)
     cache, built = {}, []
     for item in plan["items"]:
         built.append((item, build(item, cache)))
+    for a in plan.get("anchors", []):
+        anchor(a)
     for src, _ in cache.values():
         mesh = src.data
         bpy.data.objects.remove(src)

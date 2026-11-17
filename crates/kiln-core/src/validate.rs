@@ -208,6 +208,248 @@ pub fn glb_findings(subject: &str, bytes: &[u8]) -> Vec<Finding> {
     out
 }
 
+/// What the build of an asset should look like, to compare its GLB against.
+pub struct Expected<'a> {
+    pub spec: &'a crate::Spec,
+    /// Triangle budget when the spec gives none (`[rules] max_tris`).
+    pub max_tris: u64,
+    /// Size Blender reported for the build (`report.json`), width, height, depth.
+    pub size_m: Option<[f64; 3]>,
+    /// GLB material name -> palette key it wears (`materials.json`).
+    pub worn: &'a BTreeMap<String, Option<String>>,
+    /// Keys of the project's palette.
+    pub palette: &'a [String],
+}
+
+/// What differs between a built GLB and the spec it was built from.
+pub fn asset_findings(
+    subject: &str,
+    info: &glb::GlbInfo,
+    structure: &glb::Structure,
+    expected: &Expected,
+) -> Vec<Finding> {
+    let mut out = Vec::new();
+    let mut push = |severity, code: &str, message: String| {
+        out.push(Finding {
+            severity,
+            subject: subject.into(),
+            code: code.into(),
+            message,
+        })
+    };
+
+    let budget = expected.spec.asset.budget_tris.unwrap_or(expected.max_tris);
+    if info.tris > budget {
+        push(
+            Severity::Error,
+            "glb_tris",
+            format!(
+                "el GLB tiene {} triángulos y el presupuesto es {budget}",
+                info.tris
+            ),
+        );
+    }
+
+    if let Some(want) = expected.size_m {
+        let got = info.size();
+        if got.iter().zip(want).any(|(g, w)| (g - w).abs() > 0.01) {
+            push(
+                Severity::Error,
+                "glb_size",
+                format!(
+                    "el GLB mide {:.3} x {:.3} x {:.3} m y Blender informó {:.3} x {:.3} x {:.3} m",
+                    got[0], got[1], got[2], want[0], want[1], want[2]
+                ),
+            );
+        }
+    }
+
+    let used: std::collections::BTreeSet<&str> = structure
+        .nodes
+        .iter()
+        .filter_map(|n| n.mesh.as_ref())
+        .flat_map(|m| m.materials.iter().map(String::as_str))
+        .filter(|m| !m.is_empty())
+        .collect();
+    for name in used {
+        match expected.worn.get(name) {
+            Some(Some(key)) if expected.palette.contains(key) => {}
+            Some(Some(key)) => push(
+                Severity::Warn,
+                "glb_material",
+                format!("el material '{name}' lleva '{key}', que no está en la paleta"),
+            ),
+            _ => push(
+                Severity::Warn,
+                "glb_material",
+                format!("el material '{name}' no lleva ninguna clave de la paleta"),
+            ),
+        }
+    }
+
+    for n in &structure.nodes {
+        if let Some(todo) = n.extras.get("kiln_todo") {
+            let text = todo.as_str().map_or_else(|| todo.to_string(), String::from);
+            push(
+                Severity::Warn,
+                "glb_todo",
+                format!("el nodo '{}' es un sustituto pendiente: \"{text}\"", n.name),
+            );
+        }
+    }
+
+    for a in &expected.spec.anchors {
+        let name = format!("anchor_{}", a.id);
+        match structure
+            .nodes
+            .iter()
+            .find(|n| n.parent.is_none() && n.name == name)
+        {
+            None => push(
+                Severity::Error,
+                "glb_anchor",
+                format!(
+                    "el ancla '{}' no tiene el nodo raíz '{name}' en el GLB",
+                    a.id
+                ),
+            ),
+            Some(n)
+                if n.translation
+                    .iter()
+                    .zip(a.at)
+                    .any(|(g, w)| (g - w).abs() > 0.001) =>
+            {
+                push(
+                    Severity::Error,
+                    "glb_anchor",
+                    format!(
+                        "el nodo '{name}' está en {:?} y el ancla '{}' pide {:?}",
+                        n.translation, a.id, a.at
+                    ),
+                )
+            }
+            Some(_) => {}
+        }
+    }
+    out
+}
+
+/// One of the checks `verify` runs on a built asset.
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct Check {
+    /// "kiln", "gltf_validator" or "godot_import"
+    pub name: String,
+    /// "passed", "failed" or "absent" (the tool is not installed: not a failure)
+    pub status: String,
+    pub errors: u64,
+    pub warnings: u64,
+    pub detail: Option<String>,
+}
+
+/// What `verify` writes to `validation.json`.
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct Report {
+    pub asset: String,
+    pub glb_sha256: String,
+    pub structure_sha256: String,
+    pub valid: bool,
+    pub checks: Vec<Check>,
+    pub findings: Vec<Finding>,
+}
+
+impl Check {
+    pub fn absent(name: &str, detail: &str) -> Check {
+        Check {
+            name: name.into(),
+            status: "absent".into(),
+            errors: 0,
+            warnings: 0,
+            detail: Some(detail.into()),
+        }
+    }
+
+    /// From Kiln's own findings: failed when any is an Error.
+    pub fn own(findings: &[Finding]) -> Check {
+        let count = |s| findings.iter().filter(|f| f.severity == s).count() as u64;
+        let errors = count(Severity::Error);
+        Check {
+            name: "kiln".into(),
+            status: if errors > 0 { "failed" } else { "passed" }.into(),
+            errors,
+            warnings: count(Severity::Warn),
+            detail: None,
+        }
+    }
+}
+
+/// Reads the JSON report the Khronos glTF Validator prints with `-o`.
+pub fn khronos(subject: &str, report: &Value) -> (Check, Vec<Finding>) {
+    let mut check = Check {
+        name: "gltf_validator".into(),
+        status: "failed".into(),
+        errors: 0,
+        warnings: 0,
+        detail: Some("informe del validador ilegible".into()),
+    };
+    let Some(issues) = report.get("issues") else {
+        return (check, Vec::new());
+    };
+    let num = |k: &str| issues.get(k).and_then(Value::as_u64).unwrap_or(0);
+    check.errors = num("numErrors");
+    check.warnings = num("numWarnings");
+    check.status = if check.errors > 0 { "failed" } else { "passed" }.into();
+    let version = report
+        .get("validatorVersion")
+        .and_then(Value::as_str)
+        .unwrap_or("?");
+    check.detail = Some(format!("glTF Validator {version}"));
+
+    let messages = issues.get("messages").and_then(Value::as_array);
+    let findings = messages
+        .into_iter()
+        .flatten()
+        .filter_map(|m| {
+            let severity = match m.get("severity").and_then(Value::as_u64)? {
+                0 => Severity::Error,
+                1 => Severity::Warn,
+                _ => return None,
+            };
+            let text = |k: &str| m.get(k).and_then(Value::as_str).unwrap_or("");
+            let mut message = format!("{}: {}", text("code"), text("message"));
+            if let Some(p) = m.get("pointer").and_then(Value::as_str) {
+                message.push_str(&format!(" ({p})"));
+            }
+            Some(Finding {
+                severity,
+                subject: subject.into(),
+                code: "khronos".into(),
+                message,
+            })
+        })
+        .collect();
+    (check, findings)
+}
+
+impl Report {
+    /// `valid` is true when no check failed.
+    pub fn new(
+        asset: &str,
+        glb_sha256: String,
+        structure_sha256: String,
+        checks: Vec<Check>,
+        findings: Vec<Finding>,
+    ) -> Report {
+        Report {
+            asset: asset.into(),
+            glb_sha256,
+            structure_sha256,
+            valid: checks.iter().all(|c| c.status != "failed"),
+            checks,
+            findings,
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -407,5 +649,269 @@ mod tests {
         assert!(matches!(f[0].severity, Severity::Warn));
         assert!(mutated(|d| d["nodes"][0]["scale"] = json!([2.0, 2.0, 2.00001])).is_empty());
         assert!(mutated(|d| d["nodes"][1]["scale"] = json!([1.0, -1.0, 1.0])).is_empty());
+    }
+
+    const SPEC: &str = r#"
+[asset]
+id = "crate"
+name = "Crate"
+budget_tris = 100
+
+[[anchors]]
+id = "top"
+class = "stack"
+at = [0.0, 1.0, 0.0]
+"#;
+
+    struct Case {
+        spec: crate::Spec,
+        info: glb::GlbInfo,
+        structure: glb::Structure,
+        worn: BTreeMap<String, Option<String>>,
+        palette: Vec<String>,
+        max_tris: u64,
+        size_m: Option<[f64; 3]>,
+    }
+
+    fn node(name: &str, parent: Option<&str>, at: [f64; 3]) -> glb::Node {
+        glb::Node {
+            name: name.into(),
+            parent: parent.map(String::from),
+            translation: at,
+            rotation: [0.0, 0.0, 0.0, 1.0],
+            scale: [1.0; 3],
+            extras: BTreeMap::new(),
+            mesh: None,
+        }
+    }
+
+    fn case() -> Case {
+        let mut body = node("body", Some("root"), [0.0; 3]);
+        body.mesh = Some(glb::MeshInfo {
+            tris: 12,
+            materials: vec!["body/wood".into(), "".into(), "body/wood".into()],
+        });
+        Case {
+            spec: crate::spec::parse(SPEC).unwrap(),
+            info: glb::GlbInfo {
+                min: [-0.5, 0.0, -0.5],
+                max: [0.5, 1.0, 0.5],
+                tris: 12,
+                materials: vec!["body/wood".into()],
+                images: 0,
+            },
+            structure: glb::Structure {
+                nodes: vec![
+                    node("root", None, [0.0; 3]),
+                    body,
+                    node("anchor_top", None, [0.0, 1.0, 0.0]),
+                ],
+            },
+            worn: BTreeMap::from([("body/wood".into(), Some("wood".into()))]),
+            palette: vec!["wood".into()],
+            max_tris: 5000,
+            size_m: Some([1.0, 1.0, 1.0]),
+        }
+    }
+
+    fn compare(c: &Case) -> Vec<Finding> {
+        let expected = Expected {
+            spec: &c.spec,
+            max_tris: c.max_tris,
+            size_m: c.size_m,
+            worn: &c.worn,
+            palette: &c.palette,
+        };
+        asset_findings("a", &c.info, &c.structure, &expected)
+    }
+
+    #[test]
+    fn matching_asset_has_no_findings() {
+        assert!(compare(&case()).is_empty());
+    }
+
+    #[test]
+    fn triangles_over_the_budget() {
+        let mut c = case();
+        c.info.tris = 101;
+        let f = compare(&c);
+        assert_eq!(codes(&f), ["glb_tris"]);
+        assert!(matches!(f[0].severity, Severity::Error));
+        assert!(f[0].message.contains("101") && f[0].message.contains("100"));
+        c.info.tris = 100;
+        assert!(compare(&c).is_empty());
+        c.spec.asset.budget_tris = None;
+        c.max_tris = 50;
+        c.info.tris = 51;
+        assert!(compare(&c)[0].message.contains("50"));
+    }
+
+    #[test]
+    fn size_differs_from_the_reported_one() {
+        let mut c = case();
+        c.size_m = Some([1.0, 1.02, 1.0]);
+        let f = compare(&c);
+        assert_eq!(codes(&f), ["glb_size"]);
+        assert!(matches!(f[0].severity, Severity::Error));
+        c.size_m = Some([1.0, 1.005, 1.0]);
+        assert!(compare(&c).is_empty());
+        c.size_m = None;
+        c.info.max[0] = 9.0;
+        assert!(compare(&c).is_empty());
+    }
+
+    #[test]
+    fn material_without_a_palette_key() {
+        let mut c = case();
+        c.worn.insert("body/wood".into(), None);
+        let f = compare(&c);
+        assert_eq!(codes(&f), ["glb_material"]);
+        assert!(matches!(f[0].severity, Severity::Warn));
+        assert!(f[0].message.contains("body/wood"));
+        c.worn.clear();
+        assert_eq!(codes(&compare(&c)), ["glb_material"]);
+        c.worn.insert("body/wood".into(), Some("steel".into()));
+        let f = compare(&c);
+        assert_eq!(codes(&f), ["glb_material"]);
+        assert!(f[0].message.contains("steel"));
+    }
+
+    #[test]
+    fn stand_in_nodes_are_reported() {
+        let mut c = case();
+        c.structure.nodes[1]
+            .extras
+            .insert("kiln_todo".into(), json!("model the lid"));
+        let f = compare(&c);
+        assert_eq!(codes(&f), ["glb_todo"]);
+        assert!(matches!(f[0].severity, Severity::Warn));
+        assert!(f[0].message.contains("body") && f[0].message.contains("model the lid"));
+    }
+
+    #[test]
+    fn anchors_missing_or_moved() {
+        let mut c = case();
+        c.structure.nodes[2].translation = [0.0, 1.0005, 0.0];
+        assert!(compare(&c).is_empty());
+        c.structure.nodes[2].translation = [0.0, 1.5, 0.0];
+        let f = compare(&c);
+        assert_eq!(codes(&f), ["glb_anchor"]);
+        assert!(matches!(f[0].severity, Severity::Error));
+        assert!(f[0].message.contains("anchor_top"));
+        c.structure.nodes[2].parent = Some("root".into());
+        assert!(compare(&c)[0].message.contains("no tiene el nodo raíz"));
+        c.structure.nodes.pop();
+        let f = compare(&c);
+        assert_eq!(codes(&f), ["glb_anchor"]);
+        assert!(f[0].message.contains("no tiene el nodo raíz"));
+    }
+
+    fn validator_output() -> Value {
+        json!({
+            "uri": "door.glb", "mimeType": "model/gltf-binary", "validatorVersion": "2.0.0-dev.3.10",
+            "issues": {
+                "numErrors": 0, "numWarnings": 0, "numInfos": 1, "numHints": 0,
+                "messages": [{
+                    "code": "UNUSED_OBJECT", "message": "This object may be unused.",
+                    "severity": 2, "pointer": "/meshes/0/primitives/0/attributes/TEXCOORD_0"
+                }],
+                "truncated": false
+            },
+            "info": {"version": "2.0", "generator": "Khronos glTF Blender I/O v5.2.41"}
+        })
+    }
+
+    #[test]
+    fn khronos_clean_report_passes() {
+        let (c, f) = khronos("door", &validator_output());
+        assert_eq!(c.name, "gltf_validator");
+        assert_eq!(c.status, "passed");
+        assert_eq!((c.errors, c.warnings), (0, 0));
+        assert_eq!(c.detail.as_deref(), Some("glTF Validator 2.0.0-dev.3.10"));
+        assert!(f.is_empty());
+    }
+
+    #[test]
+    fn khronos_error_fails_and_warning_does_not() {
+        let mut r = validator_output();
+        r["issues"]["numErrors"] = json!(1);
+        r["issues"]["messages"] = json!([
+            {"code": "ACCESSOR_MIN_MISMATCH", "message": "bad min", "severity": 0, "pointer": "/accessors/0"},
+            {"code": "INFO", "message": "x", "severity": 3}
+        ]);
+        let (c, f) = khronos("door", &r);
+        assert_eq!((c.status.as_str(), c.errors), ("failed", 1));
+        assert_eq!(codes(&f), ["khronos"]);
+        assert!(matches!(f[0].severity, Severity::Error));
+        assert_eq!(f[0].subject, "door");
+        assert_eq!(
+            f[0].message,
+            "ACCESSOR_MIN_MISMATCH: bad min (/accessors/0)"
+        );
+
+        let mut r = validator_output();
+        r["issues"]["numWarnings"] = json!(1);
+        r["issues"]["messages"] = json!([{"code": "W", "message": "careful", "severity": 1}]);
+        let (c, f) = khronos("door", &r);
+        assert_eq!((c.status.as_str(), c.warnings), ("passed", 1));
+        assert_eq!(codes(&f), ["khronos"]);
+        assert!(matches!(f[0].severity, Severity::Warn));
+        assert_eq!(f[0].message, "W: careful");
+    }
+
+    #[test]
+    fn khronos_garbage_fails() {
+        let (c, f) = khronos("door", &json!({"hello": 1}));
+        assert_eq!(c.status, "failed");
+        assert_eq!(c.detail.as_deref(), Some("informe del validador ilegible"));
+        assert!(f.is_empty());
+    }
+
+    fn finding(severity: Severity) -> Finding {
+        Finding {
+            severity,
+            subject: "a".into(),
+            code: "c".into(),
+            message: "m".into(),
+        }
+    }
+
+    #[test]
+    fn own_check_counts_findings() {
+        let c = Check::own(&[finding(Severity::Error), finding(Severity::Warn)]);
+        assert_eq!((c.name.as_str(), c.status.as_str()), ("kiln", "failed"));
+        assert_eq!((c.errors, c.warnings), (1, 1));
+        let c = Check::own(&[finding(Severity::Warn), finding(Severity::Warn)]);
+        assert_eq!((c.status.as_str(), c.errors, c.warnings), ("passed", 0, 2));
+    }
+
+    #[test]
+    fn report_is_valid_unless_a_check_failed() {
+        let passed = Check::own(&[]);
+        let absent = Check::absent("godot_import", "Godot no está instalado");
+        assert_eq!(absent.status, "absent");
+        assert_eq!(absent.detail.as_deref(), Some("Godot no está instalado"));
+        let ok = Report::new(
+            "a",
+            "h".into(),
+            "s".into(),
+            vec![passed.clone(), absent],
+            vec![],
+        );
+        assert!(ok.valid);
+        let failed = Check::own(&[finding(Severity::Error)]);
+        let bad = Report::new("a", "h".into(), "s".into(), vec![passed, failed], vec![]);
+        assert!(!bad.valid);
+        let v = serde_json::to_value(&bad).unwrap();
+        for k in [
+            "asset",
+            "glb_sha256",
+            "structure_sha256",
+            "valid",
+            "checks",
+            "findings",
+        ] {
+            assert!(v.get(k).is_some(), "{k}");
+        }
     }
 }

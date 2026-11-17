@@ -4,6 +4,7 @@
 
 pub mod asset;
 pub mod bindings;
+pub mod blend;
 pub mod build;
 pub mod catalog;
 pub mod chat;
@@ -38,6 +39,7 @@ pub fn open(project: &Path) -> Result<Catalog, String> {
 pub fn open_with(project: &Path, config: Config) -> Result<Catalog, String> {
     let mut catalog = catalog::index(project, &config);
     godot::apply(project, &config, &mut catalog);
+    blend::apply(project, &config, &mut catalog);
     let splits = zones::load(project)?;
     for p in &mut catalog.pieces {
         p.split = zones::mode(&splits, &p.key).map(str::to_string);

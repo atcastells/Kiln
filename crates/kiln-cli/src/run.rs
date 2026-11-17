@@ -77,7 +77,15 @@ pub fn blender(
     if is_python(&cfg.tools.blender) {
         all.push(script.into());
     } else {
-        all.extend(["--background", "--factory-startup", "--python"].map(OsString::from));
+        all.extend(
+            [
+                "--background",
+                "--factory-startup",
+                "--disable-autoexec",
+                "--python",
+            ]
+            .map(OsString::from),
+        );
         all.push(script.into());
         all.push("--".into());
     }
@@ -144,7 +152,11 @@ pub fn run(r: &Run) -> Result<Output, String> {
 }
 
 fn write_log(path: &std::path::Path, r: &Run, o: &Output) {
-    let args: Vec<String> = r.args.iter().map(|a| a.to_string_lossy().into_owned()).collect();
+    let args: Vec<String> = r
+        .args
+        .iter()
+        .map(|a| a.to_string_lossy().into_owned())
+        .collect();
     let code = o.code.map_or("timeout".to_string(), |c| c.to_string());
     let text = format!(
         "program: {} {}\ncwd: {}\nexit: {code}\nduration_ms: {}\n--- stdout ---\n{}\n--- stderr ---\n{}\n",
@@ -199,7 +211,13 @@ mod tests {
     fn failure_is_captured_and_logged() {
         let d = dir("fail");
         let log = d.join("logs").join("run.log");
-        let out = run(&sh("echo out; echo err 1>&2; exit 3", d.clone(), 5000, Some(log.clone()))).unwrap();
+        let out = run(&sh(
+            "echo out; echo err 1>&2; exit 3",
+            d.clone(),
+            5000,
+            Some(log.clone()),
+        ))
+        .unwrap();
         assert_eq!(out.code, Some(3));
         assert!(!out.success());
         assert_eq!(out.stdout, "out\n");

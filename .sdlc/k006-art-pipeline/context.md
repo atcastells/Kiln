@@ -48,3 +48,7 @@ sensitive business data (prices, margins, stock).
 - Anchor findings use the subject `anchor:<asset>/<id>`.
 - `glb::tests` has `hnode`, `base`, `hash_of` helpers; `validate::tests` has its own GLB builder.
 - `ops::read::tools(cfg)` gives the detected tools, cached for the process.
+- Read-only operations (`status`, `check`, `catalog`, `spec_get`...) must never launch a program configured in `kiln.toml`: use `tools::present` there, `tools::detect` only on an explicit request.
+- `.blend` pieces: `kiln_core::blend::{requests, record, apply}`; Blender exports them from `build` and from the measure job.
+- `validate.rs` has `glb_findings`, `asset_findings(subject, info, structure, &Expected)`, `Check`, `Report`, `khronos`.
+- `GlbInfo`, `Structure`, `Node`, `MeshInfo` have public fields: tests can build them directly.
