@@ -15,7 +15,9 @@ pub struct Tool {
 /// `..., version 2.0.0-dev.3.10`, so it is read after "version ".
 pub fn parse_version(name: &str, output: &str) -> Option<String> {
     let text = if name == "gltf_validator" {
-        output.split_once("version ").map_or(output, |(_, rest)| rest)
+        output
+            .split_once("version ")
+            .map_or(output, |(_, rest)| rest)
     } else {
         output
     };
@@ -53,10 +55,75 @@ fn parts(version: &str) -> Vec<u64> {
 pub fn older(version: &str, min: &str) -> bool {
     let (a, b) = (parts(version), parts(min));
     (0..a.len().max(b.len())).find_map(|i| {
-        let (x, y) = (a.get(i).copied().unwrap_or(0), b.get(i).copied().unwrap_or(0));
+        let (x, y) = (
+            a.get(i).copied().unwrap_or(0),
+            b.get(i).copied().unwrap_or(0),
+        );
         (x != y).then_some(x < y)
     }) == Some(true)
 }
+
+/// Where the program is, without running it: a path as given, or a name
+/// looked up in the folders of `PATH`.
+pub fn locate(program: &str) -> Option<std::path::PathBuf> {
+    let runnable = |p: &std::path::Path| {
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            p.metadata()
+                .is_ok_and(|m| m.is_file() && m.permissions().mode() & 0o111 != 0)
+        }
+        #[cfg(not(unix))]
+        {
+            p.is_file()
+        }
+    };
+    let given = std::path::Path::new(program);
+    if given.components().count() > 1 {
+        return runnable(given).then(|| given.to_path_buf());
+    }
+    std::env::split_paths(&std::env::var_os("PATH")?)
+        .map(|dir| dir.join(program))
+        .find(|p| runnable(p))
+}
+
+/// What `<program> --version` prints, or nothing when it cannot be run or
+/// does not answer in `PROBE_TIMEOUT`.
+fn version_output(program: &str) -> Option<String> {
+    use std::io::Read;
+    use std::process::{Command, Stdio};
+    let mut child = Command::new(program)
+        .arg("--version")
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .ok()?;
+    let started = std::time::Instant::now();
+    loop {
+        match child.try_wait() {
+            Ok(Some(_)) => break,
+            Ok(None) if started.elapsed() >= PROBE_TIMEOUT => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Some(String::new());
+            }
+            Ok(None) => std::thread::sleep(std::time::Duration::from_millis(20)),
+            Err(_) => return Some(String::new()),
+        }
+    }
+    let mut text = String::new();
+    if let Some(mut o) = child.stdout.take() {
+        let _ = o.read_to_string(&mut text);
+    }
+    text.push('\n');
+    if let Some(mut e) = child.stderr.take() {
+        let _ = e.read_to_string(&mut text);
+    }
+    Some(text)
+}
+
+const PROBE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
 pub fn probe(name: &str, program: &str, min: Option<&str>) -> Tool {
     let mut tool = Tool {
@@ -68,16 +135,11 @@ pub fn probe(name: &str, program: &str, min: Option<&str>) -> Tool {
         ok: false,
         note: None,
     };
-    let Ok(out) = std::process::Command::new(program).arg("--version").output() else {
+    let Some(text) = version_output(program) else {
         tool.note = Some(format!("no se encuentra «{program}»"));
         return tool;
     };
     tool.found = true;
-    let text = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&out.stdout),
-        String::from_utf8_lossy(&out.stderr)
-    );
     tool.version = parse_version(name, &text);
     let is_python = std::path::Path::new(program)
         .file_name()
@@ -96,16 +158,45 @@ pub fn probe(name: &str, program: &str, min: Option<&str>) -> Tool {
     tool
 }
 
-pub fn detect(config: &crate::Config) -> Vec<Tool> {
+/// The tools Kiln knows of: name, configured program and oldest version tested.
+fn known(config: &crate::Config) -> Vec<(&'static str, String, Option<&'static str>)> {
     let claude = std::env::var("KILN_CLAUDE").unwrap_or_else(|_| "claude".into());
     vec![
-        probe("blender", &config.tools.blender, Some("5.0")),
-        probe("godot", &config.tools.godot, Some("4.7")),
-        probe("gltf_validator", &config.tools.gltf_validator, None),
-        probe("gltf-transform", &config.tools.gltf_transform, None),
-        probe("claude", &claude, None),
-        probe("curl", "curl", None),
+        ("blender", config.tools.blender.clone(), Some("5.0")),
+        ("godot", config.tools.godot.clone(), Some("4.7")),
+        ("gltf_validator", config.tools.gltf_validator.clone(), None),
+        ("gltf-transform", config.tools.gltf_transform.clone(), None),
+        ("claude", claude, None),
+        ("curl", "curl".into(), None),
     ]
+}
+
+/// Runs each tool with `--version`. The programs come from `kiln.toml`, so
+/// this is for a person or an agent that asked for it, never for a plain read.
+pub fn detect(config: &crate::Config) -> Vec<Tool> {
+    known(config)
+        .into_iter()
+        .map(|(name, program, min)| probe(name, &program, min))
+        .collect()
+}
+
+/// Which tools are there, without running any: no versions.
+pub fn present(config: &crate::Config) -> Vec<Tool> {
+    known(config)
+        .into_iter()
+        .map(|(name, program, min)| {
+            let found = locate(&program).is_some();
+            Tool {
+                name: name.to_string(),
+                note: (!found).then(|| format!("no se encuentra «{program}»")),
+                program,
+                found,
+                version: None,
+                min: min.map(str::to_string),
+                ok: found,
+            }
+        })
+        .collect()
 }
 
 #[cfg(test)]
@@ -115,13 +206,25 @@ mod tests {
     #[test]
     fn parses_the_version_of_each_tool() {
         let v = |n, o| parse_version(n, o).as_deref().map(str::to_owned);
-        assert_eq!(v("blender", "Blender 5.2.3 LTS\n\tbuild date"), Some("5.2.3".into()));
-        assert_eq!(v("godot", "4.7.1.stable.official.a13da4feb"), Some("4.7.1".into()));
-        assert_eq!(v("curl", "curl 8.7.1 (x86_64-apple-darwin) libcurl/8.7.1"), Some("8.7.1".into()));
+        assert_eq!(
+            v("blender", "Blender 5.2.3 LTS\n\tbuild date"),
+            Some("5.2.3".into())
+        );
+        assert_eq!(
+            v("godot", "4.7.1.stable.official.a13da4feb"),
+            Some("4.7.1".into())
+        );
+        assert_eq!(
+            v("curl", "curl 8.7.1 (x86_64-apple-darwin) libcurl/8.7.1"),
+            Some("8.7.1".into())
+        );
         assert_eq!(v("claude", "2.1.0 (Claude Code)"), Some("2.1.0".into()));
         assert_eq!(v("gltf-transform", "4.1.0"), Some("4.1.0".into()));
         assert_eq!(
-            v("gltf_validator", "glTF 2.0 Validator, version 2.0.0-dev.3.10"),
+            v(
+                "gltf_validator",
+                "glTF 2.0 Validator, version 2.0.0-dev.3.10"
+            ),
             Some("2.0.0".into())
         );
         assert_eq!(v("curl", "no digits here"), None);
@@ -159,12 +262,43 @@ mod tests {
 
         let t = probe("blender", &old, Some("5.0"));
         assert!(t.found && !t.ok);
-        assert_eq!(t.note.as_deref(), Some("versión 4.2.0: Kiln está probado desde la 5.0"));
+        assert_eq!(
+            t.note.as_deref(),
+            Some("versión 4.2.0: Kiln está probado desde la 5.0")
+        );
 
         let t = probe("blender", &missing, Some("5.0"));
         assert!(!t.found && !t.ok && t.version.is_none());
         assert_eq!(t.note, Some(format!("no se encuentra «{missing}»")));
 
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn present_finds_tools_without_running_them() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = std::env::temp_dir().join(format!("kiln-tools-present-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let (tool, mark) = (dir.join("blender"), dir.join("ran"));
+        std::fs::write(&tool, format!("#!/bin/sh\ntouch {}\n", mark.display())).unwrap();
+        std::fs::set_permissions(&tool, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let plain = dir.join("not-executable");
+        std::fs::write(&plain, "x").unwrap();
+        let config = crate::Config::parse(&format!(
+            "[project]\nname = \"t\"\n[tools]\nblender = \"{}\"\ngodot = \"{}\"\n",
+            tool.display(),
+            plain.display()
+        ))
+        .unwrap();
+        let found = present(&config);
+        assert!(found[0].found && found[0].ok && found[0].version.is_none());
+        assert!(
+            !found[1].found && !found[1].ok,
+            "a file that cannot run is not a tool"
+        );
+        assert!(!mark.exists(), "present must not run the tool");
+        assert!(locate("sh").is_some() && locate("kiln-no-such-tool").is_none());
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

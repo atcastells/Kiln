@@ -29,7 +29,8 @@ fn page(rows: Vec<Value>, offset: usize, limit: usize) -> Value {
 type ToolsCache = Mutex<Option<(String, Vec<kiln_core::tools::Tool>)>>;
 static TOOLS: ToolsCache = Mutex::new(None);
 
-/// Detected external tools, probed once per process for the same configured programs.
+/// External tools with their versions, probed once per process for the same
+/// configured programs. It runs them: not for read-only operations.
 pub fn tools(cfg: &kiln_core::Config) -> Vec<kiln_core::tools::Tool> {
     let t = &cfg.tools;
     let key = [&t.blender, &t.godot, &t.gltf_validator, &t.gltf_transform]
@@ -44,6 +45,12 @@ pub fn tools(cfg: &kiln_core::Config) -> Vec<kiln_core::tools::Tool> {
     let found = kiln_core::tools::detect(cfg);
     *cache = Some((key, found.clone()));
     found
+}
+
+/// The `tools` operation: every external tool with its version.
+pub fn tools_report(ctx: &Ctx) -> Result<Value, String> {
+    let cfg = crate::production::config(&ctx.project, ctx.config.as_deref())?;
+    Ok(json!({ "tools": tools(&cfg) }))
 }
 
 pub fn status(ctx: &Ctx) -> Result<Value, String> {
@@ -78,7 +85,7 @@ pub fn status(ctx: &Ctx) -> Result<Value, String> {
         "findings": findings,
         "context": { "claims": c.claims.len(), "open_questions": c.questions.iter().filter(|q| q.status == "open").count(), "missing": missing },
         "next": next,
-        "tools": tools(&cfg),
+        "tools": kiln_core::tools::present(&cfg),
     }))
 }
 

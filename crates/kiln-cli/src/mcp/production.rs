@@ -104,6 +104,16 @@ impl Kiln {
         }
     }
 
+    /// Qué herramientas externas hay (Blender, Godot, validador de glTF, glTF-Transform, claude, curl) y en qué versión. Las ejecuta con `--version`; `status` dice solo si están, sin ejecutarlas.
+    #[tool(annotations(read_only_hint = false))]
+    async fn tools(&self) -> Reply {
+        let ctx = match self.ctx() {
+            Ok(c) => c,
+            Err(e) => return fail(e),
+        };
+        reply(blocking(move || ops::read::tools_report(&ctx)).await?)
+    }
+
     /// Godot mide las piezas que solo él abre (`.res`, `.tres`, `.tscn`) y las exporta a GLB en la caché, para que Blender y el montaje las usen. Tarda minutos: devuelve un trabajo; sigue su avance llamando a `job` hasta que su estado deje de ser `running`.
     #[tool(annotations(read_only_hint = false))]
     async fn godot_measure(&self) -> Reply {
