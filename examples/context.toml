@@ -54,3 +54,24 @@ options = ["contraventanas de tabla", "vidrio pequeño con marco de plomo", "con
 status = "answered"
 answer = "contraventanas de tabla"
 asked_by = "refine"
+
+[[claims]]
+id = "c6"
+layer = "look"
+text = "C1 · Todo texto de la interfaz se lee sobre su fondo con el contraste mínimo"
+source = "text"
+pinned = true
+
+[[claims]]
+id = "c7"
+layer = "look"
+text = "C2 · Los colores y los tamaños de la interfaz viven en el tema, no en los scripts"
+source = "text"
+pinned = true
+
+[[claims]]
+id = "c8"
+layer = "look"
+text = "C3 · El panel del almacén se entiende de un vistazo en pantalla"
+source = "text"
+pinned = true

@@ -125,6 +125,9 @@ pub fn run(config: &Config, cat: &mut Catalog) {
             );
         }
     }
+    if config.ui.is_some() {
+        out.extend(crate::ui::rules::findings(std::path::Path::new(&cat.root), config));
+    }
     cat.findings.extend(out);
     cat.findings
         .sort_by(|a, b| b.severity.cmp(&a.severity).then(a.subject.cmp(&b.subject)));
@@ -221,6 +224,19 @@ mod tests {
         let mut cat = empty();
         run(&film, &mut cat);
         assert_eq!(cat.findings[0].code, "kind_unknown");
+    }
+
+    #[test]
+    fn ui_rules_run_only_with_a_ui_section() {
+        let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/ui/project");
+        let base = "[project]\nname = \"x\"\n";
+        let ui = format!("{base}[tools]\ngodot_project = \"..\"\n[ui]\ntheme = \"dirty.tres\"\nscripts = [\"dirty.gd\"]\n");
+        for (toml, want_ui) in [(base.to_string(), false), (ui, true)] {
+            let mut cat = empty();
+            cat.root = dir.into();
+            run(&Config::parse(&toml).unwrap(), &mut cat);
+            assert_eq!(cat.findings.iter().any(|f| f.code.starts_with("ui-")), want_ui);
+        }
     }
 
     const SPEC: &str = "[asset]\nid = \"door\"\nname = \"D\"\n[[parts]]\nid = \"p\"\nwhat = \"p\"\nmaterial = \"oak\"\n[parts.source]\nkind = \"search\"\nquery = \"q\"\n[[anchors]]\nid = \"in\"\nclass = \"doorway\"\n";

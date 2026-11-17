@@ -7,7 +7,7 @@ use rmcp::{schemars, tool, tool_router};
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 struct CatalogArgs {
-    /// Qué listar: kits, pieces, materials o specs.
+    /// Qué listar: kits, pieces, materials, specs o ui.
     what: String,
     /// Texto que debe contener la clave o el nombre (sin distinguir mayúsculas).
     #[serde(default)]
@@ -65,7 +65,7 @@ impl Kiln {
         reply(blocking(move || ops::read::status(&ctx)).await?)
     }
 
-    /// Lista kits, piezas, materiales o fichas, con total y paginación (por defecto 50 filas, máximo 200). Usa `filter` para acotar antes de paginar.
+    /// Lista kits, piezas, materiales, fichas o `ui` (variaciones del tema, con su cadena, color, tamaño y si se usan), con total y paginación (por defecto 50 filas, máximo 200). Usa `filter` para acotar antes de paginar.
     #[tool(annotations(read_only_hint = true))]
     async fn catalog(&self, Parameters(a): Parameters<CatalogArgs>) -> Reply {
         if let Some(f) = &a.filter

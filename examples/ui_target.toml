@@ -1,0 +1,18 @@
+# Estado de los criterios de UI de Puerto Niebla. Cada criterio es una
+# afirmación fijada del contexto cuyo texto empieza por «Cn ·».
+# marker: po | test | kiln:<regla>   (regla: contrast, glyphs, theme_coherent, theme_only)
+# status: met | unmet | pending      (para kiln:* lo calcula Kiln y se ignora aquí)
+
+[[criteria]]
+id = "C1"
+marker = "kiln:contrast"
+
+[[criteria]]
+id = "C2"
+marker = "kiln:theme_only"
+
+[[criteria]]
+id = "C3"
+marker = "po"
+status = "pending"
+evidence = "pendiente de que el PO mire el panel del almacén en pantalla"

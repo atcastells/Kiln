@@ -178,7 +178,7 @@ fn settle_on_examples_lists_what_is_missing() {
     assert_eq!(code, 400);
     assert_eq!(
         error_of(&b).as_deref(),
-        Some("falta el párrafo de qué juego es; «Mundo» no tiene nada fijado; «Estética» no tiene nada fijado; «Escala» no tiene nada fijado; «Juego» no tiene nada fijado; «Técnica» no tiene nada fijado")
+        Some("falta el párrafo de qué juego es; «Mundo» no tiene nada fijado; «Escala» no tiene nada fijado; «Juego» no tiene nada fijado; «Técnica» no tiene nada fijado")
     );
     assert_eq!(d.read("context.toml"), before);
 }

@@ -21,6 +21,7 @@ pub mod sources;
 pub mod spec;
 pub mod tools;
 pub mod tree;
+pub mod ui;
 pub mod validate;
 pub mod zones;
 
