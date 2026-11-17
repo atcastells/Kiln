@@ -14,7 +14,7 @@ use kiln_core::review::{self, Round, Summary};
 use serde_json::Value;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 
 const RENDER: &str = include_str!("../blender/render.py");
 const SKILL: &str = include_str!("../../../skills/review/SKILL.md");
@@ -60,35 +60,21 @@ fn built_files(dir: &Path) -> Result<Vec<PathBuf>, String> {
 }
 
 /// Blender renders the sheets of `blend` into `out`.
-fn render(blender: &str, blend: &Path, out: &Path, say: &dyn Fn(String)) -> Result<(), String> {
+fn render(
+    cfg: &kiln_core::Config,
+    blend: &Path,
+    out: &Path,
+    say: &dyn Fn(String),
+) -> Result<(), String> {
     std::fs::create_dir_all(out).map_err(|e| e.to_string())?;
     let script = out.join("render.py");
     std::fs::write(&script, RENDER).map_err(|e| e.to_string())?;
-    let mut cmd = Command::new(blender);
-    let python = Path::new(blender)
-        .file_name()
-        .is_some_and(|n| n.to_string_lossy().starts_with("python"));
-    if python {
-        cmd.arg(&script).arg(blend).arg(out);
-    } else {
-        cmd.args(["--background", "--factory-startup", "--python"])
-            .arg(&script)
-            .arg("--")
-            .arg(blend)
-            .arg(out);
-    }
     say("Blender saca las cuatro hojas y las medidas".into());
-    let res = cmd
-        .output()
-        .map_err(|e| format!("no se puede lanzar {blender}: {e}"))?;
+    let res = crate::run::blender(cfg, &script, &[blend, out], out, "render");
     let _ = std::fs::remove_file(&script);
-    if !res.status.success() || !out.join("measures.json").exists() {
-        let err = String::from_utf8_lossy(&res.stderr);
-        let tail: Vec<&str> = err.lines().rev().take(6).collect();
-        return Err(format!(
-            "Blender no pudo sacar las hojas: {}",
-            tail.into_iter().rev().collect::<Vec<_>>().join(" | ")
-        ));
+    let res = res?;
+    if !res.success() || !out.join("measures.json").exists() {
+        return Err(res.failure("Blender no pudo sacar las hojas"));
     }
     Ok(())
 }
@@ -295,7 +281,7 @@ pub fn run(
             copy(&f, &dir.join(name))?;
         }
         render(
-            &cfg.tools.blender,
+            &cfg,
             &dir.join(format!("{id}.blend")),
             &dir,
             say,

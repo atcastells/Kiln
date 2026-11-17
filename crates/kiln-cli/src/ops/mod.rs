@@ -5,6 +5,7 @@ pub mod context;
 pub mod materials;
 pub mod new_game;
 pub mod production;
+pub mod publish;
 pub mod read;
 pub mod sources;
 pub mod specs;

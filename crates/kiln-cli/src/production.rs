@@ -5,13 +5,13 @@
 use kiln_core::{Config, build, godot};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 const PAINT: &str = include_str!("../blender/paint.py");
 const SPLIT: &str = include_str!("../blender/split.py");
 const REPAINT: &str = include_str!("../blender/repaint.py");
 const ASSEMBLE: &str = include_str!("../blender/assemble.py");
 const MEASURE: &str = include_str!("../godot/measure.gd");
+const EXPORT_PIECE: &str = include_str!("../blender/export_piece.py");
 
 pub fn config(project: &Path, config: Option<&Path>) -> Result<Config, String> {
     match config {
@@ -36,7 +36,10 @@ pub fn build_asset(
     for c in &order[..order.len() - 1] {
         let spec = cat.specs.iter().find(|s| &s.asset.id == c);
         let fresh = build::child_glb(project, &cfg, c, None).is_some()
-            && cat.builds.get(c).is_some_and(|r| r.stale.is_empty())
+            && cat
+                .builds
+                .get(c)
+                .is_some_and(|r| r.stale.is_empty() && r.changed.is_empty())
             && !spec.is_some_and(|s| {
                 kiln_core::spec::made_of(s)
                     .iter()
@@ -58,7 +61,19 @@ fn build_one(
     mut say: impl FnMut(String),
 ) -> Result<PathBuf, String> {
     let cfg = config(project, config_file)?;
-    let cat = crate::load(project, config_file)?;
+    let mut cat = crate::load(project, config_file)?;
+    let used: Vec<String> = cat
+        .specs
+        .iter()
+        .find(|s| s.asset.id == id)
+        .ok_or(format!("no hay ficha con id «{id}»"))?
+        .parts
+        .iter()
+        .filter_map(|p| p.source.from.clone())
+        .collect();
+    if export_blends(project, &cfg, &cat, Some(&used), &mut say)? > 0 {
+        cat = crate::load(project, config_file)?;
+    }
     let spec = cat
         .specs
         .iter()
@@ -109,32 +124,65 @@ fn build_one(
     {
         paint_asset(project, config_file, id, Some(&v.id), &mut say)?;
     }
+    write_contract(project, config_file, id)?;
     Ok(PathBuf::from(plan.glb))
+}
+
+/// Writes `asset.json` beside the build: what the asset is, what it was made
+/// from and what came out, with the hashes that tell one result from another.
+fn write_contract(project: &Path, config_file: Option<&Path>, id: &str) -> Result<(), String> {
+    let cfg = config(project, config_file)?;
+    let cat = crate::load(project, config_file)?;
+    let spec = cat
+        .specs
+        .iter()
+        .find(|s| s.asset.id == id)
+        .ok_or(format!("no hay ficha con id «{id}»"))?;
+    let dir = build::out_dir(project, &cfg, id);
+    let json = |name: &str| -> Option<serde_json::Value> {
+        serde_json::from_str(&std::fs::read_to_string(dir.join(name)).ok()?).ok()
+    };
+    let report = json("report.json");
+    let size_m = report.as_ref().and_then(|r| {
+        let v = r.get("size_m")?.as_array()?;
+        Some([v.first()?.as_f64()?, v.get(1)?.as_f64()?, v.get(2)?.as_f64()?])
+    });
+    let mut outputs = vec![(None, dir.join(format!("{id}.glb")))];
+    outputs.extend(
+        spec.variants
+            .iter()
+            .filter(|v| kiln_core::spec::plain_id(&v.id))
+            .map(|v| (Some(v.id.clone()), dir.join(format!("{}.glb", stem(id, Some(&v.id))))))
+            .filter(|(_, f)| f.exists()),
+    );
+    let tools = crate::ops::read::tools(&cfg);
+    let contract = kiln_core::asset::contract(&kiln_core::asset::Built {
+        root: project,
+        spec,
+        catalog: &cat,
+        size_m,
+        tris: report.as_ref().and_then(|r| r.get("tris")?.as_u64()),
+        materials: json("materials.json")
+            .and_then(|m| serde_json::from_value(m).ok())
+            .unwrap_or_default(),
+        outputs,
+        tools: &tools,
+    })?;
+    let text = serde_json::to_string_pretty(&contract).map_err(|e| e.to_string())?;
+    std::fs::write(dir.join("asset.json"), text).map_err(|e| e.to_string())
 }
 
 /// Runs a Kiln script in Blender on one JSON file; `made` must exist after.
 fn blender(cfg: &Config, script: &Path, job: &Path, made: &Path) -> Result<String, String> {
-    let mut cmd = Command::new(&cfg.tools.blender);
-    if is_python(&cfg.tools.blender) {
-        cmd.arg(script).arg(job);
-    } else {
-        cmd.args(["--background", "--factory-startup", "--python"])
-            .arg(script)
-            .arg("--")
-            .arg(job);
+    let work = job.parent().unwrap_or(Path::new("."));
+    let name = script
+        .file_stem()
+        .map_or("blender".into(), |n| n.to_string_lossy().into_owned());
+    let out = crate::run::blender(cfg, script, &[job], work, &name)?;
+    if !out.success() || !made.exists() {
+        return Err(out.failure("Blender falló"));
     }
-    let out = cmd
-        .output()
-        .map_err(|e| format!("no se puede lanzar {}: {e}", cfg.tools.blender))?;
-    if !out.status.success() || !made.exists() {
-        let err = String::from_utf8_lossy(&out.stderr);
-        let tail: Vec<&str> = err.lines().rev().take(6).collect();
-        return Err(format!(
-            "Blender falló: {}",
-            tail.into_iter().rev().collect::<Vec<_>>().join(" | ")
-        ));
-    }
-    Ok(String::from_utf8_lossy(&out.stdout).into_owned())
+    Ok(out.stdout)
 }
 
 /// The file names of an asset or of one of its colour variants.
@@ -196,12 +244,13 @@ pub fn paint_asset(
         say(l.trim_start_matches("kiln: ").to_string());
     }
     link_godot(project, &cfg, &glb, &materials, &mut say);
+    write_contract(project, config_file, id)?;
     Ok(glb)
 }
 
 /// Links every `part/zone` material of a built GLB to the Godot material of
 /// its palette key, in the GLB's `.import`. Says why when it cannot.
-fn link_godot(project: &Path, cfg: &Config, glb: &Path, materials: &Path, say: &mut dyn FnMut(String)) {
+pub(crate) fn link_godot(project: &Path, cfg: &Config, glb: &Path, materials: &Path, say: &mut dyn FnMut(String)) {
     let (Some(template), Some(gp)) = (&cfg.materials.godot, &cfg.tools.godot_project) else {
         return;
     };
@@ -216,13 +265,17 @@ fn link_godot(project: &Path, cfg: &Config, glb: &Path, materials: &Path, say: &
             .and_then(|t| serde_json::from_str(&t).map_err(|e| e.to_string()))?;
         let import = PathBuf::from(format!("{}.import", glb.display()));
         if !import.exists() {
+            if !gp.join("project.godot").is_file() {
+                return Err(format!("{} no tiene project.godot", gp.display()));
+            }
             say(format!("Godot importa el GLB por primera vez ({})", cfg.tools.godot));
-            let _ = Command::new(&cfg.tools.godot)
-                .args(["--headless", "--path"])
-                .arg(&gp)
-                .arg("--import")
-                .output()
-                .map_err(|e| format!("no se puede lanzar {}: {e}", cfg.tools.godot))?;
+            let work = glb.parent().unwrap_or(&gp).to_path_buf();
+            let _ = crate::run::godot(
+                cfg,
+                vec!["--path".into(), gp.clone().into(), "--import".into()],
+                &work,
+                "godot-import",
+            )?;
         }
         let text = std::fs::read_to_string(&import)
             .map_err(|_| "Godot no ha escrito el .import del GLB".to_string())?;
@@ -240,12 +293,6 @@ fn link_godot(project: &Path, cfg: &Config, glb: &Path, materials: &Path, say: &
     }
 }
 
-fn is_python(tool: &str) -> bool {
-    Path::new(tool)
-        .file_name()
-        .is_some_and(|n| n.to_string_lossy().starts_with("python"))
-}
-
 /// Has Godot measure and export every piece only it can read.
 pub fn measure(
     project: &Path,
@@ -253,16 +300,21 @@ pub fn measure(
     mut say: impl FnMut(String),
 ) -> Result<usize, String> {
     let cfg = config(project, config_file)?;
-    let gp = cfg
-        .tools
-        .godot_project
-        .as_ref()
-        .ok_or("falta [tools] godot_project en kiln.toml (la carpeta con project.godot)")?;
     let cat = kiln_core::catalog::index(project, &cfg);
+    let exported = export_blends(project, &cfg, &cat, None, &mut say)?;
+    let gp = match cfg.tools.godot_project.as_ref() {
+        Some(gp) => gp,
+        None if cat.pieces.iter().any(|p| p.format == "blend") => return Ok(exported),
+        None => {
+            return Err(
+                "falta [tools] godot_project en kiln.toml (la carpeta con project.godot)".into(),
+            );
+        }
+    };
     let reqs = godot::requests(project, &cfg, &cat);
     if reqs.is_empty() {
         say("No hay piezas que solo lea Godot".into());
-        return Ok(0);
+        return Ok(exported);
     }
     let out = godot::cache_file(project, &cfg);
     let dir = out.parent().unwrap_or(project).to_path_buf();
@@ -282,24 +334,61 @@ pub fn measure(
         cfg.tools.godot
     ));
     let abs = |p: &Path| std::fs::canonicalize(p).unwrap_or(p.to_path_buf());
-    let status = Command::new(&cfg.tools.godot)
-        .arg("--headless")
-        .arg("--path")
-        .arg(project.join(gp))
-        .arg("--script")
-        .arg(abs(&script))
-        .arg("--")
-        .arg(abs(&req_file))
-        .arg(abs(&dir).join("pieces.json"))
-        .output()
-        .map_err(|e| format!("no se puede lanzar {}: {e}", cfg.tools.godot))?;
+    let status = crate::run::godot(
+        &cfg,
+        vec![
+            "--path".into(),
+            project.join(gp).into(),
+            "--script".into(),
+            abs(&script).into(),
+            "--".into(),
+            abs(&req_file).into(),
+            abs(&dir).join("pieces.json").into(),
+        ],
+        &abs(&dir),
+        "measure",
+    )?;
     if !out.exists() {
-        let err = String::from_utf8_lossy(&status.stderr);
         return Err(format!(
             "Godot no escribió las medidas: {}",
-            err.lines().last().unwrap_or("")
+            status.stderr.lines().last().unwrap_or("")
         ));
     }
     say(format!("Medidas en {}", out.display()));
+    Ok(reqs.len() + exported)
+}
+
+/// Has Blender export the `.blend` pieces that are not exported or changed
+/// since; with `only`, just those keys. Returns how many it exported.
+fn export_blends(
+    project: &Path,
+    cfg: &Config,
+    cat: &kiln_core::Catalog,
+    only: Option<&[String]>,
+    say: &mut dyn FnMut(String),
+) -> Result<usize, String> {
+    let reqs: Vec<_> = kiln_core::blend::requests(project, cfg, cat)
+        .into_iter()
+        .filter(|r| only.is_none_or(|keys| keys.contains(&r.key)))
+        .collect();
+    if reqs.is_empty() {
+        return Ok(0);
+    }
+    let cache = kiln_core::blend::cache_file(project, cfg);
+    let dir = cache.parent().unwrap_or(project).to_path_buf();
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let script = dir.join("export_piece.py");
+    std::fs::write(&script, EXPORT_PIECE).map_err(|e| e.to_string())?;
+    for r in &reqs {
+        say(format!("Blender exporta {} ({})", r.key, cfg.tools.blender));
+        let glb = Path::new(&r.glb);
+        let _ = std::fs::remove_file(glb);
+        let name = format!("export-{}", r.key.replace('/', "__"));
+        let out = crate::run::blender(cfg, &script, &[Path::new(&r.blend), glb], &dir, &name)?;
+        if !out.success() || !glb.exists() {
+            return Err(out.failure(&format!("Blender no pudo exportar {}", r.key)));
+        }
+        kiln_core::blend::record(project, cfg, r)?;
+    }
     Ok(reqs.len())
 }

@@ -2,10 +2,13 @@
 //!
 //!   kiln index  --project DIR [--config FILE] [--out FILE]   catalog as JSON
 //!   kiln check  --project DIR [--config FILE]                findings; exit 1 on errors
+//!   kiln tools  --project DIR [--config FILE]                external tools found, with their versions
 //!   kiln mcp    --project DIR [--config FILE]                MCP over stdio, for Claude Code
 //!   kiln serve  --project DIR [--config FILE] [--port 4330] [--ui-dir DIR]  the graph at http://127.0.0.1:PORT (--ui-dir: read the new UI from disk)
 //!   kiln build  --project DIR [--config FILE] --asset ID     assemble an asset in Blender
 //!   kiln paint  --project DIR [--config FILE] --asset ID [--variant ID]   wear its materials again, no assembling
+//!   kiln verify --project DIR [--config FILE] --asset ID     check the built GLB: own checks, glTF Validator if installed, Godot import
+//!   kiln publish --project DIR [--config FILE] --asset ID    copy a verified asset to `[publish] dir` for the game
 //!   kiln godot  --project DIR [--config FILE]                Godot measures its own pieces
 //!   kiln review --project DIR [--config FILE] --asset ID     build, render, review and fix, up to 3 rounds
 //!   kiln content-manifest --project DIR [--config FILE] [--set NAME]   Godot lists the ids of the scenes of the content sets
@@ -17,7 +20,9 @@ mod mcp;
 mod ops;
 mod production;
 mod review;
+mod run;
 mod serve;
+mod verify;
 
 use kiln_core::{Catalog, Config, Severity};
 use std::path::PathBuf;
@@ -68,7 +73,7 @@ fn parse() -> Result<Args, String> {
     Ok(a)
 }
 
-const USAGE: &str = "uso: kiln <index|check|mcp|serve|build|paint|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--ui-dir DIR] [--asset ID] [--variant ID] [--set NAME]";
+const USAGE: &str = "uso: kiln <index|check|tools|mcp|serve|build|paint|verify|publish|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--ui-dir DIR] [--asset ID] [--variant ID] [--set NAME]";
 
 pub fn load(
     project: &std::path::Path,
@@ -137,6 +142,22 @@ fn main() -> ExitCode {
                     ExitCode::SUCCESS
                 })
             }
+            "tools" => {
+                let cfg = production::config(&args.project, args.config.as_deref())?;
+                let found = ops::read::tools(&cfg);
+                let w = found.iter().map(|t| t.name.len()).max().unwrap_or(0);
+                for t in &found {
+                    let state = match (t.found, t.ok) {
+                        (false, _) => "ausente",
+                        (true, true) => "ok",
+                        (true, false) => "no compatible",
+                    };
+                    let version = t.version.as_deref().unwrap_or("-");
+                    let line = format!("{:<w$}  {:<10}  {:<13}  {}", t.name, version, state, t.note.as_deref().unwrap_or(""));
+                    println!("{}", line.trim_end());
+                }
+                Ok(ExitCode::SUCCESS)
+            }
             "mcp" => mcp::run(args.project.clone(), args.config.clone()).map(|_| ExitCode::SUCCESS),
             "serve" => serve::run(args.project.clone(), args.config.clone(), args.port, args.ui_dir.clone())
                 .map(|_| ExitCode::SUCCESS),
@@ -147,6 +168,27 @@ fn main() -> ExitCode {
                         eprintln!("{l}")
                     })?;
                 println!("{}", glb.display());
+                Ok(ExitCode::SUCCESS)
+            }
+            "verify" => {
+                let id = args.asset.as_deref().ok_or("falta --asset ID")?;
+                ops::check_id("el asset", id)?;
+                let report =
+                    verify::verify_asset(&args.project, args.config.as_deref(), id, |l| {
+                        eprintln!("{l}")
+                    })?;
+                println!("{}", report.display());
+                Ok(ExitCode::SUCCESS)
+            }
+            "publish" => {
+                let id = args.asset.as_deref().ok_or("falta --asset ID")?;
+                let done = ops::publish::publish_asset(
+                    &args.project,
+                    args.config.as_deref(),
+                    id,
+                    |l| eprintln!("{l}"),
+                )?;
+                println!("{}", args.project.join(&done.dir).display());
                 Ok(ExitCode::SUCCESS)
             }
             "paint" => {

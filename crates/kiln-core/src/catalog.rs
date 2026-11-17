@@ -123,7 +123,7 @@ pub struct Finding {
     pub message: String,
 }
 
-const MODEL_EXT: [&str; 6] = ["glb", "gltf", "res", "tres", "tscn", "obj"];
+const MODEL_EXT: [&str; 7] = ["glb", "gltf", "res", "tres", "tscn", "obj", "blend"];
 
 pub fn index(root: &Path, config: &Config) -> Catalog {
     let mut cat = Catalog {
@@ -170,7 +170,19 @@ fn index_kit(root: &Path, dir: &Path, cat: &mut Catalog) {
                 models.insert(file_name(&entry), inner);
             }
         } else if ext(&entry).is_some_and(|e| MODEL_EXT.contains(&e.as_str())) {
-            models.entry(stem(&entry)).or_insert(entry);
+            // A `.blend` only stands in when nothing exported sits beside it.
+            let blend = ext(&entry).as_deref() == Some("blend");
+            let slot = models.entry(stem(&entry));
+            match slot {
+                std::collections::btree_map::Entry::Occupied(mut o)
+                    if !blend && ext(o.get()).as_deref() == Some("blend") =>
+                {
+                    o.insert(entry);
+                }
+                slot => {
+                    slot.or_insert(entry);
+                }
+            }
         }
     }
     let mut names: Vec<String> = models.keys().cloned().collect();

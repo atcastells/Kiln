@@ -33,6 +33,29 @@ pub struct Config {
     /// stop the config from loading; see `content_sets`.
     #[serde(default)]
     pub content: Option<toml::Value>,
+    /// Classes of anchor (`[anchors.<class>]`) and which ones each fits.
+    #[serde(default)]
+    pub anchors: std::collections::BTreeMap<String, AnchorClass>,
+    /// Where a verified asset is published for the game to use.
+    #[serde(default)]
+    pub publish: PublishSection,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct AnchorClass {
+    /// The classes an anchor of this class may be mounted on.
+    #[serde(default)]
+    pub fits: Vec<String>,
+    /// Width and height, in metres, of the opening an asset with this anchor must fit in.
+    #[serde(default)]
+    pub opening_m: Option<[f64; 2]>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize)]
+pub struct PublishSection {
+    /// Folder inside the project; each asset gets `<dir>/<id>/`.
+    #[serde(default)]
+    pub dir: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -148,6 +171,15 @@ pub struct Tools {
     /// What Kiln works out and keeps (Godot measures, exported GLBs).
     #[serde(default = "default_cache")]
     pub cache: String,
+    /// Longest a run of Blender or Godot may take, in seconds.
+    #[serde(default = "default_timeout")]
+    pub timeout_s: u64,
+    /// The Khronos glTF Validator; optional, used by `verify` when found.
+    #[serde(default = "default_gltf_validator")]
+    pub gltf_validator: String,
+    /// glTF-Transform; `kiln tools` reports its version, nothing else uses it.
+    #[serde(default = "default_gltf_transform")]
+    pub gltf_transform: String,
 }
 
 impl Default for Tools {
@@ -158,6 +190,9 @@ impl Default for Tools {
             godot_project: None,
             build: default_build(),
             cache: default_cache(),
+            timeout_s: default_timeout(),
+            gltf_validator: default_gltf_validator(),
+            gltf_transform: default_gltf_transform(),
         }
     }
 }
@@ -173,6 +208,15 @@ fn default_build() -> String {
 }
 fn default_cache() -> String {
     "kiln/cache".into()
+}
+fn default_timeout() -> u64 {
+    600
+}
+fn default_gltf_validator() -> String {
+    "gltf_validator".into()
+}
+fn default_gltf_transform() -> String {
+    "gltf-transform".into()
 }
 
 /// Where the nodes of one level are declared: each file matched by `files`
@@ -364,5 +408,35 @@ impl Config {
 
     pub fn parse(text: &str) -> Result<Config, String> {
         toml::from_str(text).map_err(|e| e.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_config_without_the_new_sections_gets_the_defaults() {
+        let c = Config::parse("[project]\nname = \"x\"\n").unwrap();
+        assert_eq!(c.tools.timeout_s, 600);
+        assert_eq!(c.tools.gltf_validator, "gltf_validator");
+        assert_eq!(c.tools.gltf_transform, "gltf-transform");
+        assert!(c.anchors.is_empty());
+        assert!(c.publish.dir.is_none());
+    }
+
+    #[test]
+    fn reads_anchor_classes_publish_and_timeout() {
+        let c = Config::parse(
+            "[project]\nname = \"x\"\n[tools]\ntimeout_s = 5\n\
+             [anchors.doorway]\nfits = [\"wall_gap\"]\nopening_m = [1.4, 2.2]\n\
+             [anchors.wall_gap]\n[publish]\ndir = \"godot/assets\"\n",
+        )
+        .unwrap();
+        assert_eq!(c.tools.timeout_s, 5);
+        assert_eq!(c.anchors["doorway"].fits, ["wall_gap"]);
+        assert_eq!(c.anchors["doorway"].opening_m, Some([1.4, 2.2]));
+        assert!(c.anchors["wall_gap"].fits.is_empty());
+        assert_eq!(c.publish.dir.as_deref(), Some("godot/assets"));
     }
 }

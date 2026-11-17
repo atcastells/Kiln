@@ -4,6 +4,7 @@ use super::rel;
 use crate::agent::Ctx;
 use kiln_core::{Catalog, Severity};
 use serde_json::{Value, json};
+use std::sync::Mutex;
 
 fn load(ctx: &Ctx) -> Result<Catalog, String> {
     crate::load(&ctx.project, ctx.config.as_deref())
@@ -25,8 +26,36 @@ fn page(rows: Vec<Value>, offset: usize, limit: usize) -> Value {
     json!({ "total": rows.len(), "offset": offset, "items": items })
 }
 
+type ToolsCache = Mutex<Option<(String, Vec<kiln_core::tools::Tool>)>>;
+static TOOLS: ToolsCache = Mutex::new(None);
+
+/// External tools with their versions, probed once per process for the same
+/// configured programs. It runs them: not for read-only operations.
+pub fn tools(cfg: &kiln_core::Config) -> Vec<kiln_core::tools::Tool> {
+    let t = &cfg.tools;
+    let key = [&t.blender, &t.godot, &t.gltf_validator, &t.gltf_transform]
+        .map(|s| s.as_str())
+        .join("\u{1f}");
+    let mut cache = TOOLS.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((k, found)) = cache.as_ref()
+        && *k == key
+    {
+        return found.clone();
+    }
+    let found = kiln_core::tools::detect(cfg);
+    *cache = Some((key, found.clone()));
+    found
+}
+
+/// The `tools` operation: every external tool with its version.
+pub fn tools_report(ctx: &Ctx) -> Result<Value, String> {
+    let cfg = crate::production::config(&ctx.project, ctx.config.as_deref())?;
+    Ok(json!({ "tools": tools(&cfg) }))
+}
+
 pub fn status(ctx: &Ctx) -> Result<Value, String> {
     let cat = load(ctx)?;
+    let cfg = crate::production::config(&ctx.project, ctx.config.as_deref())?;
     let c = kiln_core::context::load(&ctx.context_file)?;
     let missing = c.missing(&ctx.layers);
     let findings = counts(&cat);
@@ -56,6 +85,7 @@ pub fn status(ctx: &Ctx) -> Result<Value, String> {
         "findings": findings,
         "context": { "claims": c.claims.len(), "open_questions": c.questions.iter().filter(|q| q.status == "open").count(), "missing": missing },
         "next": next,
+        "tools": kiln_core::tools::present(&cfg),
     }))
 }
 
@@ -113,7 +143,17 @@ pub fn spec_get(ctx: &Ctx, id: &str) -> Result<Value, String> {
     let spec = cat.specs.iter().find(|s| s.asset.id == id).ok_or(format!("no hay ficha con id «{id}»"))?;
     let toml = std::fs::read_to_string(&file).map_err(|e| format!("no se pudo leer la ficha: {e}"))?;
     let findings: Vec<_> = cat.findings.iter().filter(|f| f.subject.contains(id)).collect();
-    Ok(json!({ "spec": spec, "file": rel(&ctx.project, &file), "toml": toml, "findings": findings }))
+    let mut out = json!({ "spec": spec, "file": rel(&ctx.project, &file), "toml": toml, "findings": findings });
+    // what the last build and the last verification left, when there are any
+    let cfg = crate::production::config(&ctx.project, ctx.config.as_deref())?;
+    let dir = kiln_core::build::out_dir(&ctx.project, &cfg, id);
+    for (key, name) in [("contract", "asset.json"), ("validation", "validation.json")] {
+        let read = std::fs::read_to_string(dir.join(name)).ok();
+        if let Some(v) = read.and_then(|t| serde_json::from_str::<Value>(&t).ok()) {
+            out[key] = v;
+        }
+    }
+    Ok(out)
 }
 
 /// What `GET /api/context` serves.

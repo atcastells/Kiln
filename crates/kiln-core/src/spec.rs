@@ -16,6 +16,9 @@ pub struct Spec {
     /// Looks of the asset: only the zones that change from the base.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub variants: Vec<Variant>,
+    /// Mount points: where the asset joins something else.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub anchors: Vec<Anchor>,
     /// Relative path of the file it was read from (set by Kiln).
     #[serde(default, skip_deserializing)]
     pub file: String,
@@ -63,6 +66,20 @@ pub struct Variant {
     /// `part/zone` -> palette key.
     #[serde(default)]
     pub materials: BTreeMap<String, String>,
+}
+
+/// A mount point of the asset: where it joins something else.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Anchor {
+    pub id: String,
+    /// A class declared in `[anchors.<class>]` of kiln.toml.
+    pub class: String,
+    /// Metres from the asset's origin.
+    #[serde(default)]
+    pub at: [f64; 3],
+    /// Degrees about X, Y and Z.
+    #[serde(default)]
+    pub turn: [f64; 3],
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -501,6 +518,28 @@ pub fn check(s: &Spec, rules: &crate::config::Rules, cat: &mut Catalog) {
             }
         }
     }
+    for (i, a) in s.anchors.iter().enumerate() {
+        let subject = format!("anchor:{}/{}", s.asset.id, a.id);
+        if !plain_id(&a.id) {
+            push(
+                Severity::Error,
+                subject.clone(),
+                "anchor_id",
+                format!(
+                    "«{}» no vale como nombre de ancla: solo letras, números, guiones y guiones bajos",
+                    a.id
+                ),
+            );
+        }
+        if s.anchors[..i].iter().any(|o| o.id == a.id) {
+            push(
+                Severity::Error,
+                subject,
+                "anchor_repeated",
+                format!("el ancla «{}» está repetida", a.id),
+            );
+        }
+    }
     if let Some(b) = s.asset.budget_tris
         && parts_tris > b
     {
@@ -856,5 +895,57 @@ mod nesting_tests {
         let codes: Vec<&str> = cat.findings.iter().map(|f| f.code.as_str()).collect();
         assert!(codes.contains(&"closed_box"), "{codes:?}");
         assert!(!codes.contains(&"material_unset") && !codes.contains(&"source_kind"));
+    }
+}
+
+#[cfg(test)]
+mod anchor_tests {
+    use super::*;
+
+    const HEAD: &str = "[asset]\nid = \"a\"\nname = \"A\"\n[[parts]]\nid = \"p\"\nwhat = \"p\"\nmaterial = \"oak\"\n[parts.source]\nkind = \"search\"\nquery = \"q\"\n";
+
+    fn codes(anchors: &str) -> Vec<String> {
+        let mut cat = Catalog::default();
+        check(&parse(&format!("{HEAD}{anchors}")).unwrap(), &Default::default(), &mut cat);
+        cat.findings.into_iter().map(|f| f.code).collect()
+    }
+
+    #[test]
+    fn reads_anchors_with_defaults() {
+        let s = parse(&format!(
+            "{HEAD}[[anchors]]\nid = \"top\"\nclass = \"socket\"\nat = [0.0, 1.5, 0.0]\nturn = [0.0, 90.0, 0.0]\n[[anchors]]\nid = \"base\"\nclass = \"floor\"\n"
+        ))
+        .unwrap();
+        assert_eq!(s.anchors.len(), 2);
+        assert_eq!(s.anchors[0].class, "socket");
+        assert_eq!(s.anchors[0].at, [0.0, 1.5, 0.0]);
+        assert_eq!(s.anchors[0].turn, [0.0, 90.0, 0.0]);
+        assert_eq!(s.anchors[1].at, [0.0; 3]);
+        assert_eq!(s.anchors[1].turn, [0.0; 3]);
+    }
+
+    #[test]
+    fn a_spec_without_anchors_serializes_as_before() {
+        let out = toml::to_string(&parse(HEAD).unwrap()).unwrap();
+        assert!(!out.contains("anchors"), "{out}");
+    }
+
+    #[test]
+    fn flags_a_bad_anchor_id() {
+        let c = codes("[[anchors]]\nid = \"top one\"\nclass = \"socket\"\n");
+        assert!(c.contains(&"anchor_id".to_string()), "{c:?}");
+    }
+
+    #[test]
+    fn flags_a_repeated_anchor_id() {
+        let c = codes("[[anchors]]\nid = \"top\"\nclass = \"s\"\n[[anchors]]\nid = \"top\"\nclass = \"s\"\n");
+        assert!(c.contains(&"anchor_repeated".to_string()), "{c:?}");
+        assert!(!c.contains(&"anchor_id".to_string()), "{c:?}");
+    }
+
+    #[test]
+    fn a_clean_spec_has_neither() {
+        let c = codes("[[anchors]]\nid = \"top\"\nclass = \"s\"\n[[anchors]]\nid = \"base\"\nclass = \"s\"\n");
+        assert!(!c.iter().any(|x| x.starts_with("anchor_")), "{c:?}");
     }
 }

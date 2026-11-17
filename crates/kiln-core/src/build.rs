@@ -29,6 +29,18 @@ pub struct Plan {
     /// Where Blender writes which palette key each `part/zone` material wears.
     pub materials: String,
     pub items: Vec<Item>,
+    /// Mount points, exported as empty nodes named `anchor_<id>`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub anchors: Vec<PlanAnchor>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlanAnchor {
+    pub name: String,
+    /// Metres from the asset's origin, Y up.
+    pub at: [f64; 3],
+    /// Degrees about X, Y and Z.
+    pub turn: [f64; 3],
 }
 
 /// One copy of one part.
@@ -91,6 +103,10 @@ pub struct Report {
     /// are to be assembled again themselves: it is to be assembled again.
     #[serde(default, skip_deserializing)]
     pub stale: Vec<String>,
+    /// The pieces (`kit/piece`) whose source changed since it was assembled
+    /// (a `.blend` saved again): it is to be assembled again.
+    #[serde(default, skip_deserializing, skip_serializing_if = "Vec::is_empty")]
+    pub changed: Vec<String>,
     /// `part/zone` -> the palette key it wears (none: the model's own); set
     /// by Kiln when read, from materials.json.
     #[serde(default)]
@@ -316,6 +332,16 @@ pub fn plan(root: &Path, config: &Config, cat: &Catalog, spec: &Spec) -> Plan {
         auto_layout: auto,
         materials: dir.join("materials.json").to_string_lossy().into(),
         items,
+        anchors: spec
+            .anchors
+            .iter()
+            .filter(|a| crate::spec::plain_id(&a.id))
+            .map(|a| PlanAnchor {
+                name: format!("anchor_{}", a.id),
+                at: a.at,
+                turn: a.turn,
+            })
+            .collect(),
     }
 }
 
@@ -349,7 +375,9 @@ fn mark_stale(
             .into_iter()
             .filter(|c| {
                 built(c).is_none_or(|t| t > at)
-                    || reports.get(*c).is_some_and(|r| !r.stale.is_empty())
+                    || reports
+                        .get(*c)
+                        .is_some_and(|r| !r.stale.is_empty() || !r.changed.is_empty())
             })
             .map(String::from)
             .collect();
@@ -397,6 +425,12 @@ pub fn reports(root: &Path, config: &Config, specs: &[Spec]) -> BTreeMap<String,
             let text = std::fs::read_to_string(dir.join("report.json")).ok()?;
             let mut r: Report = serde_json::from_str(&text).ok()?;
             r.glb = rel(root, &dir.join(format!("{}.glb", s.asset.id)));
+            // a piece retouched after the build (a `.blend` saved again)
+            r.changed = std::fs::read_to_string(dir.join("asset.json"))
+                .ok()
+                .and_then(|t| serde_json::from_str::<serde_json::Value>(&t).ok())
+                .map(|c| crate::asset::changed_pieces(root, &c))
+                .unwrap_or_default();
             r.materials = std::fs::read_to_string(dir.join("materials.json"))
                 .ok()
                 .and_then(|t| serde_json::from_str(&t).ok())
@@ -475,7 +509,10 @@ mod tests {
             project: String::new(),
             root: String::new(),
             kits: vec![],
-            pieces: vec![piece("kit/beam", &[]), piece("kit/post", &[("wood", "oak")])],
+            pieces: vec![
+                piece("kit/beam", &[]),
+                piece("kit/post", &[("wood", "oak")]),
+            ],
             materials: vec![mat("oak"), mat("iron"), mat("pine")],
             specs: vec![],
             tree: None,
@@ -520,13 +557,18 @@ materials = { "beam/wood" = "pine", "flat/x" = "ghost" }
         let s = crate::spec::parse(SPEC).unwrap();
         let root = Path::new("/p");
         let names: Vec<String> = [
-            "beam/wood", "beam/bad", "flat/x", "post/wood", "post/metal", "ghost/x", "nope",
+            "beam/wood",
+            "beam/bad",
+            "flat/x",
+            "post/wood",
+            "post/metal",
+            "ghost/x",
+            "nope",
         ]
         .map(String::from)
         .to_vec();
-        let key = |m: &BTreeMap<String, Option<Paint>>, n: &str| {
-            m[n].as_ref().map(|p| p.key.clone())
-        };
+        let key =
+            |m: &BTreeMap<String, Option<Paint>>, n: &str| m[n].as_ref().map(|p| p.key.clone());
         let base = paints(root, &cat(), &s, &names, None);
         assert_eq!(key(&base, "beam/wood").as_deref(), Some("oak"));
         // a key outside the palette falls through to the part's material

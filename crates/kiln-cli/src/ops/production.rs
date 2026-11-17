@@ -33,6 +33,28 @@ pub fn paint(jobs: &Jobs, ctx: Arc<Ctx>, asset: &str, variant: Option<String>) -
     }))
 }
 
+pub fn verify(jobs: &Jobs, ctx: Arc<Ctx>, asset: &str) -> Result<u64, String> {
+    if asset.is_empty() {
+        return Err("falta el asset".into());
+    }
+    let id = asset.to_string();
+    Ok(agent::job(jobs, format!("verificar {id}"), move |say| {
+        let report = crate::verify::verify_asset(&ctx.project, ctx.config.as_deref(), &id, say)?;
+        Ok(Some(super::rel(&ctx.project, &report)))
+    }))
+}
+
+pub fn publish(jobs: &Jobs, ctx: Arc<Ctx>, asset: &str) -> Result<u64, String> {
+    if asset.is_empty() {
+        return Err("falta el asset".into());
+    }
+    let id = asset.to_string();
+    Ok(agent::job(jobs, format!("publicar {id}"), move |say| {
+        let done = super::publish::publish_asset(&ctx.project, ctx.config.as_deref(), &id, say)?;
+        Ok(Some(format!("{}/asset.json", done.dir)))
+    }))
+}
+
 pub fn godot_measure(jobs: &Jobs, ctx: Arc<Ctx>) -> u64 {
     agent::job(jobs, "medir con Godot".into(), move |say| {
         crate::production::measure(&ctx.project, ctx.config.as_deref(), say).map(|_| None)
