@@ -38,6 +38,22 @@ pub fn sha256_file(path: &std::path::Path) -> Result<String, String> {
         .collect())
 }
 
+/// Writes a file Kiln owns in place of whatever has that name. A link left
+/// there is removed, never followed: the folders Kiln writes in belong to a
+/// project that anyone may have prepared.
+pub fn write_replacing(path: &std::path::Path, bytes: &[u8]) -> std::io::Result<()> {
+    use std::io::Write;
+    match std::fs::remove_file(path) {
+        Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(e),
+        _ => {}
+    }
+    std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(path)?
+        .write_all(bytes)
+}
+
 /// The sha256 of a file of the project, named relative to its root. Nothing
 /// when the name leaves the project (absolute, `..`, or a link that leads
 /// out) or is not a regular file: such names come from files of the project
@@ -524,5 +540,22 @@ from = "child"
         ] } });
         assert_eq!(changed_pieces(&root, &contract), ["k/zero"]);
         std::fs::remove_dir_all(base).unwrap();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn write_replacing_replaces_a_link_instead_of_following_it() {
+        let dir = std::env::temp_dir().join(format!("kiln-asset-replace-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let (victim, file) = (dir.join("victim"), dir.join("report.log"));
+        std::fs::write(&victim, b"untouched").unwrap();
+        std::os::unix::fs::symlink(&victim, &file).unwrap();
+        write_replacing(&file, b"new").unwrap();
+        assert_eq!(std::fs::read(&victim).unwrap(), b"untouched");
+        assert_eq!(std::fs::read(&file).unwrap(), b"new");
+        assert!(!file.symlink_metadata().unwrap().is_symlink());
+        write_replacing(&file, b"again").unwrap();
+        assert_eq!(std::fs::read(&file).unwrap(), b"again");
+        std::fs::remove_dir_all(dir).unwrap();
     }
 }

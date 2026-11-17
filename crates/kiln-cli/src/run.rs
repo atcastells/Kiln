@@ -216,7 +216,7 @@ fn write_log(path: &std::path::Path, r: &Run, o: &Output) {
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    let _ = std::fs::write(path, text);
+    let _ = kiln_core::asset::write_replacing(path, text.as_bytes());
 }
 
 #[cfg(all(test, unix))]
