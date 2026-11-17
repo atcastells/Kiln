@@ -143,7 +143,17 @@ pub fn spec_get(ctx: &Ctx, id: &str) -> Result<Value, String> {
     let spec = cat.specs.iter().find(|s| s.asset.id == id).ok_or(format!("no hay ficha con id «{id}»"))?;
     let toml = std::fs::read_to_string(&file).map_err(|e| format!("no se pudo leer la ficha: {e}"))?;
     let findings: Vec<_> = cat.findings.iter().filter(|f| f.subject.contains(id)).collect();
-    Ok(json!({ "spec": spec, "file": rel(&ctx.project, &file), "toml": toml, "findings": findings }))
+    let mut out = json!({ "spec": spec, "file": rel(&ctx.project, &file), "toml": toml, "findings": findings });
+    // what the last build and the last verification left, when there are any
+    let cfg = crate::production::config(&ctx.project, ctx.config.as_deref())?;
+    let dir = kiln_core::build::out_dir(&ctx.project, &cfg, id);
+    for (key, name) in [("contract", "asset.json"), ("validation", "validation.json")] {
+        let read = std::fs::read_to_string(dir.join(name)).ok();
+        if let Some(v) = read.and_then(|t| serde_json::from_str::<Value>(&t).ok()) {
+            out[key] = v;
+        }
+    }
+    Ok(out)
 }
 
 /// What `GET /api/context` serves.

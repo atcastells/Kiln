@@ -52,3 +52,5 @@ sensitive business data (prices, margins, stock).
 - `.blend` pieces: `kiln_core::blend::{requests, record, apply}`; Blender exports them from `build` and from the measure job.
 - `validate.rs` has `glb_findings`, `asset_findings(subject, info, structure, &Expected)`, `Check`, `Report`, `khronos`.
 - `GlbInfo`, `Structure`, `Node`, `MeshInfo` have public fields: tests can build them directly.
+- Godot run on a folder without `project.godot` opens the project manager and never ends: check the file before `--import`.
+- Unit tests under `src/` that use `at("")` read the real `examples/` folder: never write or delete there; use `temp_project` in an integration test.

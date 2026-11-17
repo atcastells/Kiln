@@ -10,7 +10,7 @@ use std::io::{BufRead, Write};
 use std::path::Path;
 
 /// (name, readOnly, destructive, idempotent, openWorld); absent hint = false.
-const SURFACE: [(&str, bool, bool, bool, bool); 28] = [
+const SURFACE: [(&str, bool, bool, bool, bool); 30] = [
     ("bind", false, true, true, false),
     ("build", false, true, false, false),
     ("catalog", true, false, false, false),
@@ -28,6 +28,7 @@ const SURFACE: [(&str, bool, bool, bool, bool); 28] = [
     ("new_game", false, false, false, false),
     ("new_game_options", true, false, false, false),
     ("paint", false, true, false, false),
+    ("publish", false, true, false, false),
     ("review", false, true, false, false),
     ("review_sheets", true, false, false, false),
     ("search", true, false, false, true),
@@ -38,6 +39,7 @@ const SURFACE: [(&str, bool, bool, bool, bool); 28] = [
     ("status", true, false, false, false),
     ("tools", false, false, false, false),
     ("tree", true, false, false, false),
+    ("verify", false, false, false, false),
     ("zones_split", false, true, true, false),
 ];
 
@@ -105,6 +107,8 @@ fn bad_ids_and_paths_are_refused_without_touching_the_disk() {
             ("review_sheets", json!({"asset": bad})),
             ("build", json!({"asset": bad})),
             ("paint", json!({"asset": bad})),
+            ("verify", json!({"asset": bad})),
+            ("publish", json!({"asset": bad})),
         ];
         for (tool, args) in calls {
             let r = m.call(tool, args);

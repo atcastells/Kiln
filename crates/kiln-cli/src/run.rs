@@ -93,6 +93,17 @@ pub fn blender(
     run(&tool(cfg, &cfg.tools.blender, all, work, name))
 }
 
+/// Runs another tool of `[tools]` (a validator) from `work`, with the same record.
+pub fn program(
+    cfg: &Config,
+    program: &str,
+    args: Vec<OsString>,
+    work: &Path,
+    name: &str,
+) -> Result<Output, String> {
+    run(&tool(cfg, program, args, work, name))
+}
+
 /// Runs Godot without a window from `work`, with the same record as `blender`.
 pub fn godot(cfg: &Config, args: Vec<OsString>, work: &Path, name: &str) -> Result<Output, String> {
     let mut all: Vec<OsString> = vec!["--headless".into()];

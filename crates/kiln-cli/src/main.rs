@@ -7,6 +7,8 @@
 //!   kiln serve  --project DIR [--config FILE] [--port 4330] [--ui-dir DIR]  the graph at http://127.0.0.1:PORT (--ui-dir: read the new UI from disk)
 //!   kiln build  --project DIR [--config FILE] --asset ID     assemble an asset in Blender
 //!   kiln paint  --project DIR [--config FILE] --asset ID [--variant ID]   wear its materials again, no assembling
+//!   kiln verify --project DIR [--config FILE] --asset ID     check the built GLB: own checks, glTF Validator if installed, Godot import
+//!   kiln publish --project DIR [--config FILE] --asset ID    copy a verified asset to `[publish] dir` for the game
 //!   kiln godot  --project DIR [--config FILE]                Godot measures its own pieces
 //!   kiln review --project DIR [--config FILE] --asset ID     build, render, review and fix, up to 3 rounds
 //!   kiln content-manifest --project DIR [--config FILE] [--set NAME]   Godot lists the ids of the scenes of the content sets
@@ -20,6 +22,7 @@ mod production;
 mod review;
 mod run;
 mod serve;
+mod verify;
 
 use kiln_core::{Catalog, Config, Severity};
 use std::path::PathBuf;
@@ -70,7 +73,7 @@ fn parse() -> Result<Args, String> {
     Ok(a)
 }
 
-const USAGE: &str = "uso: kiln <index|check|tools|mcp|serve|build|paint|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--ui-dir DIR] [--asset ID] [--variant ID] [--set NAME]";
+const USAGE: &str = "uso: kiln <index|check|tools|mcp|serve|build|paint|verify|publish|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--ui-dir DIR] [--asset ID] [--variant ID] [--set NAME]";
 
 pub fn load(
     project: &std::path::Path,
@@ -165,6 +168,27 @@ fn main() -> ExitCode {
                         eprintln!("{l}")
                     })?;
                 println!("{}", glb.display());
+                Ok(ExitCode::SUCCESS)
+            }
+            "verify" => {
+                let id = args.asset.as_deref().ok_or("falta --asset ID")?;
+                ops::check_id("el asset", id)?;
+                let report =
+                    verify::verify_asset(&args.project, args.config.as_deref(), id, |l| {
+                        eprintln!("{l}")
+                    })?;
+                println!("{}", report.display());
+                Ok(ExitCode::SUCCESS)
+            }
+            "publish" => {
+                let id = args.asset.as_deref().ok_or("falta --asset ID")?;
+                let done = ops::publish::publish_asset(
+                    &args.project,
+                    args.config.as_deref(),
+                    id,
+                    |l| eprintln!("{l}"),
+                )?;
+                println!("{}", args.project.join(&done.dir).display());
                 Ok(ExitCode::SUCCESS)
             }
             "paint" => {

@@ -99,3 +99,18 @@ fn content_lists_the_world_set() {
     let one = m.call("content", json!({ "set": "nope" }));
     assert!(one.is_error);
 }
+
+#[test]
+fn spec_get_carries_the_contract_and_the_last_verification_when_there_are() {
+    let p = temp_project("");
+    let mut m = Mcp::start(p.path());
+    let before = m.call("spec_get", json!({ "id": "hoist" })).json();
+    assert!(before.get("contract").is_none() && before.get("validation").is_none(), "{before}");
+    let built = p.path().join("kiln/build/hoist");
+    std::fs::create_dir_all(&built).unwrap();
+    std::fs::write(built.join("asset.json"), r#"{"id":"hoist","outputs":[]}"#).unwrap();
+    std::fs::write(built.join("validation.json"), r#"{"valid":true}"#).unwrap();
+    let after = m.call("spec_get", json!({ "id": "hoist" })).json();
+    assert_eq!(after["contract"]["id"], "hoist", "{after}");
+    assert_eq!(after["validation"]["valid"], true, "{after}");
+}

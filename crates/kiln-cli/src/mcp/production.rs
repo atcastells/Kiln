@@ -104,6 +104,40 @@ impl Kiln {
         }
     }
 
+    /// Verifica un asset montado: comprobaciones propias del GLB (estructura, referencias, presupuesto, medidas, anclajes), el glTF Validator de Khronos si está instalado, y Godot importándolo e instanciándolo en un proyecto de prueba. Escribe `validation.json` junto al montaje; `spec_get` lo devuelve. Devuelve un trabajo; sigue su avance llamando a `job` hasta que su estado deje de ser `running`.
+    #[tool(annotations(read_only_hint = false))]
+    async fn verify(&self, Parameters(a): Parameters<AssetArgs>) -> Reply {
+        if let Err(e) = ops::check_id("el asset", &a.asset) {
+            return fail(e);
+        }
+        let ctx = match self.ctx() {
+            Ok(c) => c,
+            Err(e) => return fail(e),
+        };
+        let jobs = self.jobs.clone();
+        match blocking(move || ops::production::verify(&jobs, ctx, &a.asset)).await? {
+            Ok(id) => started(id),
+            Err(e) => fail(e),
+        }
+    }
+
+    /// Publica un asset verificado en `[publish] dir`/<asset>/ para que el juego lo use: el GLB, sus variantes y el contrato `asset.json` con su versión. Solo publica si la última verificación pasó y corresponde al GLB actual. Sustituye lo publicado antes. Devuelve un trabajo; sigue su avance llamando a `job`.
+    #[tool(annotations(read_only_hint = false, destructive_hint = true))]
+    async fn publish(&self, Parameters(a): Parameters<AssetArgs>) -> Reply {
+        if let Err(e) = ops::check_id("el asset", &a.asset) {
+            return fail(e);
+        }
+        let ctx = match self.ctx() {
+            Ok(c) => c,
+            Err(e) => return fail(e),
+        };
+        let jobs = self.jobs.clone();
+        match blocking(move || ops::production::publish(&jobs, ctx, &a.asset)).await? {
+            Ok(id) => started(id),
+            Err(e) => fail(e),
+        }
+    }
+
     /// Qué herramientas externas hay (Blender, Godot, validador de glTF, glTF-Transform, claude, curl) y en qué versión. Las ejecuta con `--version`; `status` dice solo si están, sin ejecutarlas.
     #[tool(annotations(read_only_hint = false))]
     async fn tools(&self) -> Reply {

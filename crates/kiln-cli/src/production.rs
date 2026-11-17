@@ -121,7 +121,52 @@ fn build_one(
     {
         paint_asset(project, config_file, id, Some(&v.id), &mut say)?;
     }
+    write_contract(project, config_file, id)?;
     Ok(PathBuf::from(plan.glb))
+}
+
+/// Writes `asset.json` beside the build: what the asset is, what it was made
+/// from and what came out, with the hashes that tell one result from another.
+fn write_contract(project: &Path, config_file: Option<&Path>, id: &str) -> Result<(), String> {
+    let cfg = config(project, config_file)?;
+    let cat = crate::load(project, config_file)?;
+    let spec = cat
+        .specs
+        .iter()
+        .find(|s| s.asset.id == id)
+        .ok_or(format!("no hay ficha con id «{id}»"))?;
+    let dir = build::out_dir(project, &cfg, id);
+    let json = |name: &str| -> Option<serde_json::Value> {
+        serde_json::from_str(&std::fs::read_to_string(dir.join(name)).ok()?).ok()
+    };
+    let report = json("report.json");
+    let size_m = report.as_ref().and_then(|r| {
+        let v = r.get("size_m")?.as_array()?;
+        Some([v.first()?.as_f64()?, v.get(1)?.as_f64()?, v.get(2)?.as_f64()?])
+    });
+    let mut outputs = vec![(None, dir.join(format!("{id}.glb")))];
+    outputs.extend(
+        spec.variants
+            .iter()
+            .filter(|v| kiln_core::spec::plain_id(&v.id))
+            .map(|v| (Some(v.id.clone()), dir.join(format!("{}.glb", stem(id, Some(&v.id))))))
+            .filter(|(_, f)| f.exists()),
+    );
+    let tools = crate::ops::read::tools(&cfg);
+    let contract = kiln_core::asset::contract(&kiln_core::asset::Built {
+        root: project,
+        spec,
+        catalog: &cat,
+        size_m,
+        tris: report.as_ref().and_then(|r| r.get("tris")?.as_u64()),
+        materials: json("materials.json")
+            .and_then(|m| serde_json::from_value(m).ok())
+            .unwrap_or_default(),
+        outputs,
+        tools: &tools,
+    })?;
+    let text = serde_json::to_string_pretty(&contract).map_err(|e| e.to_string())?;
+    std::fs::write(dir.join("asset.json"), text).map_err(|e| e.to_string())
 }
 
 /// Runs a Kiln script in Blender on one JSON file; `made` must exist after.
@@ -196,12 +241,13 @@ pub fn paint_asset(
         say(l.trim_start_matches("kiln: ").to_string());
     }
     link_godot(project, &cfg, &glb, &materials, &mut say);
+    write_contract(project, config_file, id)?;
     Ok(glb)
 }
 
 /// Links every `part/zone` material of a built GLB to the Godot material of
 /// its palette key, in the GLB's `.import`. Says why when it cannot.
-fn link_godot(project: &Path, cfg: &Config, glb: &Path, materials: &Path, say: &mut dyn FnMut(String)) {
+pub(crate) fn link_godot(project: &Path, cfg: &Config, glb: &Path, materials: &Path, say: &mut dyn FnMut(String)) {
     let (Some(template), Some(gp)) = (&cfg.materials.godot, &cfg.tools.godot_project) else {
         return;
     };
@@ -216,6 +262,9 @@ fn link_godot(project: &Path, cfg: &Config, glb: &Path, materials: &Path, say: &
             .and_then(|t| serde_json::from_str(&t).map_err(|e| e.to_string()))?;
         let import = PathBuf::from(format!("{}.import", glb.display()));
         if !import.exists() {
+            if !gp.join("project.godot").is_file() {
+                return Err(format!("{} no tiene project.godot", gp.display()));
+            }
             say(format!("Godot importa el GLB por primera vez ({})", cfg.tools.godot));
             let work = glb.parent().unwrap_or(&gp).to_path_buf();
             let _ = crate::run::godot(
