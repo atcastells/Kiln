@@ -119,8 +119,46 @@ El recorrido completo se ha probado con `hoist`, el ejemplo de Kiln:
 
 ## Aplazado
 
-- Entrega B: R11–R14 (ficha y piezas de la puerta, recorrido en ASTRA,
-  `door.tscn`, modificación y capturas).
 - Decisiones abiertas en ASTRA: q15 (medidas de puerta; Rust y el greybox
   fijan 1,4 × 2,2 m), q16 (texturas), paleta 3D, `max_tris` (20.000 en
   `kiln.toml`, 2.000 en el contexto).
+
+## Entrega B: puerta industrial piloto en ASTRA (K002-B, R11–R14)
+
+Trabajo en el worktree `astra-k002b-door-pilot` de ASTRA, sin confirmar en
+git. Plan: `plan-b.md`.
+
+- **Assets**: `door_industrial_frame` (versión 1, variante `restricted`) y
+  `door_industrial_leaf` (versión 2 tras B6), 84 triángulos cada uno,
+  publicados en `godot/assets/kiln/`. Transcripción en `e2e-b.md`.
+- **Escena**: `godot/station/door.tscn` y `door_view.gd` usan lo publicado.
+  Test nuevo `godot/tests/door_view_test.gd`, registrado como fase `door_view`
+  de `godot_station.sh`.
+- **Línea base**: `cargo test --workspace` (45 suites en verde),
+  `scripts/godot_station.sh` (igual más la fase nueva) y
+  `scripts/kiln_check.sh` (pasa de 0 a 2 piezas) coinciden con B0.
+  `git diff --stat -- crates protocol` vacío.
+- **Capturas**: `shots/` tiene cerrada, abierta y restringida, antes y después
+  de B6. Salen de `scripts/godot_window.sh --shot`, que corre los modos con
+  ventana en un contenedor, sin ventana en el escritorio. El «antes» se sacó
+  de una copia con la hoja reconstruida a su geometría de la versión 1 (misma
+  huella estructural que la publicada entonces).
+- **Añadido fuera del plan, pedido en la sesión**: `scripts/godot_window.sh` y
+  su Dockerfile; tomas 14 y 15 de `station_shots.gd` (puerta sola, NPC
+  ocultos); sección «Godot con ventana» en el `CLAUDE.md` de ASTRA y
+  `CLAUDE.md` nuevo en Kiln.
+
+### Pendiente y conocido
+
+- `godot/tests/reconcile_test.gd` falla con «notices and door records: #21
+  worker» también sin el cambio; no está en `godot_station.sh`. Sus
+  comprobaciones de puerta pasan antes del fallo.
+- `door.py` no da los mismos bytes en dos ejecuciones: el `.blend` del marco
+  se restauró a mano para que B6 cambiara una sola pieza.
+- Blender dejó `door_frame.blend1` y `door_leaf.blend1` en
+  `assets/kits/industrial/`; `.gitignore` no los excluye.
+- `godot_window.sh` fija Godot `linux.arm64` y no comprueba el sha256 de la
+  descarga.
+- La comprobación añadida tras la toma 15 solo pasó un análisis de sintaxis;
+  no se repitieron las capturas después de añadirla.
+- Verificador independiente: ámbar, sin regresiones; hallazgos menores.
