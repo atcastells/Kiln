@@ -401,14 +401,14 @@ claude mcp add kiln -- /ruta/a/kiln mcp --project /ruta/al/juego
 claude mcp add --scope project kiln -- /ruta/a/kiln mcp --project /ruta/al/juego
 ```
 
-Son 27 herramientas. Empieza por `status`.
+Son 30 herramientas. Empieza por `status`.
 
 | Grupo | Herramientas |
 |---|---|
 | Leer | `status` resumen y siguiente paso; `tree` árbol, un nivel cada vez; `catalog` kits, piezas, materiales o fichas; `check` hallazgos; `content` conjuntos de contenido; `spec_get` una ficha; `review_sheets` hojas de la revisión como imágenes |
 | Fichas | `spec_write` escribe una ficha si pasa la comprobación; `spec_layout` solo coloca piezas (`at`, `turn`) |
 | Contexto | `context_get` lee; `context_propose` la voz del agente; `context_edit` la voz de la persona |
-| Producción y trabajos | `build` monta con Blender; `paint` aplica materiales; `godot_measure` mide lo que solo Godot abre; `review` revisa el montaje; `job` y `jobs` siguen los trabajos |
+| Producción y trabajos | `build` monta con Blender; `paint` aplica materiales; `godot_measure` mide lo que solo Godot abre y exporta las piezas `.blend`; `review` revisa el montaje; `verify` comprueba el GLB montado; `publish` lo lleva al juego; `tools` dice qué herramientas externas hay y su versión; `job` y `jobs` siguen los trabajos |
 | Materiales y zonas | `material_set` material de una zona; `material_validate` lo pasa al catálogo; `bind` vincula una ranura a la paleta; `zones_split` parte una pieza en zonas |
 | Fuera | `search` busca candidatos (no escribe); `import` trae un modelo con su licencia |
 | Juego nuevo | `new_game_options` el paso de arranque; `new_game` crea el juego; `settle` lo da por asentado si no falta nada |
@@ -436,7 +436,7 @@ revisión).
 
 ### Un trabajo largo
 
-`build`, `paint`, `godot_measure`, `review` e `import` tardan minutos: devuelven
+`build`, `paint`, `godot_measure`, `review`, `verify`, `publish` e `import` tardan: devuelven
 un trabajo. `job` espera hasta 30 s a que haya líneas nuevas o termine, y
 cuando llegan sigue juntándolas hasta un segundo de silencio; se vuelve a
 llamar con `since` = el `next` anterior hasta que el estado deje de ser
@@ -466,6 +466,104 @@ elige con sus palabras, y lo que registra queda fijado.
   escribir los mismos ficheros, sin bloqueo. La página no ve los trabajos
   lanzados por MCP.
 - Las claves de Poly Pizza y Sketchfab nunca salen de Kiln.
+
+## Entrega 12: de la fuente al juego (K006)
+
+Kiln lleva un asset desde su fuente editable hasta el proyecto del juego:
+monta, verifica y publica. Cada paso deja un fichero que el siguiente lee.
+
+```bash
+kiln tools   --project ../mi-juego                 # qué herramientas hay y en qué versión
+kiln build   --project ../mi-juego --asset door    # monta y escribe asset.json
+kiln verify  --project ../mi-juego --asset door    # comprueba el GLB y escribe validation.json
+kiln publish --project ../mi-juego --asset door    # lo copia al juego, si la verificación pasó
+```
+
+Por MCP son `tools`, `build`, `verify` y `publish`; `spec_get` devuelve el
+contrato y el último informe.
+
+**Herramientas.** `kiln tools` ejecuta cada una con `--version`: Blender (probado
+desde la 5.0), Godot (desde la 4.7), el glTF Validator de Khronos,
+glTF-Transform, `claude` y `curl`. `status` dice solo si están, sin
+ejecutarlas: es una lectura, y las rutas de `[tools]` las pone el proyecto.
+Kiln no instala nada. glTF-Transform se informa pero no se usa.
+
+```toml
+[tools]
+timeout_s = 600                     # plazo de cada ejecución de Blender o Godot
+gltf_validator = "gltf_validator"   # opcional: si no está, consta como ausente
+```
+
+Blender y Godot se lanzan desde un solo sitio (`crates/kiln-cli/src/run.rs`):
+en la carpeta de trabajo del asset, con ese plazo, y dejando el registro
+completo en `<build>/<id>/.kiln/logs/`. Blender corre con
+`--disable-autoexec`.
+
+**Piezas con fuente `.blend`.** Un `.blend` dentro de un kit es una pieza.
+Kiln lo exporta a GLB en la caché (solo las mallas, con los modificadores
+aplicados, sin ejecutar los scripts que lleve dentro) y anota su sha256. Lo
+exportan `kiln build`, para las piezas que usa el asset, y `kiln godot`, para
+todas. Si el `.blend` cambia, la pieza sale con el aviso `blend_stale` hasta
+la siguiente exportación. Si junto al `.blend` hay un `.glb` con el mismo
+nombre, vale el `.glb`.
+
+**Anclajes.** Una ficha dice por dónde se une el asset a otra cosa:
+
+```toml
+# en la ficha
+[[anchors]]
+id = "mount"
+class = "doorway"
+at = [0, 0, 0]          # metros desde el origen del asset, Y arriba
+turn = [0, 0, 0]        # grados
+
+# en kiln.toml
+[anchors.doorway]
+fits = ["wall_gap"]     # clases con las que encaja
+opening_m = [1.4, 2.2]  # ancho y alto del hueco donde debe caber
+
+[anchors.wall_gap]
+```
+
+El montaje exporta cada anclaje como un nodo vacío `anchor_<id>`. `kiln check`
+da error si la clase no está declarada (`anchor_class`) o si el asset montado
+no cabe en el hueco de su clase (`anchor_opening`).
+
+**El contrato.** `build` y `paint` escriben `<build>/<id>/asset.json`: el id,
+para qué sirve (de la ficha), la ficha y cada pieza con su sha256, licencia y
+crédito, cada GLB con su sha256 y su hash estructural, medidas, ejes y
+origen, anclajes, materiales y las versiones de las herramientas. El hash
+estructural sale de los nodos, su jerarquía, sus transformaciones (a 0,1 mm),
+los triángulos y los materiales: dos montajes con el mismo hash estructural
+son equivalentes aunque los ficheros no fueran idénticos byte a byte.
+
+**Verificar.** `kiln verify` hace tres comprobaciones y escribe
+`validation.json`:
+
+| Comprobación | Qué mira |
+|---|---|
+| `kiln` | Que sea un GLB válido y sin referencias rotas; nombres de nodo vacíos o repetidos; escala negativa o desigual en la raíz; triángulos sobre el presupuesto; medidas distintas de las que dio Blender; materiales sin clave de la paleta; piezas pendientes; anclajes que faltan o están fuera de sitio |
+| `gltf_validator` | El informe del validador de Khronos. Si no está instalado consta como ausente y no cuenta como fallo |
+| `godot_import` | Godot importa el GLB en un proyecto de prueba de la caché, lo instancia y devuelve sus nodos |
+
+**Publicar.** `kiln publish` solo publica si la última verificación pasó y
+corresponde al GLB de ahora (por sha256). Copia el GLB, sus variantes y el
+contrato a la carpeta de `[publish]`, con la versión de producción, que sube
+cuando cambia lo publicado. Si esa carpeta está dentro del proyecto de Godot,
+Godot la importa y Kiln comprueba que cada GLB tiene su `.import`.
+
+```toml
+[publish]
+dir = "godot/assets"    # dentro del proyecto; cada asset va a <dir>/<id>/
+```
+
+Los tests que lanzan Blender o Godot de verdad se ejecutan a mano, con las
+herramientas en el `PATH`: `cargo test -p kiln-cli -- --ignored`.
+
+Límites: Kiln no ejecuta scripts del proyecto ni del cliente; un retoque a
+mano en el `.blend` del montaje se pierde al volver a montar (la fuente son
+los `.blend` de las piezas y la ficha); no optimiza GLB; la página web no
+tiene botones para verificar ni publicar.
 
 ## Validar contenido
 

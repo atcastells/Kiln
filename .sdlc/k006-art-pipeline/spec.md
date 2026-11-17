@@ -31,9 +31,13 @@ anclajes) y un paso de publicar. Este spec añade solo eso.
   propias (R5). glTF-Transform (MIT, pide Node) no se integra: hoy no
   resuelve ninguna carencia concreta. Solo se detecta y se informa.
 - **D4. No se integra un puente MCP de Blender.** El encargo pide priorizar
-  uno existente si supera las pruebas; en esta máquina no hay ninguno
-  configurado, así que no hay nada que probar. Se reutiliza lo que ya
-  funciona: Blender sin ventana.
+  uno existente si supera las pruebas. *Corrección (2026-11-17, durante la
+  entrega A)*: aprobé esta decisión diciendo que en esta máquina no había
+  ninguno, y no es cierto: hay uno instalado como extensión de Claude Desktop
+  (`ant.dir.gh.blender.blender-mcp`). No está conectado a Claude Code ni a
+  Kiln y no lo he probado. La entrega A no lo necesita (Blender sin ventana
+  cubre montar, exportar y verificar), pero la decisión queda **pendiente de
+  que la confirmes** con el dato correcto.
 - **D5. Medidas: la puerta se ajusta al hueco que ya existe**, 1,4 × 2,2 m en
   pared de 0,2 m (`module_view.gd:3-7`, `space.rs:23`). La pregunta q15 del
   contexto de ASTRA sigue abierta con opciones más estrechas (0,9 y 1,2 m);

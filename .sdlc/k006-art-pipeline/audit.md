@@ -24,7 +24,7 @@ Estados: **probado** (hay un test que lo ejerce y hoy pasa), **sin verificar**
 | Volver a vestir materiales sin montar (`paint`, variantes) | sin verificar | `blender/repaint.py`, `production.rs` | |
 | Zonas de material (`zones_split`) | sin verificar | `blender/split.py` | |
 | Hojas y medidas para el revisor (`review`) | sin verificar | `blender/render.py`, `review.rs` | Necesita `claude` |
-| Montar en un Blender abierto, por un puente MCP de Blender (`KILN_PLAN`) | sin verificar | README «Entrega 4»; `assemble.py` | No hay ningún puente MCP de Blender configurado en esta máquina; no se ha probado |
+| Montar en un Blender abierto, por un puente MCP de Blender (`KILN_PLAN`) | sin verificar | README «Entrega 4»; `assemble.py` | Hay un puente instalado como extensión de Claude Desktop (`ant.dir.gh.blender.blender-mcp`, visto en ejecución el 2026-11-17), pero no está conectado a Claude Code ni a Kiln; no se ha probado. La primera versión de esta auditoría decía que no había ninguno: era un error |
 | Una pieza que es una caja a propósito | ausente | `build.rs:227-243` | La caja solo sale como sustituto de una pieza que falta, y lleva `todo` |
 | Detectar Blender y su versión | ausente | — | `[tools] blender` se usa a ciegas (`config.rs:138`) |
 | Tiempo máximo y carpeta de trabajo de Blender/Godot | ausente | `production.rs:116-135` | `Command::output()` sin límite ni `current_dir` |
