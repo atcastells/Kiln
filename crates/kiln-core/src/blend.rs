@@ -73,7 +73,8 @@ pub fn record(root: &Path, config: &Config, done: &Request) -> Result<(), String
     );
     let file = cache_file(root, config);
     let text = serde_json::to_string_pretty(&entries).map_err(|e| e.to_string())?;
-    std::fs::write(&file, text).map_err(|e| format!("{}: {e}", file.display()))
+    crate::asset::write_replacing(&file, text.as_bytes())
+        .map_err(|e| format!("{}: {e}", file.display()))
 }
 
 fn read_entries(root: &Path, config: &Config) -> BTreeMap<String, Entry> {

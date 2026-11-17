@@ -107,7 +107,7 @@ pub fn verify_asset(
     report.outputs = outputs;
     let out = dir.join("validation.json");
     let text = serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?;
-    std::fs::write(&out, text).map_err(|e| e.to_string())?;
+    kiln_core::asset::write_replacing(&out, text.as_bytes()).map_err(|e| e.to_string())?;
     for c in &report.checks {
         say(format!(
             "{}: {}{}",

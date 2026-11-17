@@ -169,7 +169,8 @@ fn write_contract(project: &Path, config_file: Option<&Path>, id: &str) -> Resul
         tools: &tools,
     })?;
     let text = serde_json::to_string_pretty(&contract).map_err(|e| e.to_string())?;
-    std::fs::write(dir.join("asset.json"), text).map_err(|e| e.to_string())
+    kiln_core::asset::write_replacing(&dir.join("asset.json"), text.as_bytes())
+        .map_err(|e| e.to_string())
 }
 
 /// Runs a Kiln script in Blender on one JSON file; `made` must exist after.
