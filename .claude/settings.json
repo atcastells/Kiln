@@ -1,8 +1,10 @@
 {
   "permissions": {
     "deny": [
+      "Bash(GH_REPO=*)",
       "Bash(gh pr create * --repo*)",
       "Bash(gh pr create * -R *)",
+      "Bash(gh pr create *--repo*)",
       "Bash(gh pr create --repo*)",
       "Bash(gh pr create -R *)",
       "Bash(git cherry-pick *)",
@@ -29,6 +31,7 @@
       "Bash(git push --prune*)",
       "Bash(git push -d *)",
       "Bash(git push -f *)",
+      "Bash(git push -f)",
       "Bash(git rebase *)",
       "Bash(git reset *)",
       "Bash(git stash *)",
@@ -48,8 +51,8 @@
       "Bash(gh pr checks *)",
       "Bash(gh pr create *)",
       "Bash(gh pr view *)",
-      "Bash(git push *)",
-      "Bash(git push)"
+      "Bash(git push -u origin *)",
+      "Bash(git push origin *)"
     ]
   }
 }
