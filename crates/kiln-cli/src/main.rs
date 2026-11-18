@@ -25,6 +25,7 @@ mod review;
 mod run;
 mod serve;
 mod verify;
+mod verify_recipe;
 
 use kiln_core::{Catalog, Config, Severity};
 use std::path::PathBuf;

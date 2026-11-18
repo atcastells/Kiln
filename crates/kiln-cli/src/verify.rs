@@ -22,7 +22,9 @@ pub fn verify_asset(
 ) -> Result<PathBuf, String> {
     let cfg = config(project, config_file)?;
     let cat = crate::load(project, config_file)?;
-    crate::ops::refuse_generated(&cat.specs, id)?;
+    if cat.specs.iter().any(|s| s.asset.id == id && s.generator.is_some()) {
+        return crate::verify_recipe::verify(project, config_file, id, &mut say);
+    }
     let spec = cat
         .specs
         .iter()
@@ -142,7 +144,7 @@ pub fn verify_asset(
     }
 }
 
-fn khronos(
+pub(crate) fn khronos(
     cfg: &Config,
     dir: &Path,
     file: &Path,
@@ -215,13 +217,13 @@ fn scratch_dir(project: &Path, cfg: &Config, id: &str) -> Result<PathBuf, String
 }
 
 /// What the spec expects to find in the scene Godot imports.
-struct Wanted<'a> {
-    anchors: &'a [String],
-    animations: &'a [String],
+pub(crate) struct Wanted<'a> {
+    pub(crate) anchors: &'a [String],
+    pub(crate) animations: &'a [String],
 }
 
 /// Godot imports the GLB into a scratch project of the cache and instances it.
-fn godot_import(
+pub(crate) fn godot_import(
     project: &Path,
     cfg: &Config,
     id: &str,

@@ -109,6 +109,83 @@ fn mcp_generate_starts_a_job_that_fails_when_godot_is_missing() {
     assert!(seen.contains("godot"), "{seen}");
 }
 
+fn finish(m: &mut Mcp, id: u64) -> (serde_json::Value, String) {
+    let (mut since, mut last, mut seen) = (0, json!(null), String::new());
+    for _ in 0..10 {
+        last = m.call("job", json!({"id": id, "since": since, "wait_s": 5})).json();
+        seen.push_str(&last.to_string());
+        if last["status"] != "running" {
+            break;
+        }
+        since = last["next"].as_u64().unwrap();
+    }
+    (last, seen)
+}
+
+fn recipe_project(spec: &str, extra_cfg: &str) -> common::TempDir {
+    let p = temp_project("");
+    let cfg = p.read("kiln.toml").replace("[tools]\n", &format!("{extra_cfg}[tools]\n"));
+    std::fs::write(p.path().join("kiln.toml"), cfg).unwrap();
+    std::fs::write(p.path().join("specs/rock.toml"), spec).unwrap();
+    p
+}
+
+#[test]
+fn mcp_recipe_verify_starts_a_job_that_needs_godot() {
+    let p = recipe_project(ROCK, "");
+    let cfg = p.read("kiln.toml").replace("[tools]\n", "[tools]\ngodot = \"/nonexistent/godot\"\n");
+    std::fs::write(p.path().join("kiln.toml"), cfg).unwrap();
+    let mut m = Mcp::start(p.path());
+    let r = m.call("verify", json!({"asset": "rock"}));
+    assert!(!r.is_error && !r.text.contains("es un asset generado"), "{}", r.text);
+    let id = r.json()["job"].as_u64().expect("job id");
+    let (last, seen) = finish(&mut m, id);
+    assert_eq!(last["status"], "failed", "{last}");
+    assert!(seen.contains("/nonexistent/godot"), "{seen}");
+}
+
+#[test]
+fn mcp_recipe_verify_reports_a_static_error_without_godot() {
+    let thin = format!(
+        "{ROCK}\n[[generator.ops]]\nop = \"stretch\"\ny = 0.2\n\n[[generator.ops]]\nop = \"noise\"\namplitude = 0.9\nsize = 0.5\n"
+    );
+    let p = recipe_project("", "");
+    std::fs::remove_file(p.path().join("specs/rock.toml")).unwrap();
+    let mut m = Mcp::start(p.path());
+    let w = m.call("spec_write", json!({ "id": "rock", "toml": thin }));
+    assert!(w.is_error && w.text.contains("generator_radius"), "{}", w.text);
+    std::fs::write(p.path().join("specs/rock.toml"), &thin).unwrap();
+    let r = m.call("verify", json!({"asset": "rock"}));
+    assert!(!r.is_error, "{}", r.text);
+    let id = r.json()["job"].as_u64().expect("job id");
+    let (last, seen) = finish(&mut m, id);
+    assert_eq!(last["status"], "failed", "{last}");
+    assert!(seen.contains("radio"), "{seen}");
+    let got = m.call("spec_get", json!({ "id": "rock" })).json();
+    assert_eq!(got["validation"]["valid"], false, "{got}");
+    let codes: Vec<_> =
+        got["validation"]["findings"].as_array().unwrap().iter().map(|f| f["code"].clone()).collect();
+    assert!(codes.contains(&json!("generator_radius")), "{got}");
+    assert_eq!(got["validation"]["recipe"]["seeds"], json!([]), "{got}");
+}
+
+#[test]
+fn mcp_recipe_publish_refuses_what_was_not_verified() {
+    let p = recipe_project(ROCK, "[publish]\ndir = \"godot/assets\"\n\n");
+    let mut m = Mcp::start(p.path());
+    let r = m.call("publish", json!({"asset": "rock"}));
+    let (status, seen) = if r.is_error {
+        ("failed".into(), r.text.clone())
+    } else {
+        let id = r.json()["job"].as_u64().expect("job id");
+        let (last, seen) = finish(&mut m, id);
+        (last["status"].as_str().unwrap().to_string(), seen)
+    };
+    assert_eq!(status, "failed", "{seen}");
+    assert!(seen.contains("verifica antes el asset"), "{seen}");
+    assert!(!p.exists("godot/assets/rock"));
+}
+
 #[test]
 fn annotations_tell_what_each_tool_does() {
     let p = temp_project("");

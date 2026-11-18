@@ -16,6 +16,7 @@ pub mod generate;
 pub mod glb;
 pub mod godot;
 pub mod license;
+pub mod mesh;
 pub mod new_game;
 pub mod review;
 pub mod sources;

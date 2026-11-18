@@ -53,6 +53,26 @@ fn draw(v: &Value, key: &str, integer: bool) -> f64 {
     }
 }
 
+/// The seeds a verification generates: element 0 is `seed`, element k is the low 32 bits
+/// of `mix("<seed>/verify/<k>")`; a repeat is redrawn with `"<seed>/verify/<k>/<j>"`, j = 1, 2, ...
+pub fn batch(seed: u32, n: u32) -> Vec<u32> {
+    let mut seeds: Vec<u32> = Vec::new();
+    for k in 0..n {
+        if k == 0 {
+            seeds.push(seed);
+            continue;
+        }
+        let mut s = (mix(&format!("{seed}/verify/{k}")) & 0xffff_ffff) as u32;
+        let mut j = 1;
+        while seeds.contains(&s) {
+            s = (mix(&format!("{seed}/verify/{k}/{j}")) & 0xffff_ffff) as u32;
+            j += 1;
+        }
+        seeds.push(s);
+    }
+    seeds
+}
+
 pub fn resolve(g: &Generator, seed: u32) -> Resolved {
     let ops = g
         .ops
@@ -160,6 +180,26 @@ mod tests {
         let g = asteroid();
         assert_eq!(resolve(&g, 42), resolve(&g, 42));
         assert_ne!(resolve(&g, 42), resolve(&g, 43));
+    }
+
+    #[test]
+    fn batch_is_pinned() {
+        assert_eq!(batch(42, 4), vec![42, 1227191235, 4096378883, 621036976]);
+        assert_eq!(batch(7, 3), vec![7, 256104206, 3962503091]);
+    }
+
+    #[test]
+    fn batch_is_distinct_extends_and_handles_the_edges() {
+        let long = batch(42, 16);
+        assert_eq!(long.len(), 16);
+        assert_eq!(long[0], 42);
+        let mut sorted = long.clone();
+        sorted.sort_unstable();
+        sorted.dedup();
+        assert_eq!(sorted.len(), 16);
+        assert_eq!(long[..4], batch(42, 4)[..]);
+        assert!(batch(42, 0).is_empty());
+        assert_eq!(batch(5, 1), vec![5]);
     }
 
     #[test]

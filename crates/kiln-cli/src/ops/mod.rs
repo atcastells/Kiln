@@ -6,6 +6,7 @@ pub mod materials;
 pub mod new_game;
 pub mod production;
 pub mod publish;
+pub mod publish_recipe;
 pub mod read;
 pub mod sources;
 pub mod specs;
@@ -49,11 +50,12 @@ pub fn spec_file(project: &Path, cat: &kiln_core::Catalog, asset: &str) -> Resul
         .ok_or(format!("no hay ficha con id «{asset}»"))
 }
 
-/// Build, paint, verify, publish and review do not handle an asset made from
-/// a recipe yet. An unknown id passes: each caller reports it its own way.
+/// Build, paint and review do not handle an asset made from a recipe: it is
+/// generated and verified, never assembled. An unknown id passes: each caller
+/// reports it its own way.
 pub fn refuse_generated(specs: &[kiln_core::Spec], id: &str) -> Result<(), String> {
     if specs.iter().any(|s| s.asset.id == id && s.generator.is_some()) {
-        return Err(format!("«{id}» es un asset generado: aún no se monta ni se publica"));
+        return Err(format!("«{id}» es un asset generado: no se monta, se genera y se verifica"));
     }
     Ok(())
 }
@@ -181,13 +183,13 @@ mod tests {
     fn refuse_generated_only_refuses_a_recipe() {
         let specs = vec![parse(GENERATED), parse(PARTS)];
         let e = refuse_generated(&specs, "rock").unwrap_err();
-        assert_eq!(e, "«rock» es un asset generado: aún no se monta ni se publica");
+        assert_eq!(e, "«rock» es un asset generado: no se monta, se genera y se verifica");
         assert!(refuse_generated(&specs, "crate").is_ok());
         assert!(refuse_generated(&specs, "nope").is_ok());
     }
 
     #[test]
-    fn the_five_operations_refuse_a_generated_asset_before_any_tool() {
+    fn build_paint_and_review_refuse_a_generated_asset_before_any_tool() {
         let dir = std::env::temp_dir().join(format!("kiln-refuse-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(dir.join("specs")).unwrap();
@@ -198,21 +200,24 @@ mod tests {
         .unwrap();
         std::fs::write(dir.join("specs/rock.toml"), GENERATED).unwrap();
         let p = std::fs::canonicalize(&dir).unwrap();
-        let want = "«rock» es un asset generado: aún no se monta ni se publica";
+        let want = "«rock» es un asset generado: no se monta, se genera y se verifica";
         let said = |_: String| {};
         let got = [
             crate::production::build_asset(&p, None, "rock", said).unwrap_err(),
             crate::production::paint_asset(&p, None, "rock", None, said).unwrap_err(),
-            crate::verify::verify_asset(&p, None, "rock", said).unwrap_err(),
-            publish::publish_asset(&p, None, "rock", said).unwrap_err(),
             crate::review::run(&p, None, "rock", &|_| {}).unwrap_err(),
         ];
         let wrote = dir.join("build").exists() || dir.join(".kiln").exists();
+        // verifying and publishing a recipe are real operations, not refusals
+        let verify = crate::verify::verify_asset(&p, None, "rock", said).unwrap_err();
+        let publish = publish::publish_asset(&p, None, "rock", said).unwrap_err();
         std::fs::remove_dir_all(&dir).unwrap();
         for e in got {
             assert_eq!(e, want);
         }
         assert!(!wrote);
+        assert!(verify.contains("/nonexistent/godot"), "{verify}");
+        assert!(publish.contains("verifica antes el asset"), "{publish}");
     }
 
     #[test]
@@ -234,7 +239,7 @@ mod tests {
         let p = std::fs::canonicalize(&dir).unwrap();
         let got = crate::production::build_asset(&p, None, "pile", |_| {}).unwrap_err();
         std::fs::remove_dir_all(&dir).unwrap();
-        assert_eq!(got, "«rock» es un asset generado: aún no se monta ni se publica");
+        assert_eq!(got, "«rock» es un asset generado: no se monta, se genera y se verifica");
     }
 
     fn examples() -> Ctx {

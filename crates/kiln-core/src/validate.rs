@@ -435,6 +435,9 @@ pub struct Report {
     pub valid: bool,
     pub checks: Vec<Check>,
     pub findings: Vec<Finding>,
+    /// Only a generated asset: how its recipe was verified.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recipe: Option<Value>,
 }
 
 impl Check {
@@ -527,6 +530,7 @@ impl Report {
             valid: checks.iter().all(|c| c.status != "failed"),
             checks,
             findings,
+            recipe: None,
         }
     }
 }
@@ -1134,5 +1138,12 @@ at = [0.0, 1.0, 0.0]
         ] {
             assert!(v.get(k).is_some(), "{k}");
         }
+    }
+
+    #[test]
+    fn a_report_without_recipe_has_no_recipe_key() {
+        let r = Report::new("a", "h".into(), "s".into(), vec![], vec![]);
+        let v = serde_json::to_value(&r).unwrap();
+        assert!(v.get("recipe").is_none());
     }
 }
