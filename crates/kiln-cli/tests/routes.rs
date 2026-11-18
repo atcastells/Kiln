@@ -61,7 +61,7 @@ fn files_serves_a_model_under_the_roots() {
 fn posts_without_the_header_are_403() {
     let (_d, s) = project();
     for path in [
-        "/api/ask", "/api/build", "/api/review", "/api/godot", "/api/search", "/api/import", "/api/bind",
+        "/api/ask", "/api/build", "/api/generate", "/api/review", "/api/godot", "/api/search", "/api/import", "/api/bind",
         "/api/material", "/api/validate", "/api/split", "/api/paint", "/api/new", "/api/settle", "/api/chat",
         "/api/context/sort", "/api/context/refine", "/api/context/text", "/api/context/intent",
         "/api/context/answer", "/api/context/claim", "/api/unknown",
@@ -102,6 +102,24 @@ fn invalid_posts_are_400_with_their_message() {
     // page header with a foreign host is still refused
     let (code, _) = s.post("/api/unknown", "{}", true);
     assert_eq!(code, 404);
+}
+
+#[test]
+fn generate_refuses_a_bad_seed() {
+    let (_d, s) = project();
+    bad(&s, "/api/generate", r#"{"asset":"rock","seed":"nope"}"#, "la semilla debe ser un número entero entre 0 y 4294967295");
+    bad(&s, "/api/generate", r#"{"asset":"rock","seed":4294967296}"#, "la semilla debe ser un número entero entre 0 y 4294967295");
+}
+
+#[test]
+fn generate_rejects_an_unknown_op_and_writes_nothing() {
+    let (d, s) = project();
+    let recipe = "[asset]\nid = \"rock\"\nname = \"Rock\"\n\n[generator]\nseed = 1\n\n[[generator.ops]]\nop = \"crater\"\n";
+    let body = serde_json::json!({ "asset": "rock", "recipe": recipe }).to_string();
+    let (code, b) = s.post("/api/generate", &body, true);
+    assert_eq!(code, 400, "{}", String::from_utf8_lossy(&b));
+    assert!(error_of(&b).unwrap().contains("generator_op"), "{}", String::from_utf8_lossy(&b));
+    assert!(!d.exists("specs/rock.toml"));
 }
 
 #[test]

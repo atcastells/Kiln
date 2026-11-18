@@ -246,6 +246,7 @@ pub fn run(
 ) -> Result<PathBuf, String> {
     let cfg = crate::production::config(project, config)?;
     let cat = crate::load(project, config)?;
+    crate::ops::refuse_generated(&cat.specs, id)?;
     let spec_rel = cat
         .specs
         .iter()

@@ -15,7 +15,7 @@ decisiones, «Señal» es su apartado «How we will know it is solved».
 | R2 | La receta es una pila de operaciones de un vocabulario cerrado que Kiln conoce, definido en un único sitio. | D-4 | Una operación o un parámetro fuera del vocabulario da error en `kiln check` (`generator_op`, `generator_param`). Un test comprueba que cada operación y parámetro de la tabla aparece en el guion de Godot. |
 | R3 | Cada parámetro es un valor fijo o un rango `[mín, máx]` dentro de los límites del vocabulario. | D-3 | Un valor fuera de límites o un rango invertido da `generator_range`. El peor caso de triángulos se calcula sin generar y, si pasa de `budget_tris`, da `generator_budget`. |
 | R4 | Los rangos se sortean en Rust a partir de la semilla, con un algoritmo escrito en esta spec; Godot recibe valores ya resueltos. | D-5 | `resolve(receta, semilla)` es una función pura de `kiln-core` con vectores de prueba fijos; cambiar la semilla cambia al menos un valor sorteado. |
-| R5 | Un guion de Godot que publica Kiln genera la malla a partir de los valores resueltos y la exporta como GLB a la caché. | D-1, D-5, D-7 | Con Godot 4.7: la misma receta y semilla dan dos GLB con el mismo hash estructural (`glb::structure_hash`); otra semilla da otro hash. Test `--ignored`. |
+| R5 | Un guion de Godot que publica Kiln genera la malla a partir de los valores resueltos y la exporta como GLB a la caché. | D-1, D-5, D-7 | Con Godot 4.7: la misma receta y semilla dan dos GLB idénticos byte a byte (mismo sha256); otra semilla da otro sha256 y otras medidas. Test `--ignored`. Corregido en Build (2026-11-18): el hash estructural no mira la posición de los vértices, así que dos semillas de una receta lo comparten y no sirve de criterio. |
 | R6 | La página pinta un control por parámetro, un campo de semilla y el botón Aplicar; Aplicar guarda la receta, genera y la vista 3D carga el GLB. | D-3, D-7, Señal | En `scripts/ui_test.sh`: la ficha de ejemplo muestra sus controles; Aplicar llama a la ruta y la vista carga el GLB devuelto. |
 | R7 | Lo que hace Aplicar se puede hacer por MCP. | D-7 (regla R14 de K004, `tests/coverage.rs`) | `tests/coverage.rs` pasa con la ruta nueva ligada a su herramienta. |
 | R8 | Al pedir un asset, el agente decide si se monta con piezas o se genera; si se genera, escribe la receta con operaciones y rangos del vocabulario. | D-3, Señal | Prueba de punta a punta anotada en `e2e.md`: «crear un asteroide» deja una ficha con receta que pasa `kiln check`. Gasta suscripción: se lanza con permiso del PO. |
@@ -128,6 +128,20 @@ de `FastNoiseLite`, exportada sin ventana en un proyecto vacío.
 - 0,13 s por ejecución en caliente (0,27 s la primera), 4 224 triángulos,
   GLB de 133 kB. Sin la cola de trabajos ni la carga en la página.
 - Tres ejecuciones con la misma semilla: el mismo sha256. Otra semilla: otro.
+
+### Corregido en Build y en la revisión (2026-11-18)
+
+- R5: el criterio pasa a sha256 idéntico (ver la tabla).
+- Un material fuera de la paleta es un aviso (`generator_material`), no un
+  error, como en las piezas: el agente real propuso uno y generar se negaba.
+- Aplicar no reescribe la ficha entera: solo cambia su tabla `[generator]`.
+  Reescribirla desde la página perdía variantes y claves desconocidas.
+- La carpeta de trabajo de Godot se vacía en cada ejecución y las salidas se
+  borran antes de generar: sin eso, un fichero dejado ahí se ejecutaba y un
+  GLB viejo pasaba por nuevo.
+- Montar rechaza también un asset de piezas que lleva dentro uno generado.
+- El catálogo dice qué GLB hay ya generado para la semilla de cada receta, y
+  la ficha lo muestra al abrirla.
 
 ## Policy applied
 

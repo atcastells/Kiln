@@ -6,6 +6,7 @@
 //!   kiln mcp    --project DIR [--config FILE]                MCP over stdio, for Claude Code
 //!   kiln serve  --project DIR [--config FILE] [--port 4330] [--ui-dir DIR]  the graph at http://127.0.0.1:PORT (--ui-dir: read the new UI from disk)
 //!   kiln build  --project DIR [--config FILE] --asset ID     assemble an asset in Blender
+//!   kiln generate --project DIR [--config FILE] --asset ID [--seed N]   generate a recipe asset in Godot, no Blender
 //!   kiln paint  --project DIR [--config FILE] --asset ID [--variant ID]   wear its materials again, no assembling
 //!   kiln verify --project DIR [--config FILE] --asset ID     check the built GLB: own checks, glTF Validator if installed, Godot import
 //!   kiln publish --project DIR [--config FILE] --asset ID    copy a verified asset to `[publish] dir` for the game
@@ -16,6 +17,7 @@
 mod agent;
 mod content;
 mod fetch;
+mod generate;
 mod mcp;
 mod ops;
 mod production;
@@ -38,6 +40,7 @@ struct Args {
     variant: Option<String>,
     set: Option<String>,
     ui_dir: Option<PathBuf>,
+    seed: Option<u32>,
 }
 
 fn parse() -> Result<Args, String> {
@@ -53,6 +56,7 @@ fn parse() -> Result<Args, String> {
         variant: None,
         set: None,
         ui_dir: None,
+        seed: None,
     };
     while let Some(flag) = it.next() {
         let mut val = || it.next().ok_or(format!("falta el valor de {flag}"));
@@ -65,6 +69,7 @@ fn parse() -> Result<Args, String> {
             "--set" => a.set = Some(val()?),
             "--ui-dir" => a.ui_dir = Some(PathBuf::from(val()?)),
             "--port" => a.port = val()?.parse().map_err(|_| "--port debe ser un número")?,
+            "--seed" => a.seed = Some(val()?.parse().map_err(|_| "--seed debe ser un número entero sin signo (u32)")?),
             other => return Err(format!("opción desconocida {other}\n{USAGE}")),
         }
     }
@@ -73,7 +78,7 @@ fn parse() -> Result<Args, String> {
     Ok(a)
 }
 
-const USAGE: &str = "uso: kiln <index|check|tools|mcp|serve|build|paint|verify|publish|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--ui-dir DIR] [--asset ID] [--variant ID] [--set NAME]";
+const USAGE: &str = "uso: kiln <index|check|tools|mcp|serve|build|generate|paint|verify|publish|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--ui-dir DIR] [--asset ID] [--variant ID] [--set NAME] [--seed N]";
 
 pub fn load(
     project: &std::path::Path,
@@ -168,6 +173,18 @@ fn main() -> ExitCode {
                         eprintln!("{l}")
                     })?;
                 println!("{}", glb.display());
+                Ok(ExitCode::SUCCESS)
+            }
+            "generate" => {
+                let id = args.asset.as_deref().ok_or("falta --asset ID")?;
+                let made = generate::generate_asset(
+                    &args.project,
+                    args.config.as_deref(),
+                    id,
+                    args.seed,
+                    |l| eprintln!("{l}"),
+                )?;
+                println!("{}", made.glb.display());
                 Ok(ExitCode::SUCCESS)
             }
             "verify" => {

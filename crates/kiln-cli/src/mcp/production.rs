@@ -31,6 +31,18 @@ struct PaintArgs {
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
+struct GenerateArgs {
+    /// Id del asset generado.
+    asset: String,
+    /// Semilla con la que resolver los rangos de la receta; por defecto la de la ficha.
+    #[serde(default)]
+    seed: Option<u32>,
+    /// La ficha entera del asset en TOML, con su `[generator]`. Si se da, se guarda antes de generar; si no es válida, se rechaza y no se lanza nada.
+    #[serde(default)]
+    recipe: Option<String>,
+}
+
+#[derive(serde::Deserialize, schemars::JsonSchema)]
 struct ImportArgs {
     /// Id del asset.
     asset: String,
@@ -133,6 +145,23 @@ impl Kiln {
         };
         let jobs = self.jobs.clone();
         match blocking(move || ops::production::publish(&jobs, ctx, &a.asset)).await? {
+            Ok(id) => started(id),
+            Err(e) => fail(e),
+        }
+    }
+
+    /// Genera el GLB de un asset cuya ficha tiene una receta `[generator]` (no `[[parts]]`): Godot sin ventana construye la malla a partir de la receta y la semilla, y la deja en la caché. Con `recipe` guarda antes la ficha. Devuelve un trabajo; sigue su avance llamando a `job` hasta que su estado deje de ser `running`; su `file` es la ruta del GLB relativa al proyecto.
+    #[tool(annotations(read_only_hint = false, destructive_hint = true))]
+    async fn generate(&self, Parameters(a): Parameters<GenerateArgs>) -> Reply {
+        if let Err(e) = ops::check_id("el asset", &a.asset) {
+            return fail(e);
+        }
+        let ctx = match self.ctx() {
+            Ok(c) => c,
+            Err(e) => return fail(e),
+        };
+        let jobs = self.jobs.clone();
+        match blocking(move || ops::production::generate(&jobs, ctx, &a.asset, a.seed, a.recipe.as_deref())).await? {
             Ok(id) => started(id),
             Err(e) => fail(e),
         }

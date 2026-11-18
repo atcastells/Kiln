@@ -9,7 +9,7 @@
 Con `kiln serve` sobre un proyecto que tiene una ficha con `[generator]`: la
 página muestra sus controles, Aplicar guarda la receta, Godot sin ventana
 deja `<cache>/generated/<id>/<semilla>.glb` y la vista 3D lo carga; la misma
-receta y semilla dan el mismo hash estructural. `cargo test --workspace`, los
+receta y semilla dan el mismo GLB byte a byte. `cargo test --workspace`, los
 `--ignored`, `clippy` y `scripts/ui_test.sh` pasan. `e2e.md` anota la petición
 «crear un asteroide» con el agente real.
 
@@ -20,7 +20,7 @@ receta y semilla dan el mismo hash estructural. `cargo test --workspace`, los
   rechazo de T6.
 - El generador necesita una operación o un parámetro fuera del vocabulario
   de la spec.
-- El guion de Godot no da el mismo hash estructural en dos ejecuciones.
+- El guion de Godot no da el mismo GLB en dos ejecuciones con la misma semilla.
 - Antes de T20: lanza al agente y gasta de la suscripción.
 - The task needs to open windows or apps on the developer's screen.
 
@@ -28,27 +28,27 @@ receta y semilla dan el mismo hash estructural. `cargo test --workspace`, los
 
 | # | Task | Files | Test that proves it | Requirement (spec) | Runs on | Depends | Est | Status |
 |---|------|-------|---------------------|--------------------|---------|---------|-----|--------|
-| T1 | Tipos de la receta (`Generator`, `Op`, valor fijo o rango) y `Spec.generator`; `no_parts` no salta con receta; `generator_and_parts` | `crates/kiln-core/src/generate/mod.rs` (nuevo, declara `vocab`, `check` y `resolve` vacíos), `crates/kiln-core/src/lib.rs`, `crates/kiln-core/src/spec.rs` | Unitarios: la ficha de la spec se lee y se escribe igual; con piezas y receta da `generator_and_parts` | R1 | implementer | — | 2m/300k | pending |
-| T2 | Tabla del vocabulario: operaciones, parámetros, tipo, límites, valor por defecto y cálculo de triángulos | `crates/kiln-core/src/generate/vocab.rs` | Unitarios: las cuatro operaciones de la spec con sus límites; 64 segmentos dan 4 224 triángulos | R2 | implementer | T1 | 1m/200k | pending |
-| T3 | Comprobar la receta: `generator_op`, `generator_param`, `generator_range`, `generator_budget`, `sphere` primera, material en la paleta, semilla de 32 bits | `crates/kiln-core/src/generate/check.rs`, llamada en `spec.rs` | Un unitario por código de hallazgo | R2, R3 | implementer | T2 | 2m/300k | pending |
-| T4 | `resolve(receta, semilla)` con el algoritmo de la spec | `crates/kiln-core/src/generate/resolve.rs` | Vectores fijos; un valor fijo no cambia; otra semilla cambia algún valor; enteros hacia abajo | R4 | implementer | T2 | 1m/200k | pending |
-| T5 | Guion `generate.gd`: esfera, `stretch`, `noise`, `facet`; nombra la ranura con la clave del material; exporta GLB y escribe medidas | `crates/kiln-cli/godot/generate.gd` (nuevo), `crates/kiln-cli/tests/generate_vocab.rs` (nuevo) | Cada operación y parámetro de la tabla aparece en el texto del guion (suite normal) | R2, R5 | implementer | T2 | 2m/300k | pending |
-| T6 | Rechazar un asset generado donde entran la página, MCP y la línea de órdenes: una función común y su llamada al principio de `build_asset`, `paint_asset`, `verify_asset`, `publish_asset` y `review::run` | `crates/kiln-cli/src/ops/mod.rs`, `crates/kiln-cli/src/production.rs`, `crates/kiln-cli/src/verify.rs`, `crates/kiln-cli/src/ops/publish.rs`, `crates/kiln-cli/src/review.rs` | Cada una devuelve el mensaje con `[tools]` apuntando a un programa que no existe | R9 | implementer | T1 | 2m/300k | pending |
-| T7 | El vocabulario viaja en el catálogo que lee la página | `crates/kiln-cli/src/ops/read.rs` | El JSON del catálogo trae operaciones, parámetros y límites | R6 | implementer | T2 | 1m/200k | pending |
-| T8 | La skill decide entre montar y generar; el vocabulario de la tabla se añade al mensaje del agente de la página y al prompt MCP `kiln-asset` | `skills/asset/SKILL.md`, `crates/kiln-cli/src/agent.rs`, `crates/kiln-cli/src/mcp/prompts.rs`, `crates/kiln-cli/tests/mcp_prompts.rs` | Los dos textos contienen cada operación de la tabla | R8 | implementer | T2 | 2m/300k | pending |
-| T9 | `spec_write` acepta una ficha con receta y rechaza una receta inválida | `crates/kiln-cli/src/ops/specs.rs`, `crates/kiln-cli/tests/mcp_specs.rs` | Una receta válida se escribe; una con una operación desconocida se rechaza y no toca el fichero | R1, R8 | implementer | T3 | 1m/200k | pending |
-| T10 | seam: el lanzador usa el proyecto vacío de `verify.rs`. Resolver, escribir el encargo y lanzar el guion en la caché | `crates/kiln-cli/src/generate.rs` (nuevo), `crates/kiln-cli/src/main.rs` (solo `mod`), `crates/kiln-cli/src/verify.rs` (`scratch_dir` visible) | Con un Godot de pega: el encargo lleva los valores resueltos y la salida queda bajo `<cache>/generated/<id>/` | R5 | implementer | T4, T5, T6 | 2m/300k | pending |
-| T11 | `generated.json` (receta, semilla, valores, medidas, triángulos, hash estructural, versiones) y la prueba con Godot de verdad | `crates/kiln-cli/src/generate.rs`, `crates/kiln-cli/tests/godot_generate.rs` (nuevo) | `--ignored`: misma semilla, mismo hash estructural; otra semilla, otro; triángulos igual al cálculo estático | R5 | implementer | T10 | 2m/300k | pending |
-| T12 | Operación `generate(asset, seed, receta?)` como trabajo: valida, escribe la ficha con `spec_write`, genera | `crates/kiln-cli/src/ops/production.rs` | Una receta inválida no escribe la ficha ni lanza Godot; una válida deja el GLB con el Godot de pega | R5, R6 | implementer | T9, T11 | 2m/300k | pending |
-| T13 | Orden `kiln generate --asset ID [--seed N]` | `crates/kiln-cli/src/main.rs` | La orden sale en la ayuda y, sin Godot, falla con el mensaje de la herramienta | R5 | implementer | T12 | 1m/200k | pending |
-| T14 | Herramienta MCP `generate` | `crates/kiln-cli/src/mcp/production.rs`, `crates/kiln-cli/tests/mcp_production.rs` | La herramienta arranca el trabajo y devuelve su número | R7 | implementer | T12 | 1m/200k | pending |
-| T15 | Ruta `POST /api/generate` con la cabecera de la página y su fila en la tabla de cobertura | `crates/kiln-cli/src/serve.rs`, `crates/kiln-cli/tests/coverage.rs`, `crates/kiln-cli/tests/routes.rs` | `coverage.rs` pasa; sin la cabecera la ruta se niega | R7 | implementer | T14 | 1m/200k | pending |
-| T16 | Controles de la receta: uno por parámetro, doble si es rango, y la semilla | `crates/kiln-cli/ui/app/views/generator.js` (nuevo), su test en `crates/kiln-cli/ui/tests/unit/` | Unitario de node: de receta y vocabulario salen los controles con sus límites, y de los controles la receta | R6 | implementer | T7 | 2m/300k | pending |
-| T17 | Aplicar en la vista de la ficha: envía, espera el trabajo y carga el GLB en la vista 3D; ficha generada y Godot de pega en el proyecto de prueba de la página | `crates/kiln-cli/ui/app/views/spec.js`, `crates/kiln-cli/ui/app/api.js`, alta de `generator.js` en `serve.rs`, `scripts/ui_fixture.sh`, `crates/kiln-cli/ui/tests/app_views2.mjs` | `scripts/ui_test.sh`: la ficha muestra los controles, Aplicar llama a la ruta y la vista pide el GLB devuelto | R6 | implementer | T15, T16 | 3m/400k | pending |
-| T18 | Batería entera, `--ignored`, `clippy` y `ui_test.sh` en `main`; el resultado pasa al verificador | — | Todo verde; el verificador mira Aplicar con Godot de verdad, montar un asset de piezas y el catálogo | todos | main + verifier | T13, T17 | 8m/2.8M | pending |
-| T19 | README (entrega nueva) y cuentas de tests de `CLAUDE.md` | `README.md`, `CLAUDE.md` | Las cifras salen de la ejecución de T18 | — | main | T18 | 3m/1.7M | pending |
-| T20 | Prueba de punta a punta con el agente real: «crear un asteroide» | `.sdlc/k010-generated-assets/e2e.md` | La ficha escrita lleva receta y pasa `kiln check`; Aplicar enseña la malla | R8 | main | T18 | 5m/1.7M | pending |
-| T21 | Orquestación: encargos, lectura de cada diff y `context.md` | `.sdlc/k010-generated-assets/context.md` | — | — | main | — | 20m/6M | pending |
+| T1 | Tipos de la receta (`Generator`, `Op`, valor fijo o rango) y `Spec.generator`; `no_parts` no salta con receta; `generator_and_parts` | `crates/kiln-core/src/generate/mod.rs` (nuevo, declara `vocab`, `check` y `resolve` vacíos), `crates/kiln-core/src/lib.rs`, `crates/kiln-core/src/spec.rs` | Unitarios: la ficha de la spec se lee y se escribe igual; con piezas y receta da `generator_and_parts` | R1 | implementer | — | 2m/300k | done |
+| T2 | Tabla del vocabulario: operaciones, parámetros, tipo, límites, valor por defecto y cálculo de triángulos | `crates/kiln-core/src/generate/vocab.rs` | Unitarios: las cuatro operaciones de la spec con sus límites; 64 segmentos dan 4 224 triángulos | R2 | implementer | T1 | 1m/200k | done |
+| T3 | Comprobar la receta: `generator_op`, `generator_param`, `generator_range`, `generator_budget`, `sphere` primera, material en la paleta, semilla de 32 bits | `crates/kiln-core/src/generate/check.rs`, llamada en `spec.rs` | Un unitario por código de hallazgo | R2, R3 | implementer | T2 | 2m/300k | done |
+| T4 | `resolve(receta, semilla)` con el algoritmo de la spec | `crates/kiln-core/src/generate/resolve.rs` | Vectores fijos; un valor fijo no cambia; otra semilla cambia algún valor; enteros hacia abajo | R4 | implementer | T2 | 1m/200k | done |
+| T5 | Guion `generate.gd`: esfera, `stretch`, `noise`, `facet`; nombra la ranura con la clave del material; exporta GLB y escribe medidas | `crates/kiln-cli/godot/generate.gd` (nuevo), `crates/kiln-cli/tests/generate_vocab.rs` (nuevo) | Cada operación y parámetro de la tabla aparece en el texto del guion (suite normal) | R2, R5 | implementer | T2 | 2m/300k | done (main fixed the triangle count of `facet` and the normals at the poles after running it in Godot) |
+| T6 | Rechazar un asset generado donde entran la página, MCP y la línea de órdenes: una función común y su llamada al principio de `build_asset`, `paint_asset`, `verify_asset`, `publish_asset` y `review::run` | `crates/kiln-cli/src/ops/mod.rs`, `crates/kiln-cli/src/production.rs`, `crates/kiln-cli/src/verify.rs`, `crates/kiln-cli/src/ops/publish.rs`, `crates/kiln-cli/src/review.rs` | Cada una devuelve el mensaje con `[tools]` apuntando a un programa que no existe | R9 | implementer | T1 | 2m/300k | done |
+| T7 | El vocabulario viaja en el catálogo que lee la página | `crates/kiln-cli/src/serve.rs` (`catalog_reply`; `ops/read.rs` no sirve el catálogo de la página) | El JSON del catálogo trae operaciones, parámetros y límites | R6 | implementer, cerrada en main | T2 | 1m/200k | done (cause: the listed file was wrong; the implementer stopped and main made the 8-line change) |
+| T8 | La skill decide entre montar y generar; el vocabulario de la tabla se añade al mensaje del agente de la página y al prompt MCP `kiln-asset` | `skills/asset/SKILL.md`, `crates/kiln-cli/src/agent.rs`, `crates/kiln-cli/src/mcp/prompts.rs`, `crates/kiln-cli/tests/mcp_prompts.rs` | Los dos textos contienen cada operación de la tabla | R8 | implementer | T2 | 2m/300k | done |
+| T9 | `spec_write` acepta una ficha con receta y rechaza una receta inválida | `crates/kiln-cli/src/ops/specs.rs`, `crates/kiln-cli/tests/mcp_specs.rs` | Una receta válida se escribe; una con una operación desconocida se rechaza y no toca el fichero | R1, R8 | implementer | T3 | 1m/200k | done |
+| T10 | seam: el lanzador usa el proyecto vacío de `verify.rs`. Resolver, escribir el encargo y lanzar el guion en la caché | `crates/kiln-cli/src/generate.rs` (nuevo), `crates/kiln-cli/src/main.rs` (solo `mod`), `crates/kiln-cli/src/verify.rs` (`scratch_dir` visible) | Con un Godot de pega: el encargo lleva los valores resueltos y la salida queda bajo `<cache>/generated/<id>/` | R5 | implementer | T4, T5, T6 | 2m/300k | done (own work folder `<cache>/generated/<id>/.project`: `scratch_dir` wipes the verification scratch) |
+| T11 | `generated.json` (receta, semilla, valores, medidas, triángulos, hash estructural, versiones) y la prueba con Godot de verdad | `crates/kiln-cli/src/generate.rs`, `crates/kiln-cli/tests/godot_generate.rs` (nuevo) | `--ignored`: misma semilla, mismo hash estructural; otra semilla, otro; triángulos igual al cálculo estático | R5 | implementer | T10 | 2m/300k | done (its Godot tests wait for T13) |
+| T12 | Operación `generate(asset, seed, receta?)` como trabajo: valida, escribe la ficha con `spec_write`, genera | `crates/kiln-cli/src/ops/production.rs` | Una receta inválida no escribe la ficha ni lanza Godot; una válida deja el GLB con el Godot de pega | R5, R6 | implementer | T9, T11 | 2m/300k | done |
+| T13 | Orden `kiln generate --asset ID [--seed N]` | `crates/kiln-cli/src/main.rs` | La orden sale en la ayuda y, sin Godot, falla con el mensaje de la herramienta | R5 | implementer | T12 | 1m/200k | done |
+| T14 | Herramienta MCP `generate` | `crates/kiln-cli/src/mcp/production.rs`, `crates/kiln-cli/tests/mcp_production.rs` | La herramienta arranca el trabajo y devuelve su número | R7 | implementer | T12 | 1m/200k | done |
+| T15 | Ruta `POST /api/generate` con la cabecera de la página y su fila en la tabla de cobertura | `crates/kiln-cli/src/serve.rs`, `crates/kiln-cli/tests/coverage.rs`, `crates/kiln-cli/tests/routes.rs` | `coverage.rs` pasa; sin la cabecera la ruta se niega | R7 | implementer | T14 | 1m/200k | done |
+| T16 | Controles de la receta: uno por parámetro, doble si es rango, y la semilla | `crates/kiln-cli/ui/app/views/generator.js` (nuevo), su test en `crates/kiln-cli/ui/tests/unit/` | Unitario de node: de receta y vocabulario salen los controles con sus límites, y de los controles la receta | R6 | implementer | T7 | 2m/300k | done |
+| T17 | Aplicar en la vista de la ficha: envía, espera el trabajo y carga el GLB en la vista 3D; ficha generada y Godot de pega en el proyecto de prueba de la página | `crates/kiln-cli/ui/app/views/spec.js`, `crates/kiln-cli/ui/app/api.js`, alta de `generator.js` en `serve.rs`, `scripts/ui_fixture.sh`, `crates/kiln-cli/ui/tests/app_views2.mjs` | `scripts/ui_test.sh`: la ficha muestra los controles, Aplicar llama a la ruta y la vista pide el GLB devuelto | R6 | implementer | T15, T16 | 3m/400k | done |
+| T18 | Batería entera, `--ignored`, `clippy` y `ui_test.sh` en `main`; el resultado pasa al verificador | — | Todo verde; el verificador mira Aplicar con Godot de verdad, montar un asset de piezas y el catálogo | todos | main + verifier | T13, T17 | 8m/2.8M | done |
+| T19 | README (entrega nueva) y cuentas de tests de `CLAUDE.md` | `README.md`, `CLAUDE.md` | Las cifras salen de la ejecución de T18 | — | main | T18 | 3m/1.7M | done |
+| T20 | Prueba de punta a punta con el agente real: «crear un asteroide» | `.sdlc/k010-generated-assets/e2e.md` | La ficha escrita lleva receta y pasa `kiln check`; Aplicar enseña la malla | R8 | main | T18 | 5m/1.7M | done |
+| T21 | Orquestación: encargos, lectura de cada diff y `context.md` | `.sdlc/k010-generated-assets/context.md` | — | — | main | — | 20m/6M | done (cause: three review rounds of fixes and a blocked task closed in main) |
 
 ## Schedule
 
@@ -124,14 +124,62 @@ scripts/ui_test.sh
 
 ## Review
 
-Filled in Deploy. A plan is not closed while this section is empty.
+Tres pasadas en paralelo sobre el árbol sin commit (2026-11-18). El repo no
+tiene `REVIEW.md`; cada pasada usó los criterios de su encargo.
+
+- **bugs**: 3 importantes, los tres corregidos con test rojo primero.
+  Montar un asset de piezas que lleva dentro uno generado llegaba a Blender;
+  un Godot que salía bien sin escribir nada daba por nuevo un GLB viejo;
+  Aplicar reescribía la ficha entera y perdía variantes y claves
+  desconocidas.
+- **security**: 1 importante, corregido con test. La carpeta de trabajo de
+  Godot no se vaciaba y las salidas seguían enlaces: un `override.cfg`
+  dejado allí se ejecutaba y un enlace hacía escribir fuera del proyecto.
+- **conformance**: 3 importantes, corregidos. `resolve` no tenía valores
+  fijados (ahora los tiene, calculados aparte); al abrir una ficha ya
+  generada la vista salía vacía; faltaba la fila de la ruta en el README.
+
+Queda sin hacer, anotado como menor: dos trabajos a la vez sobre el mismo
+asset comparten carpeta de trabajo; no hay tope de operaciones `noise` ni
+limpieza de los GLB por semilla; un `recipe` que no sea texto se ignora en
+la ruta en vez de dar 400; la vista crea y descarta un visor de más tras
+Aplicar; las rutas absolutas del registro salen en los mensajes de fallo,
+como en montar y verificar.
+
+Sin confirmar: `scripts/ui_test.sh` acaba en 1 por una comprobación de la
+línea base ajena a este cambio («Contexto: search "electricidad" narrows (4
+dimmed)»); falló igual antes de añadir nada de la página, pero no se pudo
+medir sobre una copia limpia de `main`.
 
 ## Estimate vs actual
 
-Filled at Build close.
+De `actuals.jsonl`. Los encargos de código salieron en torno a la mitad del
+tiempo estimado; la mediana real de este repo (0,9 min) ya lo decía y se
+estimó por encima.
 
 | # | Runs on | Est | Actual | Deviation | Cause |
 |---|---------|-----|--------|-----------|-------|
+| T1 | implementer | 2m/300k | 0,8m/155k | −60 % | ninguna |
+| T2 | implementer | 1m/200k | 0,4m/55k | −60 % | ninguna |
+| T3 | implementer | 2m/300k | 0,8m/229k | −60 % | ninguna |
+| T4 | implementer | 1m/200k | 0,6m/168k | −40 % | ninguna |
+| T5 | implementer | 2m/300k | 0,7m/65k | −65 % | ninguna; main corrigió dos fallos al correrlo en Godot |
+| T6 | implementer | 2m/300k | 1,0m/285k | −50 % | ninguna |
+| T7 | implementer | 1m/200k | 0,3m/58k | −70 % | el fichero del plan era otro; se paró y lo cerró main |
+| T8 | implementer | 2m/300k | 0,8m/167k | −60 % | ninguna |
+| T9 | implementer | 1m/200k | 0,4m/117k | −60 % | ya funcionaba: solo tests |
+| T10 | implementer | 2m/300k | 1,1m/407k | −45 % | ninguna |
+| T11 | implementer | 2m/300k | 0,8m/331k | −60 % | ninguna |
+| T12 | implementer | 2m/300k | 0,9m/392k | −55 % | ninguna |
+| T13 | implementer | 1m/200k | 0,6m/239k | −40 % | ninguna |
+| T14 | implementer | 1m/200k | 0,7m/282k | −30 % | ninguna |
+| T15 | implementer | 1m/200k | 0,4m/165k | −60 % | ninguna |
+| T16 | implementer | 2m/300k | 0,8m/134k | −60 % | ninguna |
+| T17 | implementer | 3m/400k | 1,4m/705k | −53 % min, +76 % tok | hubo que leer media página para enlazar el panel |
+| T17 (prueba de navegador) | implementer | 3m/400k | 9,9m/883k | +230 % | un fallo real de la página (`job.spec`) obligó a arreglar y a correr otra vez la prueba entera |
+
+No medido por el gancho: el verificador, las tres revisiones y el trabajo
+de `main` (T18 a T21), que incluyó las correcciones de la revisión.
 
 ## Outside this plan
 

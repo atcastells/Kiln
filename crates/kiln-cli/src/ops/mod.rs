@@ -49,6 +49,15 @@ pub fn spec_file(project: &Path, cat: &kiln_core::Catalog, asset: &str) -> Resul
         .ok_or(format!("no hay ficha con id «{asset}»"))
 }
 
+/// Build, paint, verify, publish and review do not handle an asset made from
+/// a recipe yet. An unknown id passes: each caller reports it its own way.
+pub fn refuse_generated(specs: &[kiln_core::Spec], id: &str) -> Result<(), String> {
+    if specs.iter().any(|s| s.asset.id == id && s.generator.is_some()) {
+        return Err(format!("«{id}» es un asset generado: aún no se monta ni se publica"));
+    }
+    Ok(())
+}
+
 /// `p` relative to `root`, with forward slashes.
 pub fn rel(root: &Path, p: &Path) -> String {
     p.strip_prefix(root)
@@ -159,6 +168,73 @@ mod tests {
         let gone = a.0.clone();
         drop(a);
         assert!(!gone.exists());
+    }
+
+    const GENERATED: &str = "[asset]\nid = \"rock\"\nname = \"Rock\"\n\n[generator]\nseed = 1\nmaterial = \"basalt\"\n\n[[generator.ops]]\nop = \"sphere\"\nradius_m = 10\nsegments = 64\n";
+    const PARTS: &str = "[asset]\nid = \"crate\"\nname = \"Crate\"\n\n[[parts]]\nid = \"body\"\nwhat = \"a box\"\nsource = { kind = \"search\", query = \"box\" }\n";
+
+    fn parse(text: &str) -> kiln_core::Spec {
+        kiln_core::spec::parse(text).unwrap()
+    }
+
+    #[test]
+    fn refuse_generated_only_refuses_a_recipe() {
+        let specs = vec![parse(GENERATED), parse(PARTS)];
+        let e = refuse_generated(&specs, "rock").unwrap_err();
+        assert_eq!(e, "«rock» es un asset generado: aún no se monta ni se publica");
+        assert!(refuse_generated(&specs, "crate").is_ok());
+        assert!(refuse_generated(&specs, "nope").is_ok());
+    }
+
+    #[test]
+    fn the_five_operations_refuse_a_generated_asset_before_any_tool() {
+        let dir = std::env::temp_dir().join(format!("kiln-refuse-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("specs")).unwrap();
+        std::fs::write(
+            dir.join("kiln.toml"),
+            "[project]\nname = \"t\"\n\n[assets]\nspecs = \"specs\"\n\n[tools]\nblender = \"/nonexistent/blender\"\ngodot = \"/nonexistent/godot\"\n",
+        )
+        .unwrap();
+        std::fs::write(dir.join("specs/rock.toml"), GENERATED).unwrap();
+        let p = std::fs::canonicalize(&dir).unwrap();
+        let want = "«rock» es un asset generado: aún no se monta ni se publica";
+        let said = |_: String| {};
+        let got = [
+            crate::production::build_asset(&p, None, "rock", said).unwrap_err(),
+            crate::production::paint_asset(&p, None, "rock", None, said).unwrap_err(),
+            crate::verify::verify_asset(&p, None, "rock", said).unwrap_err(),
+            publish::publish_asset(&p, None, "rock", said).unwrap_err(),
+            crate::review::run(&p, None, "rock", &|_| {}).unwrap_err(),
+        ];
+        let wrote = dir.join("build").exists() || dir.join(".kiln").exists();
+        std::fs::remove_dir_all(&dir).unwrap();
+        for e in got {
+            assert_eq!(e, want);
+        }
+        assert!(!wrote);
+    }
+
+    #[test]
+    fn build_refuses_an_asset_made_of_a_generated_one() {
+        let dir = std::env::temp_dir().join(format!("kiln-refuse-nested-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(dir.join("specs")).unwrap();
+        std::fs::write(
+            dir.join("kiln.toml"),
+            "[project]\nname = \"t\"\n\n[assets]\nspecs = \"specs\"\n\n[tools]\nblender = \"/nonexistent/blender\"\n",
+        )
+        .unwrap();
+        std::fs::write(dir.join("specs/rock.toml"), GENERATED).unwrap();
+        std::fs::write(
+            dir.join("specs/pile.toml"),
+            "[asset]\nid = \"pile\"\nname = \"Pile\"\n\n[[parts]]\nid = \"r\"\nwhat = \"a rock\"\nsource = { kind = \"asset\", from = \"rock\" }\n",
+        )
+        .unwrap();
+        let p = std::fs::canonicalize(&dir).unwrap();
+        let got = crate::production::build_asset(&p, None, "pile", |_| {}).unwrap_err();
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert_eq!(got, "«rock» es un asset generado: aún no se monta ni se publica");
     }
 
     fn examples() -> Ctx {

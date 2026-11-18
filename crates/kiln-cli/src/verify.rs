@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 const IMPORT_CHECK: &str = include_str!("../godot/import_check.gd");
-const SCRATCH_PROJECT: &str = "config_version=5\n\n[application]\n\nconfig/name=\"kiln-verify\"\n";
+pub(crate) const SCRATCH_PROJECT: &str = "config_version=5\n\n[application]\n\nconfig/name=\"kiln-verify\"\n";
 
 /// Verifies the asset `id`; the report is written whatever the verdict, and
 /// a verdict that is not valid is an error that says where the report is.
@@ -22,6 +22,7 @@ pub fn verify_asset(
 ) -> Result<PathBuf, String> {
     let cfg = config(project, config_file)?;
     let cat = crate::load(project, config_file)?;
+    crate::ops::refuse_generated(&cat.specs, id)?;
     let spec = cat
         .specs
         .iter()

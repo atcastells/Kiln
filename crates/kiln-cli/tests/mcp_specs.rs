@@ -74,3 +74,58 @@ fn both_tools_are_annotated_as_idempotent_overwrites() {
         assert_eq!(t["annotations"]["idempotentHint"], true, "{name}");
     }
 }
+
+const ROCK: &str = r#"[asset]
+id = "rock"
+name = "Rock"
+budget_tris = 6000
+
+[generator]
+seed = 7
+
+[[generator.ops]]
+op = "sphere"
+radius_m = [2, 5]
+segments = 32
+
+[[generator.ops]]
+op = "noise"
+amplitude = 0.2
+size = 0.5
+"#;
+
+#[test]
+fn write_accepts_a_generated_spec_with_a_recipe() {
+    let p = temp_project("");
+    let mut m = Mcp::start(p.path());
+    let w = m.call("spec_write", json!({ "id": "rock", "toml": ROCK }));
+    assert!(!w.is_error, "{}", w.text);
+    assert!(p.exists("specs/rock.toml"));
+    let back: toml::Table = p.read("specs/rock.toml").parse().unwrap();
+    assert!(back["generator"].is_table());
+}
+
+#[test]
+fn write_rejects_an_unknown_op_and_creates_no_file() {
+    let p = temp_project("");
+    let mut m = Mcp::start(p.path());
+    let bad = ROCK.replacen("op = \"noise\"", "op = \"crater\"", 1);
+    let r = m.call("spec_write", json!({ "id": "rock", "toml": bad }));
+    assert!(r.is_error, "{}", r.text);
+    let codes: Vec<_> = r.json()["findings"].as_array().unwrap().iter().map(|f| f["code"].clone()).collect();
+    assert!(codes.contains(&json!("generator_op")), "{codes:?}");
+    assert!(!p.exists("specs/rock.toml"));
+}
+
+#[test]
+fn write_over_a_generated_spec_with_an_invalid_one_keeps_the_old_bytes() {
+    let p = temp_project("");
+    let mut m = Mcp::start(p.path());
+    let ok = m.call("spec_write", json!({ "id": "rock", "toml": ROCK }));
+    assert!(!ok.is_error, "{}", ok.text);
+    let before = std::fs::read(p.path().join("specs/rock.toml")).unwrap();
+    let bad = ROCK.replacen("op = \"noise\"", "op = \"crater\"", 1);
+    let r = m.call("spec_write", json!({ "id": "rock", "toml": bad }));
+    assert!(r.is_error, "{}", r.text);
+    assert_eq!(std::fs::read(p.path().join("specs/rock.toml")).unwrap(), before);
+}

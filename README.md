@@ -401,14 +401,14 @@ claude mcp add kiln -- /ruta/a/kiln mcp --project /ruta/al/juego
 claude mcp add --scope project kiln -- /ruta/a/kiln mcp --project /ruta/al/juego
 ```
 
-Son 30 herramientas. Empieza por `status`.
+Son 31 herramientas. Empieza por `status`.
 
 | Grupo | Herramientas |
 |---|---|
 | Leer | `status` resumen y siguiente paso; `tree` árbol, un nivel cada vez; `catalog` kits, piezas, materiales, fichas o la UI del juego (`what=ui`); `check` hallazgos; `content` conjuntos de contenido; `spec_get` una ficha; `review_sheets` hojas de la revisión como imágenes |
 | Fichas | `spec_write` escribe una ficha si pasa la comprobación; `spec_layout` solo coloca piezas (`at`, `turn`) |
 | Contexto | `context_get` lee; `context_propose` la voz del agente; `context_edit` la voz de la persona |
-| Producción y trabajos | `build` monta con Blender; `paint` aplica materiales; `godot_measure` mide lo que solo Godot abre y exporta las piezas `.blend`; `review` revisa el montaje; `verify` comprueba el GLB montado; `publish` lo lleva al juego; `tools` dice qué herramientas externas hay y su versión; `job` y `jobs` siguen los trabajos |
+| Producción y trabajos | `build` monta con Blender; `generate` genera con Godot un asset de receta; `paint` aplica materiales; `godot_measure` mide lo que solo Godot abre y exporta las piezas `.blend`; `review` revisa el montaje; `verify` comprueba el GLB montado; `publish` lo lleva al juego; `tools` dice qué herramientas externas hay y su versión; `job` y `jobs` siguen los trabajos |
 | Materiales y zonas | `material_set` material de una zona; `material_validate` lo pasa al catálogo; `bind` vincula una ranura a la paleta; `zones_split` parte una pieza en zonas |
 | Fuera | `search` busca candidatos (no escribe); `import` trae un modelo con su licencia |
 | Juego nuevo | `new_game_options` el paso de arranque; `new_game` crea el juego; `settle` lo da por asentado si no falta nada |
@@ -425,7 +425,7 @@ revisión).
 | `POST /api/ask` (pedir ficha, colocar) | prompt `kiln-asset` + `spec_write`, `spec_layout` |
 | `POST /api/context/sort`, `/refine` | prompt `kiln-context` + `context_propose` |
 | `POST /api/context/text`, `intent`, `answer`, `claim` | `context_edit` |
-| `POST /api/build`, `paint`, `godot`, `review` | `build`, `paint`, `godot_measure`, `review` (+ `review_sheets`) |
+| `POST /api/build`, `generate`, `paint`, `godot`, `review` | `build`, `generate`, `paint`, `godot_measure`, `review` (+ `review_sheets`) |
 | `POST /api/search`, `import` | `search`, `import` |
 | `POST /api/bind`, `material`, `validate`, `split` | `bind`, `material_set`, `material_validate`, `zones_split` |
 | `GET` y `POST /api/new`, `POST /api/settle` | `new_game_options`, `new_game`, `settle` |
@@ -1097,6 +1097,89 @@ que estén: decláralas. Guarda el kit del personaje fuera del proyecto de
 Godot (por ejemplo `kits_src/`, añadido a `[assets] kits`): con un `.blend`
 dentro de `godot/`, Godot intenta importarlo al publicar y `publish` falla.
 Kiln lee como mucho 1024 huesos por piel y 128 caracteres por nombre.
+
+## Entrega 15: assets generados a partir de una receta (K010)
+
+Hay assets cuya forma debe cambiar en cada ejemplar que hace el juego: una
+roca, un asteroide. Su ficha no lleva piezas sino una **receta**: una pila de
+operaciones de un vocabulario cerrado, con cada parámetro como valor fijo o
+como rango que la semilla sortea.
+
+```toml
+[asset]
+id = "asteroid"
+name = "Asteroide"
+budget_tris = 6000
+
+[generator]
+seed = 42                    # la semilla de la vista previa
+material = "basalt"          # clave de la paleta
+
+[[generator.ops]]
+op = "sphere"
+radius_m = [8, 40]           # rango: lo sortea la semilla
+segments = 64                # valor fijo
+
+[[generator.ops]]
+op = "stretch"
+x = [1.0, 1.8]
+
+[[generator.ops]]
+op = "noise"
+amplitude = [0.2, 0.5]
+size = 0.6
+
+[[generator.ops]]
+op = "facet"
+```
+
+| Operación | Parámetros | Notas |
+|---|---|---|
+| `sphere` | `radius_m` (0,1 a 10 000), `segments` (8 a 256, entero) | Obligatoria y primera. Triángulos = 2 · segmentos · (segmentos/2 + 1) |
+| `stretch` | `x`, `y`, `z` (0,2 a 5; por defecto 1) | Escala por eje |
+| `noise` | `amplitude` (0 a 1, fracción del radio), `size` (0,01 a 4, tamaño del relieve respecto al radio) | Se puede repetir |
+| `facet` | ninguno | Normales por cara |
+
+El vocabulario vive en una sola tabla (`kiln-core`, `generate::vocab`): de
+ella salen las comprobaciones, los controles de la página y el texto que
+recibe el agente. Al pedir un asset, el agente decide si se monta con piezas
+o se genera.
+
+**Generar.** `kiln generate --asset ID [--seed N]`, la herramienta MCP
+`generate` o el botón Aplicar de la ficha. Kiln sortea los rangos, lanza su
+guion en Godot sin ventana sobre un proyecto vacío de la caché y deja
+`<cache>/generated/<id>/<semilla>.glb` y `generated.json` (receta, semilla,
+valores sorteados, medidas, triángulos, sha256 y versiones). En la página,
+la ficha muestra un control por parámetro y la semilla; Aplicar guarda la
+receta, genera y carga la malla en la vista 3D. Al guardar solo se cambia la
+tabla `[generator]` de la ficha; lo demás (anclajes, variantes, claves que
+Kiln no conoce) se queda, aunque los comentarios del fichero se pierden. Al
+abrir una ficha ya generada con esa semilla, la vista muestra su GLB.
+
+**El sorteo** se hace en Rust, no en Godot, para que otro programa pueda
+repetirlo. Para el parámetro `p` de la operación número `i` (desde 0): la
+clave es el texto `"<semilla>/<i>/<p>"`; `h` es su FNV-1a de 64 bits pasado
+por un paso de SplitMix64; `u` son los 53 bits altos de `h` entre 2^53; el
+valor es `mín + (máx − mín) · u`, hacia abajo si es entero. Cada `noise`
+recibe además una semilla de ruido: los 32 bits bajos de `h` para la clave
+`"<semilla>/<i>/noise"`.
+
+`kiln check` da error si la receta usa una operación o un parámetro fuera del
+vocabulario (`generator_op`, `generator_param`), un valor fuera de límites
+(`generator_range`), si no empieza por una esfera (`generator_order`), si el
+peor caso de triángulos pasa de `budget_tris` (`generator_budget`) o si lleva
+receta y piezas a la vez (`generator_and_parts`). Un material fuera de la
+paleta es un aviso (`generator_material`), como en las piezas.
+
+Límites: un asset generado no se monta, pinta, verifica, revisa ni publica
+todavía; esas órdenes lo dicen y no hacen nada. La misma receta y semilla
+dan el mismo GLB byte a byte en la misma máquina y versión de Godot; entre
+máquinas no está comprobado. `generated.json` es el de la última semilla
+generada, y cada semilla deja su GLB en la caché sin que nada los borre. La
+carpeta de trabajo de Godot (`<cache>/generated/<id>/.project`) se vacía en
+cada ejecución. Dos trabajos a la vez sobre el mismo asset comparten esa
+carpeta: lánzalos de uno en uno. No hay cráteres, varios materiales ni
+colisión.
 
 ## Lo que viene
 

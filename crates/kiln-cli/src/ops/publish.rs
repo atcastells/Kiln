@@ -29,6 +29,7 @@ pub fn publish_asset(
     mut say: impl FnMut(String),
 ) -> Result<Published, String> {
     let cfg = crate::production::config(project, config_file)?;
+    crate::ops::refuse_generated(&crate::load(project, config_file)?.specs, id)?;
     let staged = stage(project, &cfg, id)?;
     say(format!("«{id}» copiado a {}", staged.done.dir));
     import_in_godot(project, &cfg, &staged, &mut say)?;

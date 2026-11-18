@@ -63,6 +63,8 @@ export function createApi({ fetch: f = (...a) => globalThis.fetch(...a), base = 
       if (!res.ok) throw await failure(res);
       return res.json();
     },
+    // Starts the generation of a recipe asset; `recipe` is the whole spec as TOML. Resolves to { job }.
+    generate(asset, seed, recipe) { return this.post("/api/generate", { asset, seed, recipe }); },
   };
 }
 
@@ -70,3 +72,4 @@ const shared = createApi();
 export const getJSON = shared.getJSON;
 export const post = shared.post;
 export const forget = shared.forget;
+export const generate = shared.generate.bind(shared);

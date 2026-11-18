@@ -34,6 +34,21 @@ fn existing(ctx: &Ctx, id: &str) -> Option<PathBuf> {
     cat.specs.iter().find(|s| s.asset.id == id).map(|s| ctx.project.join(&s.file))
 }
 
+/// The spec of `id` with only its recipe replaced by the one `toml_text`
+/// carries: anything else the file holds (anchors, variants, keys Kiln does
+/// not know) stays. Without a spec on disk the text goes as it is.
+pub fn with_recipe(ctx: &Ctx, id: &str, toml_text: &str) -> Result<String, String> {
+    let Some(path) = existing(ctx, id) else {
+        return Ok(toml_text.to_string());
+    };
+    let parse = |t: &str| t.parse::<toml::Table>().map_err(|e| format!("la ficha no se lee: {e}"));
+    let mut doc = parse(&std::fs::read_to_string(&path).map_err(|e| e.to_string())?)?;
+    let sent = parse(toml_text)?;
+    let recipe = sent.get("generator").ok_or("la ficha enviada no trae receta")?;
+    doc.insert("generator".into(), recipe.clone());
+    toml::to_string(&doc).map_err(|e| e.to_string())
+}
+
 /// Writes `text` as the spec of `id`, reloads the catalog and puts the disk
 /// back as it was if the spec has errors.
 fn write_checked(ctx: &Ctx, id: &str, text: &str, target: PathBuf) -> Result<Written, Rejected> {

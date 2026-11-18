@@ -48,6 +48,18 @@ fn asset_prompt_is_one_message_with_header_skill_and_request() {
 }
 
 #[test]
+fn asset_prompt_carries_the_generation_vocabulary() {
+    let p = temp_project("");
+    let mut m = Mcp::start(p.path());
+    let r = m.request("prompts/get", serde_json::json!({"name": "kiln-asset", "arguments": {"request": "una roca"}}));
+    let t = r["messages"][0]["content"]["text"].as_str().unwrap();
+    assert!(t.contains("Vocabulario de generación"), "{t}");
+    for op in ["sphere", "stretch", "noise", "facet"] {
+        assert!(t.contains(&format!("- {op} (")), "{op}: {t}");
+    }
+}
+
+#[test]
 fn asset_prompt_without_request_asks_the_person_first() {
     let p = temp_project("");
     let mut m = Mcp::start(p.path());

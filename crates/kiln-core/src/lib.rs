@@ -12,6 +12,7 @@ pub mod check;
 pub mod config;
 pub mod content;
 pub mod context;
+pub mod generate;
 pub mod glb;
 pub mod godot;
 pub mod license;

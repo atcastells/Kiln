@@ -3,8 +3,9 @@
 import { html } from "../html.js";
 import { format } from "../router.js";
 import { fmtN, fmtSize, plural, dl, findingsBlock, worstOfList, sevBadge, postJSON } from "./common.js";
-import { launchJob } from "./jobs.js";
-import { openViewerDialog } from "./view3d.js";
+import { launchJob, pollJob } from "./jobs.js";
+import { openViewerDialog, createViewer } from "./view3d.js";
+import { generatorPanel, bindGenerator } from "./generator.js";
 
 export const madeOf = sp => [...new Set(sp.parts.filter(p => p.source.kind === "asset" && p.source.from).map(p => p.source.from))];
 export const usedIn = (cat, id) => cat.specs.map(s => [s.asset.id, s.parts.filter(p => p.source.kind === "asset" && p.source.from === id).reduce((n, p) => n + Math.max(1, p.count || 1), 0)]).filter(([, n]) => n);
@@ -14,10 +15,32 @@ export const SOURCE = { reuse: "Reutilizar", variant: "Variante", search: "Busca
 export const canValidate = (p, cat) => Object.keys(p.materials ?? {}).length > 0 && ["reuse", "variant"].includes(p.source.kind) && cat.pieces.some(c => c.key === p.source.from);
 const sourceText = p => (p.source.from ? p.source.from + (p.source.variant ? ` · ${p.source.variant}` : "") : p.source.query ? `buscar «${p.source.query}»` : "—");
 
+const tomlStr = s => `"${String(s).replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n").replace(/\r/g, "\\r").replace(/\t/g, "\\t")}"`;
+const tomlVal = v => (Array.isArray(v) ? `[${v.map(tomlVal).join(", ")}]` : typeof v === "number" ? String(v) : tomlStr(v));
+
+// The whole spec of a recipe asset as TOML (`[asset]` and `[generator]`, no parts).
+// `recipe` is the generator to write (seed, material, ops).
+export function specToml(spec, recipe) {
+  const a = spec.asset, out = ["[asset]"];
+  for (const k of ["id", "name", "asked", "used_by", "where", "states", "budget_tris", "status", "notes", "level", "children", "animations"]) {
+    const v = a[k];
+    if (v == null || v === "" || (Array.isArray(v) && !v.length)) continue;
+    out.push(`${k} = ${tomlVal(v)}`);
+  }
+  out.push("", "[generator]", `seed = ${recipe.seed ?? 0}`);
+  if (recipe.material) out.push(`material = ${tomlStr(recipe.material)}`);
+  for (const o of recipe.ops ?? []) {
+    out.push("", "[[generator.ops]]", `op = ${tomlStr(o.op)}`);
+    for (const [k, v] of Object.entries(o)) if (k !== "op") out.push(`${k} = ${tomlVal(v)}`);
+  }
+  for (const n of spec.anchors ?? []) out.push("", "[[anchors]]", `id = ${tomlStr(n.id)}`, `class = ${tomlStr(n.class)}`, `at = ${tomlVal(n.at ?? [0, 0, 0])}`, `turn = ${tomlVal(n.turn ?? [0, 0, 0])}`);
+  return out.join("\n") + "\n";
+}
+
 export function mount(el, ctx) {
   const { store, api } = ctx;
   const id = ctx.route.args?.[0] ?? null;
-  let alive = true, selected = null;
+  let alive = true, selected = null, viewer = null, glb = null, token = 0;
   const doc = el.ownerDocument, detailEl = doc.getElementById("detail");
   const specName = (cat, x) => cat.specs.find(s => s.asset.id === x)?.asset.name ?? x;
   const link = (cat, x) => html`<a href="${format({ view: "spec", args: [x] })}">${specName(cat, x)}</a>`;
@@ -25,6 +48,7 @@ export function mount(el, ctx) {
   const askForm = html`<form class="askform" id="sAsk"><label for="sAskText" class="sec">Pedir un asset</label><div class="row"><input class="field" id="sAskText" type="text" placeholder="Pedir un asset: crear un ascensor" autocomplete="off"><button class="btn primary" type="submit">Desglosar</button></div><p class="muted small">El agente lo desglosa en piezas y escribe su ficha. Lo ves en Trabajos.</p></form>`;
 
   function draw() {
+    viewer?.dispose(); viewer = null; token++;
     const cat = store.get("catalog"); if (!cat) { el.innerHTML = ""; return; }
     const sp = id && cat.specs.find(s => s.asset.id === id);
     if (!id || !sp) {
@@ -41,9 +65,40 @@ export function mount(el, ctx) {
       <section class="card pad"><h2 class="sec">Hecho de y dónde se usa</h2>${stale.length ? html`<div class="finding"><span class="pill warn">por rehacer</span> ${stale.map(x => link(cat, x))} ${stale.length > 1 ? "cambiaron" : "cambió"} después del último montaje.</div>` : ""}
         <p><b>Hecho de:</b> ${down.length ? down.map(x => link(cat, x)).reduce((acc, x) => [acc, ", ", x]) : html`<span class="muted">solo piezas del catálogo</span>`}</p>
         <p><b>Se usa en:</b> ${up.length ? up.map(([s, n]) => html`${link(cat, s)}${n > 1 ? ` ×${n}` : ""}`).reduce((acc, x) => [acc, ", ", x]) : html`<span class="muted">ningún otro asset</span>`}</p></section></div>
-      <section class="card"><h2 class="sec pad">Piezas <span class="n">${sp.parts.length}</span></h2><table class="tbl"><thead><tr><th>Pieza</th><th>Fuente</th><th>De</th><th>Medida</th><th>Material</th><th>Hallazgos</th></tr></thead><tbody>
-        ${sp.parts.map(p => html`<tr class="clickrow" data-part="${p.id}" tabindex="0" aria-label="Pieza ${p.what}"><td><b>${p.what}</b>${p.count > 1 ? ` ×${p.count}` : ""}</td><td>${SOURCE[p.source.kind] ?? p.source.kind}</td><td class="mono">${sourceText(p)}</td><td>${p.size_m ? fmtSize(p.size_m) : "libre"}</td><td class="mono">${p.material ?? "el suyo"}</td><td>${sevBadge(worstOfList(cat.findings.filter(f => f.subject === `part:${a.id}/${p.id}`)))}</td></tr>`)}</tbody></table></section>
+      ${sp.generator ? html`<section class="card pad" id="genRoot">${generatorPanel(sp, cat.generator_ops ?? [])}<div class="view3d" id="g3d" aria-label="Vista 3D del asset generado"></div></section>` : html`<section class="card"><h2 class="sec pad">Piezas <span class="n">${sp.parts.length}</span></h2><table class="tbl"><thead><tr><th>Pieza</th><th>Fuente</th><th>De</th><th>Medida</th><th>Material</th><th>Hallazgos</th></tr></thead><tbody>
+        ${sp.parts.map(p => html`<tr class="clickrow" data-part="${p.id}" tabindex="0" aria-label="Pieza ${p.what}"><td><b>${p.what}</b>${p.count > 1 ? ` ×${p.count}` : ""}</td><td>${SOURCE[p.source.kind] ?? p.source.kind}</td><td class="mono">${sourceText(p)}</td><td>${p.size_m ? fmtSize(p.size_m) : "libre"}</td><td class="mono">${p.material ?? "el suyo"}</td><td>${sevBadge(worstOfList(cat.findings.filter(f => f.subject === `part:${a.id}/${p.id}`)))}</td></tr>`)}</tbody></table></section>`}
       <section class="card pad">${findingsBlock(fs, "Validación de la ficha", 2)}</section>${askForm}</div>`.toString();
+    const root = el.querySelector("#genRoot");
+    if (root) {
+      // The root is new on every draw, so its listeners never stack.
+      bindGenerator(root, sp, cat.generator_ops ?? [], { onApply: (recipe, seed) => apply(sp, recipe, seed, root.querySelector("[data-apply]")) });
+      glb = cat.generated?.[sp.asset.id] ?? glb;
+      if (glb) showGenerated();
+    }
+  }
+
+  async function showGenerated() {
+    const box = el.querySelector("#g3d"), my = ++token;
+    if (!box) return;
+    const v = await createViewer(box, glb, { materials: store.get("catalog")?.materials ?? [] });
+    if (!alive || my !== token) { v.dispose(); return; }
+    viewer = v;
+  }
+
+  async function apply(sp, recipe, seed, btn) {
+    try {
+      const job = await ctx.busy(btn, "Generando el asset…", async () => {
+        const r = await api.generate(sp.asset.id, seed, specToml(sp, recipe));
+        ctx.toasts.info("Generando el asset", "Guarda la receta y genera la malla.");
+        return pollJob(api, r.job, { alive: () => alive });
+      });
+      if (!alive) return;
+      if (job.status !== "done" || !job.spec) { ctx.toasts.error("No se pudo generar", `${(job.log ?? []).at(-1) ?? "sin detalle"}. Revisa la receta y vuelve a pulsar Aplicar.`); return; }
+      glb = job.spec;
+      ctx.toasts.ok("Asset generado", `Semilla ${seed}.`);
+      await ctx.reload();
+      if (alive && !el.querySelector("#g3d canvas")) showGenerated();
+    } catch (e) { ctx.toasts.error("No se pudo generar", `${e.message} Revisa la receta y vuelve a pulsar Aplicar.`); }
   }
 
   function showPart(pid) {
@@ -87,5 +142,5 @@ export function mount(el, ctx) {
   el.addEventListener("click", onClick); el.addEventListener("keydown", onKey); el.addEventListener("submit", onSubmit); detailEl.addEventListener("click", onDetail);
   draw();
   const off = store.subscribe("catalog", () => { draw(); if (selected) showPart(selected); });
-  return () => { alive = false; off(); el.removeEventListener("click", onClick); el.removeEventListener("keydown", onKey); el.removeEventListener("submit", onSubmit); detailEl.removeEventListener("click", onDetail); ctx.detail.clear(); el.innerHTML = ""; };
+  return () => { alive = false; viewer?.dispose(); off(); el.removeEventListener("click", onClick); el.removeEventListener("keydown", onKey); el.removeEventListener("submit", onSubmit); detailEl.removeEventListener("click", onDetail); ctx.detail.clear(); el.innerHTML = ""; };
 }

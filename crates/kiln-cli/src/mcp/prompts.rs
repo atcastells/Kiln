@@ -65,7 +65,10 @@ impl Kiln {
     async fn kiln_asset(&self, Parameters(a): Parameters<AssetArgs>) -> Result<Vec<PromptMessage>, ErrorData> {
         let request = a.request.as_deref().map(str::trim).unwrap_or_default();
         crate::ops::check_len("la petición", request, 500).map_err(|e| ErrorData::invalid_params(e, None))?;
-        let mut text = format!("{ASSET_HEADER}\n\n{ASSET_SKILL}\n\n");
+        let mut text = format!(
+            "{ASSET_HEADER}\n\n{ASSET_SKILL}\n\nVocabulario de generación:\n{}\n\n",
+            crate::agent::generator_vocabulary()
+        );
         if request.is_empty() {
             text.push_str("Pregunta a la persona qué asset quiere y espera su respuesta antes de empezar.");
         } else {
