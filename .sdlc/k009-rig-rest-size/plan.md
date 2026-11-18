@@ -15,7 +15,7 @@ pasan `kiln verify` y el técnico reconstruido sigue igual al publicado.
 
 - Un test existente falla por algo ajeno a este cambio.
 - El GLB de una pieza con esqueleto cambia.
-- Hay que tocar algo más que `assemble.py`, el fixture y el test.
+- Hay que tocar algo más que `assemble.py`, el fixture, el test y el README.
 
 ## Tasks
 
@@ -51,7 +51,9 @@ cargo test -p kiln-cli -- --ignored blender_contract blender_piece
 
 ## Review
 
-Pending: the three review passes run with the closure of ASTRA T010-C2, before the PR.
+- **bugs**: no important findings. Blender 5.2.3: the four `blender_rig` tests pass; the measurement runs after the save and the export, so neither file changes; a shared armature datablock restores correctly; models without a skeleton lose their armatures on import, so they are measured as before. Nits kept as they are: the loop covers every armature object rather than only the built rigs (equivalent today); no `try/finally` round the restore (nothing can fail in between and the process ends).
+- **security**: no findings. No new input reaches Blender or the filesystem.
+- **conformance**: no important findings. R1 reproduced red by the reviewer with the `assemble.py` of `main` (0.62 x 1.67 x 0.464 m) and green with the change; R2 holds by construction and by `build_keeps_rig`; R3 by the Blender tests. Nit fixed: the stop rule now lists `README.md`, which T4 touches.
 
 Build result (2026-11-18): red test measured 0.62 x 1.67 x 0.464 m; green after the fix. `cargo test --workspace` 423 passed; Clippy clean; ignored tests of `blender_rig` (4), `godot_verify` rig (3), `blender_contract`, `blender_piece`, `blender_turn` and `blender_anchor` green. In ASTRA: the technician rebuilt equals the published version 6; `crew_guard` and `crew_porter` pass `verify`.
 
