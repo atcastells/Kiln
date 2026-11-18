@@ -42,9 +42,11 @@ Todo es actual; no hay partes heredadas.
 
 ## Git
 
-- `add`/`commit` solo cuando se pide, con confirmación. NUNCA `push`, `merge`,
-  `rebase`, `reset`, `stash`, `tag`, `cherry-pick` (denegados en
-  `.claude/settings.json`).
+- `add`/`commit` solo cuando se pide, con confirmación.
+- `push` de la rama de trabajo y abrir su PR (`gh pr create`) los hace Claude
+  al cerrar una entrega. NUNCA `push --force` ni `push` directo a `main`.
+- NUNCA `merge`, `rebase`, `reset`, `stash`, `tag`, `cherry-pick` (denegados
+  en `.claude/settings.json`): unir un PR es del desarrollador.
 - `checkout` y `branch` solo si el desarrollador lo pide. Rama base: `main`.
 
 ## Lo que Claude falla

@@ -1,15 +1,16 @@
 {
   "permissions": {
     "deny": [
-      "Bash(git push *)",
-      "Bash(git push)",
       "Bash(git merge *)",
       "Bash(git rebase *)",
       "Bash(git reset *)",
       "Bash(git stash *)",
       "Bash(git tag *)",
       "Bash(git cherry-pick *)",
-      "Bash(git clean *)"
+      "Bash(git clean *)",
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "Bash(git push * --force*)"
     ],
     "ask": [
       "Bash(git add *)",
@@ -20,6 +21,13 @@
       "Bash(git branch)",
       "Bash(git checkout *)",
       "Bash(git checkout)"
+    ],
+    "allow": [
+      "Bash(gh pr checks *)",
+      "Bash(gh pr create *)",
+      "Bash(gh pr view *)",
+      "Bash(git push *)",
+      "Bash(git push)"
     ]
   }
 }
