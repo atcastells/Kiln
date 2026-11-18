@@ -88,6 +88,7 @@ por la orden de línea y por MCP. Sin botones nuevos en la página.
 | 2026-11-18 | Qué semillas se verifican | Una tanda fija: 16 semillas derivadas de la de la ficha, siempre las mismas, con el número ajustable en `kiln.toml`. El informe da el peor caso | Aaron Castells |
 | 2026-11-18 | Qué bloquea y qué avisa | Error lo roto: suma de amplitudes 1 o más, alguna semilla sobre el presupuesto de triángulos, triángulos sin área fuera de los polos. Aviso lo feo: picos empinados y amplitud total alta | Aaron Castells |
 | 2026-11-18 | Señal de que está resuelto | Verificar, publicar y ver el rechazo, por la orden de línea y por MCP. Sin botones en la página ni prueba de regenerar en Godot | Aaron Castells |
+| 2026-11-18 | Qué bloquea, corregido al medir (sustituye «suma de amplitudes 1 o más» de la fila anterior) | La cota del radio: empieza en 1, cada estirado la multiplica por su factor menor y cada ruido le resta su amplitud; a 0 o menos, error. Medido: «estirar a 0,2 y ruido 0,9» suma 0,9 y vuelve caras. Aprobado con la spec | Aaron Castells |
 | 2026-11-18 | Cavidades, puertos y estructuras modulares | Incremento posterior, cuando esté definido cómo se representan sus relaciones espaciales | Aaron Castells |
 
 ---
