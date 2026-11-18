@@ -4,7 +4,8 @@ piece and the assembly can use it.
     blender --background --factory-startup --python export_piece.py -- piece.blend out.glb
 
 Scripts embedded in the .blend never run. Only meshes go out, with their
-modifiers applied; cameras, lights and empties stay in the .blend.
+modifiers applied; cameras, lights and empties stay in the .blend. When the
+scene has an armature, it goes out too, with the skins and every action.
 """
 
 import os
@@ -26,10 +27,12 @@ def main():
     meshes = [o for o in bpy.context.scene.objects if o.type == "MESH"]
     if not meshes:
         raise SystemExit("export_piece.py: el .blend no tiene ninguna malla en su escena")
+    rigged = any(o.type == "ARMATURE" for o in bpy.context.scene.objects)
+    keep = ("MESH", "ARMATURE") if rigged else ("MESH",)
     for o in bpy.context.scene.objects:
         o.hide_set(False)
         o.hide_viewport = False
-        o.select_set(o.type == "MESH")
+        o.select_set(o.type in keep)
     os.makedirs(os.path.dirname(glb), exist_ok=True)
     bpy.ops.export_scene.gltf(
         filepath=glb,
@@ -39,7 +42,9 @@ def main():
         export_extras=True,
         export_cameras=False,
         export_lights=False,
-        export_animations=False,
+        export_animations=rigged,
+        export_skins=rigged,
+        export_animation_mode="ACTIONS",
     )
     print("kiln: exported", glb, len(meshes), "meshes")
 

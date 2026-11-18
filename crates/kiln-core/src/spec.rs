@@ -52,6 +52,9 @@ pub struct Asset {
     /// For a spec above the asset level: its children, as ids or `level:id`.
     #[serde(default)]
     pub children: Vec<String>,
+    /// Animations the built GLB must carry (a rigged asset); empty when none.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub animations: Vec<String>,
 }
 
 fn brief() -> String {
@@ -456,6 +459,16 @@ pub fn check(s: &Spec, rules: &crate::config::Rules, cat: &mut Catalog) {
                 format!("{} posiciones para {n} copias", p.at.len()),
             );
         }
+        if !s.asset.animations.is_empty() && n > 1 {
+            push(
+                Severity::Error,
+                subject.clone(),
+                "rig_count",
+                format!(
+                    "un asset con animaciones coloca cada pieza una vez; {n} copias no son posibles (una pieza con rig no se copia)"
+                ),
+            );
+        }
         for st in &p.only_in {
             if !s.asset.states.contains(st) {
                 push(
@@ -637,6 +650,51 @@ materials = { "beam/wood" = "pine", "ghost/wood" = "oak" }
         assert!(has("variant_part"));
         assert!(!has("material_unset"));
         assert!(!has("variant_duplicate"));
+    }
+
+    fn rig_spec(animations: &str, count: u32) -> String {
+        format!(
+            "[asset]\nid = \"a\"\nname = \"A\"\n{animations}\n[[parts]]\nid = \"body\"\nwhat = \"cuerpo\"\ncount = {count}\n[parts.source]\nkind = \"reuse\"\nfrom = \"kit/body\"\n"
+        )
+    }
+
+    fn rig_codes(text: &str) -> Vec<String> {
+        let mut cat = Catalog {
+            project: String::new(),
+            root: String::new(),
+            kits: vec![],
+            pieces: vec![],
+            materials: vec![],
+            specs: vec![],
+            tree: None,
+            builds: Default::default(),
+            content: vec![],
+            findings: vec![],
+        };
+        check(&parse(text).unwrap(), &Default::default(), &mut cat);
+        cat.findings.into_iter().map(|f| f.code).collect()
+    }
+
+    #[test]
+    fn reads_declared_animations() {
+        let s = parse(&rig_spec("animations = [\"idle\", \"walk\"]", 1)).unwrap();
+        assert_eq!(s.asset.animations, vec!["idle", "walk"]);
+    }
+
+    #[test]
+    fn no_animations_is_empty_and_not_serialized() {
+        let s = parse(&rig_spec("", 1)).unwrap();
+        assert!(s.asset.animations.is_empty());
+        assert!(!toml::to_string(&s).unwrap().contains("animations"));
+    }
+
+    #[test]
+    fn rigged_asset_places_each_part_once() {
+        let rigged = rig_spec("animations = [\"idle\"]", 2);
+        assert!(rig_codes(&rigged).contains(&"rig_count".to_string()));
+        assert!(!rig_codes(&rig_spec("", 2)).contains(&"rig_count".to_string()));
+        let one = rig_spec("animations = [\"idle\"]", 1);
+        assert!(!rig_codes(&one).contains(&"rig_count".to_string()));
     }
 }
 

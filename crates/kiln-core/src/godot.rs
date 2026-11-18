@@ -188,6 +188,112 @@ pub fn link_materials(import_text: &str, links: &BTreeMap<String, Option<String>
     Ok(format!("{}{}{}", &import_text[..at], pretty, &rest[len..]))
 }
 
+/// Findings about the rig Godot saw in the import, against the animations the
+/// spec expects. Nothing is required when `expected` is empty.
+pub fn rig_import_findings(subject: &str, report: &serde_json::Value, expected: &[String]) -> Vec<Finding> {
+    let mut out = Vec::new();
+    if expected.is_empty() {
+        return out;
+    }
+    let mut push = |severity, code: &str, message: String| {
+        out.push(Finding { severity, subject: subject.into(), code: code.into(), message });
+    };
+    let listed = |key: &str| report.get(key).and_then(|v| v.as_array()).cloned().unwrap_or_default();
+    if listed("skeletons").is_empty() {
+        push(Severity::Error, "godot_no_skeleton", "Godot no encuentra ningún esqueleto en el asset".into());
+    }
+    let animations = listed("animations");
+    for name in expected {
+        let found = animations.iter().find(|a| a.get("name").and_then(|n| n.as_str()) == Some(name));
+        match found {
+            None => push(
+                Severity::Error,
+                "godot_animation_missing",
+                format!("Godot no encuentra la animación declarada «{name}»"),
+            ),
+            Some(a) if a.get("moves").and_then(|m| m.as_bool()) == Some(false) => push(
+                Severity::Warn,
+                "godot_animation_static",
+                format!("la animación «{name}» no mueve ningún hueso en Godot"),
+            ),
+            Some(_) => {}
+        }
+    }
+    out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn names(expected: &[&str]) -> Vec<String> {
+        expected.iter().map(|s| s.to_string()).collect()
+    }
+
+    fn codes(f: &[Finding]) -> Vec<&str> {
+        f.iter().map(|f| f.code.as_str()).collect()
+    }
+
+    #[test]
+    fn nothing_expected_gives_no_findings() {
+        let report = json!({ "skeletons": [], "animations": [] });
+        assert!(rig_import_findings("a.glb", &report, &[]).is_empty());
+    }
+
+    #[test]
+    fn todays_report_shape_with_nothing_expected_is_clean() {
+        let report = json!({ "ok": true, "nodes": ["Root"], "meshes": 1, "size_m": [1.0, 1.0, 1.0] });
+        assert!(rig_import_findings("a.glb", &report, &[]).is_empty());
+    }
+
+    #[test]
+    fn missing_or_empty_skeletons_is_an_error() {
+        let expected = names(&["idle"]);
+        let anims = json!([{ "name": "idle", "length": 1.0, "moves": true }]);
+        let empty = json!({ "skeletons": [], "animations": anims });
+        let absent = json!({ "animations": anims });
+        for report in [empty, absent] {
+            let f = rig_import_findings("a.glb", &report, &expected);
+            assert_eq!(codes(&f), ["godot_no_skeleton"]);
+            assert_eq!(f[0].severity, Severity::Error);
+        }
+    }
+
+    #[test]
+    fn each_missing_animation_is_an_error_naming_it() {
+        let report = json!({
+            "skeletons": [{ "bones": 3 }],
+            "animations": [{ "name": "idle", "length": 1.0, "moves": true }]
+        });
+        let f = rig_import_findings("a.glb", &report, &names(&["idle", "walk", "run"]));
+        assert_eq!(codes(&f), ["godot_animation_missing", "godot_animation_missing"]);
+        assert!(f[0].message.contains("walk"));
+        assert!(f[1].message.contains("run"));
+        assert!(f.iter().all(|x| x.severity == Severity::Error));
+    }
+
+    #[test]
+    fn a_static_animation_is_a_warning() {
+        let report = json!({
+            "skeletons": [{ "bones": 3 }],
+            "animations": [{ "name": "idle", "length": 1.0, "moves": false }]
+        });
+        let f = rig_import_findings("a.glb", &report, &names(&["idle"]));
+        assert_eq!(codes(&f), ["godot_animation_static"]);
+        assert_eq!(f[0].severity, Severity::Warn);
+    }
+
+    #[test]
+    fn a_moving_expected_animation_is_clean() {
+        let report = json!({
+            "skeletons": [{ "bones": 3 }],
+            "animations": [{ "name": "idle", "length": 1.0, "moves": true }]
+        });
+        assert!(rig_import_findings("a.glb", &report, &names(&["idle"])).is_empty());
+    }
+}
+
 #[cfg(test)]
 mod link_tests {
     use super::*;

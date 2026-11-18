@@ -121,5 +121,11 @@ at = [[0, 0, 0]]                  # centro de la base de cada copia (una por `co
 turn = [[0, 0, 0]]                # opcional: grados sobre X, Y, Z
 ```
 
+Si el asset es un personaje con esqueleto (su pieza es un `.blend` con
+armadura), declara en `[asset]` las animaciones que debe traer, con el nombre
+de las acciones: `animations = ["idle", "walk"]`. Esa pieza va una sola vez
+(`count` 1), con `kind = "reuse"` y sin cambiar de tamaño; `at` es donde
+queda el origen de su fuente (los pies, si el `.blend` los tiene en el origen).
+
 Escribe la ficha una sola vez, completa. Termina con una línea que resuma
 cuántas piezas reutilizas y cuántas hay que buscar.

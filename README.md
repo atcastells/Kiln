@@ -584,6 +584,55 @@ mano en el `.blend` del montaje se pierde al volver a montar (la fuente son
 los `.blend` de las piezas y la ficha); no optimiza GLB; la página web no
 tiene botones para verificar ni publicar.
 
+## Entrega 14: personajes con esqueleto (K008)
+
+Una pieza `.blend` con armadura pasa por `build`, `verify` y `publish` con su
+esqueleto, sus pesos y sus acciones. La ficha declara qué animaciones espera:
+
+```toml
+[asset]
+id = "crew_member"
+name = "Tripulante"
+animations = ["idle", "walk"]     # nombres de las acciones del .blend
+
+[[parts]]
+id = "body"
+what = "personaje con esqueleto"
+size_m = [0.62, 1.67, 0.22]
+source = { kind = "reuse", from = "crew/humanoid" }
+at = [[0, 0, 0]]
+```
+
+- **Exportar la pieza.** Si el `.blend` tiene una armadura, sale con las
+  mallas, las pieles y todas sus acciones. Sin armadura, como siempre.
+- **Montar.** La pieza con esqueleto se coloca una vez, tal como viene: sin
+  hornear, unir, recentrar ni escalar. Su origen es el de la fuente (por
+  convenio, los pies en el origen); `at` y `turn` mueven la raíz. Los materiales se visten igual
+  que en cualquier pieza.
+- **Verificar.** Con `animations` declaradas, falla si el GLB no tiene
+  esqueleto (`rig_no_skeleton`) o le falta una (`rig_animation_missing`), y
+  Godot lo comprueba por su lado (`godot_no_skeleton`,
+  `godot_animation_missing`); una animación que no mueve ningún hueso es un
+  aviso (`godot_animation_static`). Siempre, con o sin declaración, un
+  esqueleto o una animación mal formados son error: `skin_no_joints_attr`,
+  `skin_no_weights_attr`, `animation_empty` y los índices rotos
+  (`glb_broken_ref`). La normalización de los pesos la mira el glTF Validator.
+- **Contrato.** `asset.json` lleva `outputs[].rig`, con el número de huesos y
+  cada animación con su duración. El hash estructural cubre pieles y
+  animaciones; el de un GLB sin ellas no cambia.
+
+Límites: una pieza con esqueleto no admite varias copias, cambio de tamaño ni
+división por zonas: el montaje se detiene. La ficha no sabe qué pieza trae el
+esqueleto, así que con `animations` declaradas marca `rig_count` en cualquier
+pieza con `count` mayor que 1, también una estática. Las variantes de color
+de un asset con esqueleto conservan piel y animaciones en una prueba a mano,
+pero no tienen test. Kiln no fija
+el bucle de las animaciones: Godot las importa sin bucle y lo pone quien
+integra. Sin formas clave, cinemática inversa ni cambio de esqueleto. La raíz
+toma el nombre de la pieza en el montaje; si la malla se llamaba igual,
+Blender le añade `.001`. Con `animations` sin declarar no se comprueba que
+estén: decláralas.
+
 ## Validar contenido
 
 Opcional y por proyecto. Kiln no sabe nada de ningún juego: cada proyecto
