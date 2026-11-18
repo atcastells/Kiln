@@ -46,8 +46,9 @@ Todo es actual; no hay partes heredadas.
 - `push` de la rama de trabajo y abrir su PR (`gh pr create`) los hace Claude
   al cerrar una entrega. NUNCA `push --force` ni `push` directo a `main`.
 - NUNCA `merge`, `rebase`, `reset`, `stash`, `tag`, `cherry-pick` (denegados
-  en `.claude/settings.json`). Un PR se une con `gh pr merge`, y solo cuando
-  el desarrollador lo pide para ese PR.
+  en `.claude/settings.json`). Un PR se une con `gh pr merge`, y lo hace
+  Claude al cerrar la entrega: sin conflictos, con lo verificado dicho en el
+  PR y sin checks en rojo.
 - `checkout` y `branch` solo si el desarrollador lo pide. Rama base: `main`.
 
 ## Lo que Claude falla
