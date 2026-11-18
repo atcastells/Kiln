@@ -1071,6 +1071,8 @@ at = [[0, 0, 0]]
   hornear, unir, recentrar ni escalar. Su origen es el de la fuente (por
   convenio, los pies en el origen); `at` y `turn` mueven la raíz. Los materiales se visten igual
   que en cualquier pieza.
+  El tamaño que informa el montaje es el de la pose de reposo, como las
+  cotas del GLB, empiece donde empiece la primera animación (K009).
 - **Verificar.** Con `animations` declaradas, falla si el GLB no tiene
   esqueleto (`rig_no_skeleton`) o le falta una (`rig_animation_missing`), y
   Godot lo comprueba por su lado (`godot_no_skeleton`,

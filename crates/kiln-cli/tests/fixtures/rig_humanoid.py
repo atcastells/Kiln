@@ -1,10 +1,11 @@
 """Test fixture: a minimal humanoid saved as a .blend.
 
-    blender --background --factory-startup --python rig_humanoid.py -- out.blend [still]
+    blender --background --factory-startup --python rig_humanoid.py -- out.blend [still] [reach]
 
 Six bones, one skinned mesh of 72 triangles (24 of its 48 vertices blend two
 bones), feet on the origin, facing -Y, and the actions idle and walk. A second
-argument `still` adds an action of that name that moves nothing.
+argument `still` adds an action of that name that moves nothing; `reach` makes
+idle start with both arms raised, so its first pose leaves the rest bounds.
 """
 import math, sys
 import bpy
@@ -85,7 +86,8 @@ def action(name, frames):
             pb.keyframe_insert("rotation_euler", frame=frame)
     return a
 sw = math.radians(30)
-action("idle", [(1, {"spine": 0.0}), (30, {"spine": math.radians(2)}), (60, {"spine": 0.0})])
+first = {"arm_l": math.radians(60), "arm_r": math.radians(60)} if "reach" in extra else {"spine": 0.0}
+action("idle", [(1, first), (30, {"spine": math.radians(2)}), (60, {"spine": 0.0})])
 action("walk", [
     (1, {"leg_l": sw, "leg_r": -sw, "arm_l": -sw, "arm_r": sw}),
     (12, {"leg_l": -sw, "leg_r": sw, "arm_l": sw, "arm_r": -sw}),

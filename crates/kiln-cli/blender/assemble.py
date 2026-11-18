@@ -279,10 +279,18 @@ def main():
     bpy.ops.export_scene.gltf(
         filepath=plan["glb"], export_format="GLB", export_extras=True
     )
+    # A rig is measured at rest, like the bounds of its GLB, not in the pose its first action starts in.
+    rigs = [a for a in bpy.data.objects if a.type == "ARMATURE"]
+    posed = [a.data.pose_position for a in rigs]
+    for a in rigs:
+        a.data.pose_position = "REST"
+    bpy.context.view_layer.update()
     corners = []
     for _, o in built:
         for m in meshes_of(o):
             corners += [m.matrix_world @ Vector(c) for c in m.bound_box]
+    for a, was in zip(rigs, posed):
+        a.data.pose_position = was
     lo = Vector((min(c.x for c in corners), min(c.y for c in corners), min(c.z for c in corners)))
     hi = Vector((max(c.x for c in corners), max(c.y for c in corners), max(c.z for c in corners)))
     size = hi - lo

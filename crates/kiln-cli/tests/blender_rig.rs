@@ -11,6 +11,11 @@ const HUMANOID: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/rig_
 
 /// The examples project with the test humanoid as the piece `crew/humanoid`.
 fn project() -> TempDir {
+    project_with(&[])
+}
+
+/// The same, with extra arguments for the fixture script.
+fn project_with(extra: &[&str]) -> TempDir {
     let p = temp_project("");
     let kit = p.path().join("godot/kits/crew");
     std::fs::create_dir_all(&kit).unwrap();
@@ -23,6 +28,7 @@ fn project() -> TempDir {
     let out = Command::new("blender")
         .args(["--background", "--factory-startup", "--python", HUMANOID, "--"])
         .arg(&blend)
+        .args(extra)
         .output()
         .expect("blender");
     assert!(blend.exists(), "{}", String::from_utf8_lossy(&out.stderr));
@@ -147,6 +153,33 @@ fn build_keeps_rig() {
     assert!(
         (size[0] - 0.62).abs() < 0.01 && (size[1] - 1.67).abs() < 0.01 && (size[2] - 0.22).abs() < 0.01,
         "{size:?}"
+    );
+}
+
+/// The size a build reports is the one the GLB has, at rest, whatever pose the first action starts in.
+#[test]
+#[ignore]
+fn build_measures_a_rig_at_rest() {
+    let p = project_with(&["reach"]);
+    piece_glb(p.path());
+    spec(p.path(), 1);
+    let out = kiln(p.path(), &["build", "--asset", "crew_member"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let report: serde_json::Value =
+        serde_json::from_str(&p.read("kiln/build/crew_member/report.json")).unwrap();
+    let size: Vec<f64> = report["size_m"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|v| v.as_f64().unwrap())
+        .collect();
+    assert!(
+        (size[0] - 0.62).abs() < 0.01 && (size[1] - 1.67).abs() < 0.01 && (size[2] - 0.22).abs() < 0.01,
+        "posed, not rest: {size:?}"
     );
 }
 
