@@ -19,7 +19,7 @@ import sys
 from datetime import datetime, timezone
 
 import bpy
-from mathutils import Euler, Vector
+from mathutils import Euler, Matrix, Vector
 
 
 def plan_path():
@@ -35,6 +35,8 @@ def to_blender(v):
 
 
 ZONES = {}
+# models that came with a skeleton: placed once, never copied
+RIGS = set()
 
 
 def dress(o, item):
@@ -62,11 +64,32 @@ def dress(o, item):
         o.data.materials[i] = ZONES[name]
 
 
+def meshes_of(o):
+    """The meshes of a piece: itself, or those under the root of a rigged one."""
+    if not o.get("kiln_rig"):
+        return [o]
+    return ([o] if o.type == "MESH" else []) + [c for c in o.children_recursive if c.type == "MESH"]
+
+
 def import_model(path):
-    """The glTF as one mesh object, with its base centred on the origin."""
+    """The glTF as one mesh object, with its base centred on the origin.
+
+    A model with a skeleton stays as it came instead: its root is returned,
+    with hierarchy, weights and actions untouched.
+    """
     before = set(bpy.data.objects)
-    bpy.ops.import_scene.gltf(filepath=path)
+    bpy.ops.import_scene.gltf(filepath=path, disable_bone_shape=True)
     new = [o for o in bpy.data.objects if o not in before]
+    if any(o.type == "ARMATURE" for o in new):
+        roots = [o for o in new if o.parent is None]
+        root = roots[0]
+        if len(roots) > 1:
+            root = bpy.data.objects.new("rig_root", None)
+            bpy.context.scene.collection.objects.link(root)
+            for o in roots:
+                o.parent = root
+        root["kiln_rig"] = True
+        return root
     meshes = [o for o in new if o.type == "MESH"]
     for o in new:
         if o.type != "MESH":
@@ -108,7 +131,7 @@ def base_to_origin(o):
 
 
 def tris(o):
-    return sum(len(p.vertices) - 2 for p in o.data.polygons)
+    return sum(len(p.vertices) - 2 for m in meshes_of(o) for p in m.data.polygons)
 
 
 def collection(name):
@@ -119,12 +142,60 @@ def collection(name):
     return c
 
 
+def tag(o, item):
+    """What the spec says of the part, as custom properties the GLB carries as extras."""
+    o["kiln_part"] = item["part"]
+    o["kiln_kind"] = item["kind"]
+    if item.get("moves"):
+        o["kiln_moves"] = item["moves"]
+    if item.get("only_in"):
+        o["kiln_only_in"] = ",".join(item["only_in"])
+    if item.get("todo"):
+        o["kiln_todo"] = item["todo"]
+
+
+def build_rig(item, o):
+    """Places a rigged piece once, where and how it was authored: no bake, no fit, no recentring."""
+    if item["fit"] or item.get("split"):
+        raise SystemExit(
+            "assemble.py: una pieza con esqueleto no se ajusta de tamaño ni se divide: " + item["part"]
+        )
+    if not meshes_of(o):
+        raise SystemExit("assemble.py: la pieza con esqueleto no tiene ninguna malla: " + item["part"])
+    # the root takes the name of the copy; a child that had it keeps a name of its own
+    for c in o.children_recursive:
+        if c.name == item["name"]:
+            c.name = item["name"] + "_mesh"
+    o.name = item["name"]
+    rx, ry, rz = (math.radians(a) for a in item["turn"])
+    turn = Euler((rx, -rz, ry), "XYZ").to_matrix().to_4x4()
+    o.matrix_world = Matrix.Translation(to_blender(item["at"])) @ turn @ o.matrix_world
+    parts = collection("parts")
+    for x in [o] + list(o.children_recursive):
+        for c in x.users_collection:
+            c.objects.unlink(x)
+        parts.objects.link(x)
+    bpy.context.view_layer.update()
+    for m in meshes_of(o):
+        dress(m, item)
+    for x in [o] + meshes_of(o):
+        tag(x, item)
+    return o
+
+
 def build(item, cache):
     model = item.get("model")
     o = None
     if model and os.path.exists(model):
+        if model in RIGS:
+            raise SystemExit(
+                "assemble.py: una pieza con esqueleto se coloca una sola vez: " + item["part"]
+            )
         if model not in cache:
             src = import_model(model)
+            if src is not None and src.get("kiln_rig"):
+                RIGS.add(model)
+                return build_rig(item, src)
             if src is not None:
                 src.name = "src_" + os.path.basename(model)
                 if item.get("split"):
@@ -166,14 +237,7 @@ def build(item, cache):
     )
     o.location = to_blender(item["at"]) - base
     dress(o, item)
-    o["kiln_part"] = item["part"]
-    o["kiln_kind"] = item["kind"]
-    if item.get("moves"):
-        o["kiln_moves"] = item["moves"]
-    if item.get("only_in"):
-        o["kiln_only_in"] = ",".join(item["only_in"])
-    if item.get("todo"):
-        o["kiln_todo"] = item["todo"]
+    tag(o, item)
     return o
 
 
@@ -217,7 +281,8 @@ def main():
     )
     corners = []
     for _, o in built:
-        corners += [o.matrix_world @ Vector(c) for c in o.bound_box]
+        for m in meshes_of(o):
+            corners += [m.matrix_world @ Vector(c) for c in m.bound_box]
     lo = Vector((min(c.x for c in corners), min(c.y for c in corners), min(c.z for c in corners)))
     hi = Vector((max(c.x for c in corners), max(c.y for c in corners), max(c.z for c in corners)))
     size = hi - lo

@@ -143,8 +143,66 @@ pub fn glb_findings(subject: &str, bytes: &[u8]) -> Vec<Finding> {
             }
         }
     }
+    let meshes = arr(&doc, "meshes");
+    let mut rig: Vec<(&str, String)> = Vec::new();
+    let mut skinned = std::collections::BTreeSet::new();
+    for (i, n) in arr(&doc, "nodes").iter().enumerate() {
+        let Some(skin) = n.get("skin") else { continue };
+        broken(format!("/nodes/{i}/skin"), "skins", skin);
+        let mesh = n.get("mesh").and_then(Value::as_u64);
+        let Some(m) = mesh.and_then(|m| meshes.get(m as usize)) else {
+            continue;
+        };
+        // once per mesh and attribute: a crafted file must not multiply findings
+        if !skinned.insert(mesh.unwrap_or_default()) {
+            continue;
+        }
+        for (attr, code) in [
+            ("JOINTS_0", "skin_no_joints_attr"),
+            ("WEIGHTS_0", "skin_no_weights_attr"),
+        ] {
+            let lacks = arr(m, "primitives")
+                .iter()
+                .position(|p| p.pointer(&format!("/attributes/{attr}")).is_none());
+            if let Some(j) = lacks {
+                rig.push((
+                    code,
+                    format!(
+                        "/meshes/{}/primitives/{j} se usa con una skin (/nodes/{i}) pero no tiene {attr}",
+                        mesh.unwrap_or_default()
+                    ),
+                ));
+            }
+        }
+    }
+    for (i, s) in arr(&doc, "skins").iter().enumerate() {
+        for (j, n) in arr(s, "joints").iter().enumerate() {
+            broken(format!("/skins/{i}/joints/{j}"), "nodes", n);
+        }
+    }
+    for (i, a) in arr(&doc, "animations").iter().enumerate() {
+        let channels = arr(a, "channels");
+        if channels.is_empty() {
+            rig.push((
+                "animation_empty",
+                format!("/animations/{i} no tiene ningún canal"),
+            ));
+        }
+        for (j, c) in channels.iter().enumerate() {
+            if let Some(v) = c.pointer("/target/node") {
+                broken(
+                    format!("/animations/{i}/channels/{j}/target/node"),
+                    "nodes",
+                    v,
+                );
+            }
+        }
+    }
     for m in overruns.into_iter().chain(external) {
         push(Severity::Error, "glb_broken_ref", m);
+    }
+    for (code, m) in rig {
+        push(Severity::Error, code, m);
     }
 
     let st = glb::structure_of(&doc);
@@ -329,6 +387,26 @@ pub fn asset_findings(
                 )
             }
             Some(_) => {}
+        }
+    }
+
+    let declared = &expected.spec.asset.animations;
+    if !declared.is_empty() {
+        if structure.skins.is_empty() {
+            push(
+                Severity::Error,
+                "rig_no_skeleton",
+                "el spec declara animaciones pero el GLB no tiene esqueleto".into(),
+            );
+        }
+        for name in declared {
+            if !structure.animations.iter().any(|a| &a.name == name) {
+                push(
+                    Severity::Error,
+                    "rig_animation_missing",
+                    format!("la animación '{name}' está declarada en el spec y no está en el GLB"),
+                );
+            }
         }
     }
     out
@@ -654,6 +732,93 @@ mod tests {
         assert!(mutated(|d| d["nodes"][1]["scale"] = json!([1.0, -1.0, 1.0])).is_empty());
     }
 
+    fn rigged() -> Value {
+        let mut d = clean();
+        d["nodes"] = json!([
+            {"name": "root", "children": [1, 2, 3]},
+            {"name": "body", "mesh": 0, "skin": 0},
+            {"name": "hip"},
+            {"name": "leg"}
+        ]);
+        d["meshes"][0]["primitives"][0]["attributes"] =
+            json!({"POSITION": 0, "JOINTS_0": 0, "WEIGHTS_0": 0});
+        d["skins"] = json!([{"joints": [2, 3]}]);
+        d["animations"] = json!([{
+            "name": "idle",
+            "samplers": [{"input": 0, "output": 0}],
+            "channels": [{"sampler": 0, "target": {"node": 2, "path": "translation"}}]
+        }]);
+        d
+    }
+
+    #[test]
+    fn well_formed_rig_has_no_findings() {
+        assert!(run(&rigged()).is_empty());
+    }
+
+    /// A hostile GLB cannot multiply findings: one per mesh and attribute,
+    /// however many nodes use the mesh and however many primitives it has.
+    #[test]
+    fn a_skinned_mesh_is_reported_once() {
+        let mut d = rigged();
+        let bad = json!({"attributes": {"POSITION": 0}, "material": 0});
+        d["meshes"][0]["primitives"] = json!([bad.clone(), bad.clone(), bad]);
+        d["nodes"][2] = json!({"name": "hip", "mesh": 0, "skin": 0});
+        d["nodes"][3] = json!({"name": "leg", "mesh": 0, "skin": 0});
+        let codes: Vec<String> = run(&d).into_iter().map(|f| f.code).collect();
+        assert_eq!(codes, ["skin_no_joints_attr", "skin_no_weights_attr"]);
+    }
+
+    #[test]
+    fn malformed_rig_is_reported() {
+        let cases: [(&str, &str, Mutation); 6] = [
+            (
+                "skin_no_joints_attr",
+                "JOINTS_0",
+                Box::new(|d| {
+                    let a = &mut d["meshes"][0]["primitives"][0]["attributes"];
+                    a.as_object_mut().unwrap().remove("JOINTS_0");
+                }),
+            ),
+            (
+                "skin_no_weights_attr",
+                "WEIGHTS_0",
+                Box::new(|d| {
+                    let a = &mut d["meshes"][0]["primitives"][0]["attributes"];
+                    a.as_object_mut().unwrap().remove("WEIGHTS_0");
+                }),
+            ),
+            (
+                "glb_broken_ref",
+                "/skins/0/joints/1",
+                Box::new(|d| d["skins"][0]["joints"][1] = json!(9)),
+            ),
+            (
+                "glb_broken_ref",
+                "/nodes/1/skin",
+                Box::new(|d| d["nodes"][1]["skin"] = json!(4)),
+            ),
+            (
+                "animation_empty",
+                "/animations/0",
+                Box::new(|d| d["animations"][0]["channels"] = json!([])),
+            ),
+            (
+                "glb_broken_ref",
+                "/animations/0/channels/0/target/node",
+                Box::new(|d| d["animations"][0]["channels"][0]["target"]["node"] = json!(9)),
+            ),
+        ];
+        for (code, ptr, mutate) in cases {
+            let mut d = rigged();
+            mutate(&mut d);
+            let f = run(&d);
+            assert_eq!(codes(&f), [code], "{ptr}");
+            assert!(f[0].message.contains(ptr), "{ptr}: {}", f[0].message);
+            assert!(matches!(f[0].severity, Severity::Error));
+        }
+    }
+
     const SPEC: &str = r#"
 [asset]
 id = "crate"
@@ -709,6 +874,8 @@ at = [0.0, 1.0, 0.0]
                     body,
                     node("anchor_top", None, [0.0, 1.0, 0.0]),
                 ],
+                skins: vec![],
+                animations: vec![],
             },
             worn: BTreeMap::from([("body/wood".into(), Some("wood".into()))]),
             palette: vec!["wood".into()],
@@ -731,6 +898,57 @@ at = [0.0, 1.0, 0.0]
     #[test]
     fn matching_asset_has_no_findings() {
         assert!(compare(&case()).is_empty());
+    }
+
+    fn rig_case(declared: &[&str], skin: bool, present: &[&str]) -> Case {
+        let mut c = case();
+        c.spec.asset.animations = declared.iter().map(|s| s.to_string()).collect();
+        if skin {
+            c.structure.skins = vec![glb::Skin {
+                name: "armature".into(),
+                joints: vec!["root".into()],
+            }];
+        }
+        c.structure.animations = present
+            .iter()
+            .map(|n| glb::Animation {
+                name: n.to_string(),
+                channels: 1,
+                duration: 1.0,
+            })
+            .collect();
+        c
+    }
+
+    #[test]
+    fn declared_animation_missing_from_the_glb() {
+        let f = compare(&rig_case(&["idle", "walk"], true, &["idle"]));
+        let missing: Vec<_> = f
+            .iter()
+            .filter(|f| f.code == "rig_animation_missing")
+            .collect();
+        assert_eq!(missing.len(), 1);
+        assert!(missing[0].message.contains("walk"));
+        assert_eq!(missing[0].severity, Severity::Error);
+        assert!(!codes(&f).contains(&"rig_no_skeleton"));
+    }
+
+    #[test]
+    fn declared_animations_without_a_skeleton() {
+        let f = compare(&rig_case(&["idle"], false, &["idle"]));
+        assert!(codes(&f).contains(&"rig_no_skeleton"));
+    }
+
+    #[test]
+    fn declared_animations_all_present() {
+        let f = compare(&rig_case(&["idle", "walk"], true, &["idle", "walk"]));
+        assert!(f.is_empty());
+    }
+
+    #[test]
+    fn nothing_declared_ignores_the_rig() {
+        assert!(compare(&rig_case(&[], false, &[])).is_empty());
+        assert!(compare(&rig_case(&[], true, &["idle"])).is_empty());
     }
 
     #[test]

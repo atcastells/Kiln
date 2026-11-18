@@ -139,6 +139,42 @@ pub struct Output {
     pub file: String,
     pub sha256: String,
     pub structure_sha256: String,
+    /// Skeleton and animations of the GLB; absent when it has neither.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rig: Option<Rig>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct Rig {
+    /// Joints over all skins.
+    pub bones: u64,
+    /// Sorted by name.
+    pub animations: Vec<RigAnimation>,
+}
+
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct RigAnimation {
+    pub name: String,
+    pub duration_s: f64,
+}
+
+fn rig_of(s: &glb::Structure) -> Option<Rig> {
+    if s.skins.is_empty() && s.animations.is_empty() {
+        return None;
+    }
+    let mut animations: Vec<RigAnimation> = s
+        .animations
+        .iter()
+        .map(|a| RigAnimation {
+            name: a.name.clone(),
+            duration_s: a.duration,
+        })
+        .collect();
+    animations.sort_by(|a, b| a.name.cmp(&b.name));
+    Some(Rig {
+        bones: s.skins.iter().map(|k| k.joints.len() as u64).sum(),
+        animations,
+    })
 }
 
 #[derive(Debug, Clone, serde::Serialize)]
@@ -221,6 +257,7 @@ pub fn contract(b: &Built) -> Result<Contract, String> {
                 .unwrap_or_default(),
             sha256: sha256_file(path)?,
             structure_sha256: glb::structure_hash(&structure),
+            rig: rig_of(&structure),
         });
     }
 
@@ -370,6 +407,28 @@ from = "child"
         out
     }
 
+    fn glb_from_json(json: &str) -> Vec<u8> {
+        let mut json = json.as_bytes().to_vec();
+        while !json.len().is_multiple_of(4) {
+            json.push(b' ');
+        }
+        let mut out = b"glTF".to_vec();
+        out.extend(2u32.to_le_bytes());
+        out.extend((20 + json.len() as u32).to_le_bytes());
+        out.extend((json.len() as u32).to_le_bytes());
+        out.extend(b"JSON");
+        out.extend(json);
+        out
+    }
+
+    const RIGGED: &str = r#"{"asset":{"version":"2.0"},"scenes":[{"nodes":[0]}],
+        "nodes":[{"name":"root","children":[1]},{"name":"hip"}],
+        "skins":[{"name":"body","joints":[0,1]}],
+        "accessors":[{"count":2,"max":[2.5]},{"count":2,"max":[1.0]}],
+        "animations":[
+            {"name":"walk","channels":[],"samplers":[{"input":0}]},
+            {"name":"idle","channels":[],"samplers":[{"input":1}]}]}"#;
+
     struct World {
         dir: PathBuf,
         spec: Spec,
@@ -471,6 +530,33 @@ from = "child"
             serde_json::to_string(&a).unwrap(),
             serde_json::to_string(&b).unwrap()
         );
+        std::fs::remove_dir_all(&w.dir).unwrap();
+    }
+
+    #[test]
+    fn a_rigged_output_records_its_bones_and_animations_sorted() {
+        let w = world("rig");
+        let path = w.dir.join("hero.glb");
+        std::fs::write(&path, glb_from_json(RIGGED)).unwrap();
+        let c = contract(&built(&w, vec![(None, path)])).unwrap();
+        let rig = c.outputs[0].rig.as_ref().expect("rig");
+        assert_eq!(rig.bones, 2);
+        let names: Vec<_> = rig.animations.iter().map(|a| a.name.as_str()).collect();
+        assert_eq!(names, ["idle", "walk"]);
+        assert_eq!(rig.animations[0].duration_s, 1.0);
+        assert_eq!(rig.animations[1].duration_s, 2.5);
+        std::fs::remove_dir_all(&w.dir).unwrap();
+    }
+
+    #[test]
+    fn an_output_without_skeleton_has_no_rig_key() {
+        let w = world("norig");
+        let path = w.dir.join("shed.glb");
+        std::fs::write(&path, glb_bytes("shed")).unwrap();
+        let c = contract(&built(&w, vec![(None, path)])).unwrap();
+        assert!(c.outputs[0].rig.is_none());
+        let json = serde_json::to_value(&c).unwrap();
+        assert!(json["outputs"][0].get("rig").is_none());
         std::fs::remove_dir_all(&w.dir).unwrap();
     }
 

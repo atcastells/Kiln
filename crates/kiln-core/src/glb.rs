@@ -95,6 +95,8 @@ fn from_doc(doc: &Value) -> Result<GlbInfo, String> {
         }
         let Some(node) = nodes.get(n) else { continue };
         let world = mul(&parent, &local(node));
+        // glTF ignores the transform of a skinned mesh node: its vertices are in skeleton space
+        let placed = if node.get("skin").is_some() { IDENTITY } else { world };
         if let Some(mesh) = node
             .get("mesh")
             .and_then(Value::as_u64)
@@ -118,7 +120,7 @@ fn from_doc(doc: &Value) -> Result<GlbInfo, String> {
                             if c & 2 == 0 { lo[1] } else { hi[1] },
                             if c & 4 == 0 { lo[2] } else { hi[2] },
                         ];
-                        bounds.add(apply(&world, corner));
+                        bounds.add(apply(&placed, corner));
                     }
                 }
                 let mode = p.get("mode").and_then(Value::as_u64).unwrap_or(4);
@@ -179,9 +181,33 @@ pub struct MeshInfo {
     pub materials: Vec<String>,
 }
 
+/// Joints read per skin and characters kept per joint name: far above any real
+/// rig, and a bound on what a crafted file can make Kiln hold.
+pub const MAX_JOINTS: usize = 1024;
+pub const MAX_JOINT_NAME: usize = 128;
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct Skin {
+    pub name: String,
+    /// Names of the joint nodes, in skin order.
+    pub joints: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct Animation {
+    pub name: String,
+    pub channels: u64,
+    /// Seconds: the largest keyframe time among the sampler inputs.
+    pub duration: f64,
+}
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Structure {
     pub nodes: Vec<Node>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skins: Vec<Skin>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub animations: Vec<Animation>,
 }
 
 /// Reads the node structure of a `.glb` or `.gltf`.
@@ -309,7 +335,47 @@ pub fn structure_of(doc: &Value) -> Structure {
             }
         })
         .collect();
-    Structure { nodes: out }
+    let skins = arr("skins")
+        .iter()
+        .map(|s| Skin {
+            name: name_of(Some(s)),
+            joints: s
+                .get("joints")
+                .and_then(Value::as_array)
+                .unwrap_or(&empty)
+                .iter()
+                .take(MAX_JOINTS)
+                .map(|j| {
+                    name_of(j.as_u64().and_then(|j| nodes.get(j as usize)))
+                        .chars()
+                        .take(MAX_JOINT_NAME)
+                        .collect()
+                })
+                .collect(),
+        })
+        .collect();
+    let animations = arr("animations")
+        .iter()
+        .map(|a| {
+            let list = |k: &str| a.get(k).and_then(Value::as_array).unwrap_or(&empty);
+            let duration = list("samplers")
+                .iter()
+                .filter_map(|s| s.get("input").and_then(Value::as_u64))
+                .filter_map(|i| accessors.get(i as usize))
+                .filter_map(|acc| acc.pointer("/max/0").and_then(Value::as_f64))
+                .fold(0.0, f64::max);
+            Animation {
+                name: name_of(Some(a)),
+                channels: list("channels").len() as u64,
+                duration,
+            }
+        })
+        .collect();
+    Structure {
+        nodes: out,
+        skins,
+        animations,
+    }
 }
 
 fn vec3(v: Option<&Value>) -> Option<[f64; 3]> {
@@ -445,6 +511,25 @@ pub fn structure_hash(s: &Structure) -> String {
         }
         text.push('\n');
     }
+    if !s.skins.is_empty() {
+        let mut skins: Vec<&Skin> = s.skins.iter().collect();
+        skins.sort_by(|a, b| a.name.cmp(&b.name));
+        for k in skins {
+            text.push_str(&format!("skin|{}|{}\n", k.name, k.joints.join(",")));
+        }
+    }
+    if !s.animations.is_empty() {
+        let mut anims: Vec<&Animation> = s.animations.iter().collect();
+        anims.sort_by(|a, b| a.name.cmp(&b.name));
+        for a in anims {
+            text.push_str(&format!(
+                "anim|{}|{}|{}\n",
+                a.name,
+                a.channels,
+                fmt4(a.duration)
+            ));
+        }
+    }
     crate::asset::sha256_hex(text.as_bytes())
 }
 
@@ -464,6 +549,26 @@ mod tests {
         out.extend(b"JSON");
         out.extend(j);
         out
+    }
+
+    /// A skinned mesh is already in the space of its skeleton: glTF ignores the
+    /// transform of its node, so a turned rig root must not turn the box again.
+    #[test]
+    fn a_skinned_mesh_ignores_its_node_transform() {
+        let doc = |skin: &str| {
+            format!(
+                r#"{{"scenes":[{{"nodes":[0]}}],
+                "nodes":[{{"name":"rig","rotation":[0,0.7071068,0,0.7071068],"translation":[2,0,1],"children":[1,2]}},
+                         {{"name":"body","mesh":0{skin}}},{{"name":"bone"}}],
+                "skins":[{{"joints":[2]}}],
+                "meshes":[{{"primitives":[{{"attributes":{{"POSITION":0}}}}]}}],
+                "accessors":[{{"count":3,"type":"VEC3","min":[1.9,0,0.7],"max":[2.1,1.6,1.3]}}]}}"#
+            )
+        };
+        let skinned = parse(&glb(&doc(r#","skin":0"#))).unwrap();
+        assert_eq!((skinned.min, skinned.max), ([1.9, 0.0, 0.7], [2.1, 1.6, 1.3]));
+        let plain = parse(&glb(&doc(""))).unwrap();
+        assert!((plain.size()[0] - 0.6).abs() < 1e-3, "a plain mesh follows its node: {:?}", plain.size());
     }
 
     #[test]
@@ -533,7 +638,11 @@ mod tests {
     }
 
     fn hash_of(nodes: Vec<Node>) -> String {
-        structure_hash(&Structure { nodes })
+        structure_hash(&Structure {
+            nodes,
+            skins: vec![],
+            animations: vec![],
+        })
     }
 
     fn base() -> Vec<Node> {
@@ -592,6 +701,73 @@ mod tests {
         let mut n = base();
         n[1].extras.insert("kiln_part".into(), "panel".into());
         assert_ne!(hash_of(n), h);
+    }
+
+    const RIGGED: &str = r#"{"nodes":[{"name":"root","children":[1,2]},{"name":"hip"},{"name":"knee"}],
+        "skins":[{"name":"body","joints":[1,2,9]}],
+        "accessors":[{"count":2,"max":[0.5]},{"count":2,"max":[1.25]},{"count":2,"max":[2.0]}],
+        "animations":[
+          {"name":"walk","channels":[{},{},{}],"samplers":[{"input":0},{"input":1}]},
+          {"name":"idle","channels":[{}],"samplers":[{"input":2}]}]}"#;
+
+    fn rigged(mutate: impl FnOnce(&mut Value)) -> Structure {
+        let mut doc: Value = serde_json::from_str(RIGGED).unwrap();
+        mutate(&mut doc);
+        structure_of(&doc)
+    }
+
+    /// A crafted skin (one long name, repeated) cannot blow the memory up.
+    #[test]
+    fn joint_names_are_bounded() {
+        let s = rigged(|d| {
+            d["nodes"][1]["name"] = "n".repeat(10_000).into();
+            d["skins"][0]["joints"] = vec![1; 50_000].into();
+        });
+        let chars: usize = s.skins[0].joints.iter().map(String::len).sum();
+        assert!(chars <= MAX_JOINTS * MAX_JOINT_NAME, "{chars}");
+    }
+
+    #[test]
+    fn reads_skins_and_animations() {
+        let s = rigged(|_| {});
+        assert_eq!(s.skins.len(), 1);
+        assert_eq!(s.skins[0].name, "body");
+        assert_eq!(s.skins[0].joints, ["hip", "knee", ""]);
+        assert_eq!(s.animations.len(), 2);
+        assert_eq!(s.animations[0].name, "walk");
+        assert_eq!(s.animations[0].channels, 3);
+        assert_eq!(s.animations[0].duration, 1.25);
+        assert_eq!(s.animations[1].name, "idle");
+        assert_eq!(s.animations[1].channels, 1);
+        assert_eq!(s.animations[1].duration, 2.0);
+    }
+
+    #[test]
+    fn structure_hash_covers_rig_only_when_present() {
+        let h = structure_hash(&rigged(|_| {}));
+        let fewer = rigged(|d| {
+            d["animations"].as_array_mut().unwrap().pop();
+        });
+        assert_ne!(structure_hash(&fewer), h);
+        let no_skins = rigged(|d| {
+            d.as_object_mut().unwrap().remove("skins");
+        });
+        assert_ne!(structure_hash(&no_skins), h);
+    }
+
+    #[test]
+    fn structure_without_rig_is_unchanged() {
+        let expected = crate::asset::sha256_hex(
+            b"a||0.0000,0.0000,0.0000|0.0000,0.0000,0.0000,1.0000|1.0000,1.0000,1.0000\n",
+        );
+        let plain = serde_json::json!({"nodes":[{"name":"a"}]});
+        let empty = serde_json::json!({"nodes":[{"name":"a"}],"skins":[],"animations":[]});
+        for doc in [plain, empty] {
+            let s = structure_of(&doc);
+            assert_eq!(structure_hash(&s), expected);
+            let json = serde_json::to_value(&s).unwrap();
+            assert!(json.get("skins").is_none() && json.get("animations").is_none());
+        }
     }
 
     #[test]

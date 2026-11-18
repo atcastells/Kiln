@@ -92,7 +92,11 @@ pub fn verify_asset(
             .iter()
             .map(|a| format!("anchor_{}", a.id))
             .collect();
-        let (check, found) = godot_import(project, &cfg, id, &file, &subject, &anchors, &mut say)?;
+        let wanted = Wanted {
+            anchors: &anchors,
+            animations: &spec.asset.animations,
+        };
+        let (check, found) = godot_import(project, &cfg, id, &file, &subject, &wanted, &mut say)?;
         checks.push(check);
         findings.extend(found);
     }
@@ -209,6 +213,12 @@ fn scratch_dir(project: &Path, cfg: &Config, id: &str) -> Result<PathBuf, String
     Ok(scratch)
 }
 
+/// What the spec expects to find in the scene Godot imports.
+struct Wanted<'a> {
+    anchors: &'a [String],
+    animations: &'a [String],
+}
+
 /// Godot imports the GLB into a scratch project of the cache and instances it.
 fn godot_import(
     project: &Path,
@@ -216,7 +226,7 @@ fn godot_import(
     id: &str,
     file: &Path,
     subject: &str,
-    anchors: &[String],
+    wanted: &Wanted,
     say: &mut dyn FnMut(String),
 ) -> Result<(Check, Vec<Finding>), String> {
     if tools::locate(&cfg.tools.godot).is_none() {
@@ -274,11 +284,11 @@ fn godot_import(
         if out["meshes"].as_u64().unwrap_or(0) == 0 {
             problems.push("la escena importada no tiene ninguna malla".into());
         }
-        for a in anchors.iter().filter(|a| !names.contains(&a.as_str())) {
+        for a in wanted.anchors.iter().filter(|a| !names.contains(&a.as_str())) {
             problems.push(format!("la escena importada no tiene el nodo «{a}»"));
         }
     }
-    let findings: Vec<Finding> = problems
+    let mut findings: Vec<Finding> = problems
         .iter()
         .map(|m| Finding {
             severity: Severity::Error,
@@ -287,16 +297,22 @@ fn godot_import(
             message: m.clone(),
         })
         .collect();
+    if out["ok"] == true {
+        findings.extend(kiln_core::godot::rig_import_findings(
+            subject,
+            &out,
+            wanted.animations,
+        ));
+    }
+    let errors = findings
+        .iter()
+        .filter(|f| f.severity == Severity::Error)
+        .count() as u64;
     let check = Check {
         name: "godot_import".into(),
-        status: if findings.is_empty() {
-            "passed"
-        } else {
-            "failed"
-        }
-        .into(),
-        errors: findings.len() as u64,
-        warnings: 0,
+        status: if errors == 0 { "passed" } else { "failed" }.into(),
+        errors,
+        warnings: findings.len() as u64 - errors,
         detail: Some(format!(
             "proyecto de prueba en {}",
             crate::ops::rel(project, &scratch)

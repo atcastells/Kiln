@@ -135,3 +135,94 @@ fn verify_uses_the_khronos_validator_when_it_is_installed() {
         "{khronos}"
     );
 }
+
+const HUMANOID: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/rig_humanoid.py");
+
+/// Builds and verifies the test humanoid with a spec that declares `animations`.
+fn verify_rig(animations: &str, placement: &str) -> (bool, Value) {
+    verify_rig_with(animations, placement, &[])
+}
+
+/// `extra` goes to the fixture script (`still` adds an action that moves nothing).
+fn verify_rig_with(animations: &str, placement: &str, extra: &[&str]) -> (bool, Value) {
+    let p = temp_project("");
+    let kit = p.path().join("godot/kits/crew");
+    std::fs::create_dir_all(&kit).unwrap();
+    std::fs::copy(
+        p.path().join("godot/kits/harbor/LICENSE.md"),
+        kit.join("LICENSE.md"),
+    )
+    .unwrap();
+    let blend = Command::new("blender")
+        .args(["--background", "--factory-startup", "--python", HUMANOID, "--"])
+        .arg(kit.join("humanoid.blend"))
+        .args(extra)
+        .output()
+        .expect("blender");
+    assert!(blend.status.success(), "{}", err(&blend));
+    let spec = format!(
+        "[asset]\nid = \"crew_member\"\nname = \"Tripulante\"\nasked = \"rig test\"\n\
+         budget_tris = 300\nstatus = \"layout\"\nanimations = {animations}\n\n\
+         [[parts]]\nid = \"body\"\nwhat = \"humanoid\"\nsize_m = [0.62, 1.67, 0.22]\n\
+         source = {{ kind = \"reuse\", from = \"crew/humanoid\" }}\n{placement}\n"
+    );
+    std::fs::write(p.path().join("specs/crew_member.toml"), spec).unwrap();
+    let out = kiln(p.path(), &["build", "--asset", "crew_member"]);
+    assert!(out.status.success(), "{}", err(&out));
+    let out = kiln(p.path(), &["verify", "--asset", "crew_member"]);
+    let report = serde_json::from_str(&p.read("kiln/build/crew_member/validation.json")).unwrap();
+    (out.status.success(), report)
+}
+
+#[test]
+#[ignore]
+fn rig_passes_with_its_declared_animations() {
+    let (ok, report) = verify_rig("[\"idle\", \"walk\"]", "at = [[0, 0, 0]]");
+    assert!(ok && report["valid"] == true, "{report}");
+    let godot = check(&report, "godot_import");
+    assert_eq!(godot["status"], "passed", "{report}");
+    assert_eq!(godot["warnings"], 0, "both animations move bones: {report}");
+}
+
+#[test]
+#[ignore]
+fn a_declared_animation_that_moves_nothing_is_a_warning() {
+    let (ok, report) = verify_rig_with("[\"idle\", \"still\"]", "at = [[0, 0, 0]]", &["still"]);
+    assert!(ok && report["valid"] == true, "{report}");
+    let statics: Vec<&str> = report["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|f| f["code"] == "godot_animation_static")
+        .filter_map(|f| f["message"].as_str())
+        .collect();
+    assert!(statics.len() == 1 && statics[0].contains("still"), "{report}");
+}
+
+#[test]
+#[ignore]
+fn rig_fails_without_a_declared_animation() {
+    let (ok, report) = verify_rig("[\"idle\", \"walk\", \"run\"]", "at = [[0, 0, 0]]");
+    assert!(!ok && report["valid"] == false, "{report}");
+    assert_eq!(check(&report, "godot_import")["status"], "failed", "{report}");
+    let codes: Vec<&str> = report["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter_map(|f| f["code"].as_str())
+        .collect();
+    assert!(
+        codes.contains(&"godot_animation_missing") && codes.contains(&"rig_animation_missing"),
+        "{codes:?}"
+    );
+}
+
+#[test]
+#[ignore]
+fn a_moved_and_turned_rig_still_verifies() {
+    let (ok, report) = verify_rig(
+        "[\"idle\", \"walk\"]",
+        "at = [[2, 0, 1]]\nturn = [[0, 90, 0]]",
+    );
+    assert!(ok && report["valid"] == true, "{report}");
+}
