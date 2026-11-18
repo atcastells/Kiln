@@ -53,3 +53,16 @@ sensitive business data (prices, margins, stock).
 
 ## Learned
 
+- `kiln_core::mesh::{Mesh { positions: Vec<[f32; 3]>, indices: Vec<u32> }, read(&Path) -> Result<Vec<Mesh>, String>, read_bytes(&[u8]), MAX_VERTICES}`: one `Mesh` per triangle primitive; non-indexed meshes come out with indices `0..count`; damaged files are `Err`, never a panic.
+- `generate::check` now also emits `generator_radius` (Error) and `generator_amplitude` (Warn, sum above 0.5): a test recipe whose noise amplitudes sum over 0.5 carries that warning.
+- `cfg.generate.verify_seeds` (u32, default 16, 1..=64) and `cfg.generate.steep_max` (f64, default 0.10); validated in `Config::parse`.
+- `generate::resolve::batch(seed, n) -> Vec<u32>`: n distinct seeds, the first is `seed`.
+- Godot scripts: `crates/kiln-cli/godot/kiln_generator.gd` (the builder, `static func build(job) -> {"mesh","tris"} | {"error"}`) and `generate.gd` (the runner, loads `res://kiln_generator.gd`). In `generate.rs`: `SCRIPT` (runner), `BUILDER`, `builder_sha256()`; both files are written into the work folder. Proven with real Godot: the split gives byte-identical GLBs.
+- `generate::measure::{Measures { tris, degenerate, flipped, steep, size_m }, measure(&[Mesh], stretch: [f64; 3]) -> Measures, total_stretch(&Resolved) -> [f64; 3]}`. `Mesh` has no `Debug`/`Clone`. An outward tetrahedron for tests: vertices (1,1,1), (1,-1,-1), (-1,1,-1), (-1,-1,1), indices `[1,3,2, 0,2,3, 0,3,1, 0,1,2]`.
+- `crate::generate::{cache_dir (pub(crate)), verify_dir(project, cfg, id) -> <cache>/generated/<id>/verify created empty, run_seed(cfg, project, id, out_dir, &Resolved, say) -> Run { glb, out }}`: `run_seed` takes the seed from `resolved.seed`, writes `<out_dir>/<seed>.glb`, wipes `<out_dir>/.project`, writes no `generated.json`. They carry `#[allow(dead_code)]` until a caller exists: remove it when you add one.
+- `generate::hash::recipe_sha256(&Generator, budget_tris: Option<u64>) -> String`; `generate::measure::{judge(asset_id, seed, &Measures, &Limits) -> Vec<Finding>, Limits { segments, budget_tris, max_tris, steep_max }, segments_of(&Resolved)}`.
+- `crate::verify_recipe::{run(project, cfg, spec, palette, say) -> Result<Outcome { seeds: Vec<SeedResult>, findings }, String>, verify(project, config_file, id, say) -> Result<PathBuf, String>}`; `verify_asset` branches to `verify` when the spec has a generator. A seed whose GLB cannot be read is a finding (`generated_unreadable`) and is absent from `seeds`.
+- The report of a recipe is `kiln_core::build::out_dir(project, &cfg, id)/validation.json` (`kiln/build/<id>/`), today's `Report` plus `recipe`: `{ recipe_sha256, generator_version, script_sha256, verify_seeds, seeds: [ { seed, glb_sha256, resolved: { seed, material, ops: [ { op, params, noise_seed } ] }, tris, degenerate, flipped, steep, size_m } ], worst: { tris, steep, flipped, size_m } | null }`. `valid` is false and `seeds` empty when a static error stopped the batch.
+- Test helpers in `verify_recipe::tests` (`pub(crate)`): `sphere_glb(segments, flip_one)` (8 segments: 80 triangles, 16 degenerate), `setup`, `report_of`.
+- The fake Godot of the `generate.rs` tests copies `fixture.glb` (a GLB with no triangles to measure): a test that measures a mesh needs its own fixture with a real mesh.
+

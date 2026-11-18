@@ -14,7 +14,7 @@ pub struct Published {
     pub files: Vec<String>,
 }
 
-fn read_json(path: &Path, missing: &str) -> Result<Value, String> {
+pub(super) fn read_json(path: &Path, missing: &str) -> Result<Value, String> {
     let bytes = std::fs::read(path).map_err(|_| missing.to_string())?;
     serde_json::from_slice(&bytes).map_err(|e| format!("{} no es JSON válido: {e}", path.display()))
 }
@@ -29,7 +29,13 @@ pub fn publish_asset(
     mut say: impl FnMut(String),
 ) -> Result<Published, String> {
     let cfg = crate::production::config(project, config_file)?;
-    crate::ops::refuse_generated(&crate::load(project, config_file)?.specs, id)?;
+    let specs = crate::load(project, config_file)?.specs;
+    if specs
+        .iter()
+        .any(|s| s.asset.id == id && s.generator.is_some())
+    {
+        return super::publish_recipe::publish(project, config_file, id, &mut say);
+    }
     let staged = stage(project, &cfg, id)?;
     say(format!("«{id}» copiado a {}", staged.done.dir));
     import_in_godot(project, &cfg, &staged, &mut say)?;
@@ -138,9 +144,9 @@ fn commit(staged: Staged) -> Result<Published, String> {
     Ok(staged.done)
 }
 
-/// Checks that the build is the verified one and copies its GLBs.
-fn stage(project: &Path, cfg: &kiln_core::Config, id: &str) -> Result<Staged, String> {
-    super::check_id("el asset", id)?;
+/// `[publish] dir` as written, refused when it is missing or names a place
+/// outside the project.
+fn publish_dir(cfg: &kiln_core::Config) -> Result<&str, String> {
     let dir = cfg
         .publish
         .dir
@@ -155,6 +161,47 @@ fn stage(project: &Path, cfg: &kiln_core::Config, id: &str) -> Result<Staged, St
             "[publish] dir «{dir}» debe quedar dentro del proyecto"
         ));
     }
+    Ok(dir)
+}
+
+/// `[publish] dir`/<id>/ and `dir` as written, refused when it leaves the
+/// project, also through a link on the way. Creates nothing.
+pub(super) fn dest_dir(
+    project: &Path,
+    cfg: &kiln_core::Config,
+    id: &str,
+) -> Result<(std::path::PathBuf, String), String> {
+    let dir = publish_dir(cfg)?;
+    let root = std::fs::canonicalize(project).map_err(|e| format!("proyecto: {e}"))?;
+    let dest = project.join(dir).join(id);
+    // a link on the way that leads out is refused before anything is created
+    let standing = dest.ancestors().find(|a| a.exists()).unwrap_or(project);
+    if !std::fs::canonicalize(standing).is_ok_and(|a| a.starts_with(&root)) {
+        return Err(format!(
+            "[publish] dir «{dir}» debe quedar dentro del proyecto"
+        ));
+    }
+    Ok((dest, dir.to_string()))
+}
+
+/// Creates the destination and checks again that it is inside the project.
+pub(super) fn create_dest(project: &Path, dest: &Path, dir: &str) -> Result<(), String> {
+    let root = std::fs::canonicalize(project).map_err(|e| format!("proyecto: {e}"))?;
+    std::fs::create_dir_all(dest)
+        .map_err(|e| format!("no se puede crear {}: {e}", dest.display()))?;
+    let real = std::fs::canonicalize(dest).map_err(|e| e.to_string())?;
+    if !real.starts_with(&root) {
+        return Err(format!(
+            "[publish] dir «{dir}» debe quedar dentro del proyecto"
+        ));
+    }
+    Ok(())
+}
+
+/// Checks that the build is the verified one and copies its GLBs.
+fn stage(project: &Path, cfg: &kiln_core::Config, id: &str) -> Result<Staged, String> {
+    super::check_id("el asset", id)?;
+    publish_dir(cfg)?;
 
     let build = kiln_core::build::out_dir(project, cfg, id);
     let validation = read_json(
@@ -201,24 +248,9 @@ fn stage(project: &Path, cfg: &kiln_core::Config, id: &str) -> Result<Staged, St
     }
     let names: Vec<String> = outputs.iter().map(|(n, _)| n.clone()).collect();
 
-    let dest = project.join(dir_path);
-    let root = std::fs::canonicalize(project).map_err(|e| format!("proyecto: {e}"))?;
-    let dest = dest.join(id);
-    // a link on the way that leads out is refused before anything is created
-    let standing = dest.ancestors().find(|a| a.exists()).unwrap_or(project);
-    if !std::fs::canonicalize(standing).is_ok_and(|a| a.starts_with(&root)) {
-        return Err(format!(
-            "[publish] dir «{dir}» debe quedar dentro del proyecto"
-        ));
-    }
-    std::fs::create_dir_all(&dest)
-        .map_err(|e| format!("no se puede crear {}: {e}", dest.display()))?;
-    let real = std::fs::canonicalize(&dest).map_err(|e| e.to_string())?;
-    if !real.starts_with(&root) {
-        return Err(format!(
-            "[publish] dir «{dir}» debe quedar dentro del proyecto"
-        ));
-    }
+    // in the order it always had: the build and its verification first
+    let (dest, dir) = dest_dir(project, cfg, id)?;
+    create_dest(project, &dest, &dir)?;
 
     let old = read_json(&dest.join("asset.json"), "").unwrap_or(Value::Null);
     let old_version = old["version"].as_u64().unwrap_or(0);

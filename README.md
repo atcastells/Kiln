@@ -1173,8 +1173,9 @@ peor caso de triángulos pasa de `budget_tris` (`generator_budget`) o si lleva
 receta y piezas a la vez (`generator_and_parts`). Un material fuera de la
 paleta es un aviso (`generator_material`), como en las piezas.
 
-Límites: un asset generado no se monta, pinta, verifica, revisa ni publica
-todavía; esas órdenes lo dicen y no hacen nada. La misma receta y semilla
+Límites: un asset generado no se monta, pinta ni revisa; esas órdenes lo
+dicen y no hacen nada (verificarlo y publicarlo, en la entrega 16). La misma
+receta y semilla
 dan el mismo GLB byte a byte en la misma máquina y versión de Godot; entre
 máquinas no está comprobado. `generated.json` es el de la última semilla
 generada, y cada semilla deja su GLB en la caché sin que nada los borre. La
@@ -1182,6 +1183,80 @@ carpeta de trabajo de Godot (`<cache>/generated/<id>/.project`) se vacía en
 cada ejecución. Dos trabajos a la vez sobre el mismo asset comparten esa
 carpeta: lánzalos de uno en uno. No hay cráteres, varios materiales ni
 colisión.
+
+## Entrega 16: verificar y publicar una receta (K011)
+
+Un asset generado no tiene un GLB que dar por bueno: lo que se da por buena
+es la receta, y para eso hay que mirar más de una semilla.
+
+**Reglas sin generar.** `kiln check` sigue la receta en orden con una cota
+del radio que empieza en 1: cada `stretch` la multiplica por su factor menor
+y cada `noise` le resta su amplitud, siempre con el peor extremo de un
+rango. Si llega a cero, la malla puede cruzarse consigo misma y es un error
+(`generator_radius`). Si las amplitudes de ruido suman más de 0,5, aviso
+(`generator_amplitude`): suele salir con picos.
+
+**Verificar.** `kiln verify --asset ID` genera una tanda fija de semillas (la
+de la ficha y las derivadas de ella, siempre las mismas), lee cada GLB y
+mide la malla:
+
+| Hallazgo | Qué mira | |
+|---|---|---|
+| `generated_flipped` | caras que miran hacia dentro | error |
+| `generated_degenerate` | triángulos sin área, aparte de los dos por segmento de los polos | error |
+| `generated_tris` | triángulos distintos de los de la esfera, o por encima de `budget_tris` o de `[rules] max_tris` | error |
+| `generated_unreadable` | un GLB que Kiln no lee | error |
+| `generated_steep` | fracción de caras a más de 60° de la dirección del radio, con el estirado deshecho, sobre el umbral | aviso |
+
+Las comprobaciones propias del GLB pasan por todas las semillas; el
+validador de Khronos y la importación en Godot, por la de la ficha. El
+informe es el `validation.json` de siempre con un bloque `recipe`: el hash
+de la receta, la versión y el hash del generador, lo medido en cada semilla
+y el peor caso.
+
+```toml
+[generate]
+verify_seeds = 16     # semillas de la tanda, de 1 a 64
+steep_max = 0.10      # fracción de caras empinadas a partir de la que avisa
+```
+
+**Publicar.** `kiln publish --asset ID` solo publica si la última
+verificación pasó y corresponde a la receta y al generador de ahora. Deja en
+`[publish] dir/<id>/`:
+
+- `recipe.json`: la receta y, por cada semilla verificada, sus operaciones
+  con los valores ya sorteados, sus triángulos y sus medidas;
+- `kiln_generator.gd`: el guion que construye la malla, el mismo con el que
+  Kiln generó las de la verificación;
+- `asset.json`: el contrato, con la versión, que sube cuando cambia la
+  receta o el guion.
+
+No se publica ningún GLB y Godot no importa nada. Un juego genera una de las
+semillas así:
+
+```gdscript
+var recipe = JSON.parse_string(FileAccess.get_file_as_string("res://assets/kiln/asteroid/recipe.json"))
+var entry = recipe["seeds"][0]
+var made = load("res://assets/kiln/asteroid/kiln_generator.gd").build({"material": entry["material"], "ops": entry["ops"]})
+# made["mesh"] es un ArrayMesh; made["error"] trae el motivo si algo falla
+```
+
+Las órdenes son las mismas de un asset de piezas, también por MCP (`verify`,
+`publish`). `build`, `paint` y `review` siguen sin valer para un asset
+generado.
+
+Límites: la cota del radio es prudente y rechaza alguna receta que saldría
+bien. El umbral de caras empinadas sale de once recetas medidas. Las
+semillas publicadas son las de la tanda: para otra semilla, el juego tiene
+que repetir el sorteo de la entrega 15. La semilla número `k` de la tanda
+(desde 1) son los 32 bits bajos de `mix("<semilla>/verify/<k>")`; si
+repite una anterior, se prueba con `"<semilla>/verify/<k>/<j>"` para `j`
+desde 1. Si Godot no arranca a media tanda, el informe anterior se queda en
+disco: sigue valiendo solo si la receta no cambió. Dos verificaciones a la
+vez del mismo asset comparten carpeta: una cada vez. La malla no lleva
+colisión. Entre
+máquinas o versiones de Godot no está comprobado que la misma semilla dé la
+misma malla.
 
 ## Lo que viene
 

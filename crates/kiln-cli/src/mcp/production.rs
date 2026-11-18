@@ -116,7 +116,7 @@ impl Kiln {
         }
     }
 
-    /// Verifica un asset montado: comprobaciones propias del GLB (estructura, referencias, presupuesto, medidas, anclajes), el glTF Validator de Khronos si está instalado, y Godot importándolo e instanciándolo en un proyecto de prueba. Escribe `validation.json` junto al montaje; `spec_get` lo devuelve. Devuelve un trabajo; sigue su avance llamando a `job` hasta que su estado deje de ser `running`.
+    /// Verifica un asset montado: comprobaciones propias del GLB (estructura, referencias, presupuesto, medidas, anclajes), el glTF Validator de Khronos si está instalado, y Godot importándolo e instanciándolo en un proyecto de prueba. Si el asset es generado (su ficha lleva `[generator]`), genera con Godot una tanda fija de semillas, mide cada malla y falla si alguna se cruza consigo misma o pasa del presupuesto. Escribe `validation.json` junto al montaje; `spec_get` lo devuelve. Devuelve un trabajo; sigue su avance llamando a `job` hasta que su estado deje de ser `running`.
     #[tool(annotations(read_only_hint = false))]
     async fn verify(&self, Parameters(a): Parameters<AssetArgs>) -> Reply {
         if let Err(e) = ops::check_id("el asset", &a.asset) {
@@ -133,7 +133,7 @@ impl Kiln {
         }
     }
 
-    /// Publica un asset verificado en `[publish] dir`/<asset>/ para que el juego lo use: el GLB, sus variantes y el contrato `asset.json` con su versión. Solo publica si la última verificación pasó y corresponde al GLB actual. Sustituye lo publicado antes. Si la carpeta está dentro del proyecto de Godot, Godot la importa abriendo ese proyecto, con los plugins de editor que el proyecto tenga activados. Devuelve un trabajo; sigue su avance llamando a `job`.
+    /// Publica un asset verificado en `[publish] dir`/<asset>/ para que el juego lo use: el GLB, sus variantes y el contrato `asset.json` con su versión. Solo publica si la última verificación pasó y corresponde al GLB actual. De un asset generado publica `recipe.json` (la receta y las semillas verificadas con sus valores ya sorteados), el guion `kiln_generator.gd` y el contrato, sin GLB, y solo si la receta es la que se verificó. Sustituye lo publicado antes. Si la carpeta está dentro del proyecto de Godot, Godot la importa abriendo ese proyecto, con los plugins de editor que el proyecto tenga activados. Devuelve un trabajo; sigue su avance llamando a `job`.
     #[tool(annotations(read_only_hint = false, destructive_hint = true))]
     async fn publish(&self, Parameters(a): Parameters<AssetArgs>) -> Reply {
         if let Err(e) = ops::check_id("el asset", &a.asset) {

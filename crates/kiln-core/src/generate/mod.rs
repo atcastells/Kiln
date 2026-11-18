@@ -2,6 +2,8 @@
 //! table of a spec.
 
 pub mod check;
+pub mod hash;
+pub mod measure;
 pub mod resolve;
 pub mod vocab;
 

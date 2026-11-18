@@ -42,6 +42,35 @@ pub struct Config {
     /// The UI of the game: theme, scripts and scenes to check. None when left out.
     #[serde(default)]
     pub ui: Option<UiSection>,
+    /// How a recipe (`[generator]`) is verified.
+    #[serde(default)]
+    pub generate: GenerateSection,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct GenerateSection {
+    /// Seeds a verification of a recipe generates (1..=64).
+    #[serde(default = "default_verify_seeds")]
+    pub verify_seeds: u32,
+    /// Fraction of steep faces above which a seed gets a warning (0..=1).
+    #[serde(default = "default_steep_max")]
+    pub steep_max: f64,
+}
+
+impl Default for GenerateSection {
+    fn default() -> Self {
+        GenerateSection {
+            verify_seeds: default_verify_seeds(),
+            steep_max: default_steep_max(),
+        }
+    }
+}
+
+fn default_verify_seeds() -> u32 {
+    16
+}
+fn default_steep_max() -> f64 {
+    0.10
 }
 
 /// How serious a finding of a rule is; `error` makes `kiln check` fail.
@@ -507,7 +536,14 @@ impl Config {
     }
 
     pub fn parse(text: &str) -> Result<Config, String> {
-        toml::from_str(text).map_err(|e| e.to_string())
+        let c: Config = toml::from_str(text).map_err(|e| e.to_string())?;
+        if !(1..=64).contains(&c.generate.verify_seeds) {
+            return Err("[generate] verify_seeds debe estar entre 1 y 64".into());
+        }
+        if !(0.0..=1.0).contains(&c.generate.steep_max) {
+            return Err("[generate] steep_max debe estar entre 0 y 1".into());
+        }
+        Ok(c)
     }
 }
 
@@ -538,6 +574,38 @@ mod tests {
         assert_eq!(c.anchors["doorway"].opening_m, Some([1.4, 2.2]));
         assert!(c.anchors["wall_gap"].fits.is_empty());
         assert_eq!(c.publish.dir.as_deref(), Some("godot/assets"));
+    }
+
+    #[test]
+    fn generate_defaults_when_the_section_is_absent() {
+        let c = Config::parse("[project]\nname = \"x\"\n").unwrap();
+        assert_eq!(c.generate.verify_seeds, 16);
+        assert_eq!(c.generate.steep_max, 0.10);
+    }
+
+    #[test]
+    fn reads_the_generate_section() {
+        let c = Config::parse(
+            "[project]\nname = \"x\"\n[generate]\nverify_seeds = 4\nsteep_max = 0.25\n",
+        )
+        .unwrap();
+        assert_eq!(c.generate.verify_seeds, 4);
+        assert_eq!(c.generate.steep_max, 0.25);
+    }
+
+    #[test]
+    fn rejects_generate_values_out_of_range() {
+        let parse = |body: &str| Config::parse(&format!("[project]\nname = \"x\"\n[generate]\n{body}\n"));
+        for body in ["verify_seeds = 0", "verify_seeds = 65"] {
+            let e = parse(body).unwrap_err();
+            assert!(e.contains("[generate] verify_seeds debe estar entre 1 y 64"), "{e}");
+        }
+        for body in ["steep_max = 1.5", "steep_max = -0.1"] {
+            let e = parse(body).unwrap_err();
+            assert!(e.contains("[generate] steep_max debe estar entre 0 y 1"), "{e}");
+        }
+        assert!(parse("verify_seeds = 64\nsteep_max = 1.0").is_ok());
+        assert!(parse("verify_seeds = 1\nsteep_max = 0.0").is_ok());
     }
 
     #[test]
