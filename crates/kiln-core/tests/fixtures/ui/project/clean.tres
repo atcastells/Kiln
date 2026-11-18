@@ -1,0 +1,11 @@
+[gd_resource type="Theme" format=3]
+
+[ext_resource type="FontFile" path="res://IBMPlexMono-Regular.ttf" id="1_font"]
+
+[resource]
+Good/base_type = &"GoodBase"
+GoodBase/base_type = &"Label"
+GoodBase/colors/font_color = Color(1, 1, 1, 1)
+GoodBase/colors/font_outline_color = Color(0, 0, 0, 1)
+GoodBase/constants/outline_size = 2
+GoodBase/fonts/font = ExtResource("1_font")

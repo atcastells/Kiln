@@ -52,3 +52,35 @@ godot_project = "godot"
 
 [context]
 file = "context.toml"
+
+# La UI del juego: Kiln lee el tema y los scripts como texto, sin Godot.
+# Rutas relativas al proyecto. Cada regla lleva `level = "warn" | "error" | "off"`
+# (por defecto warn; error hace que `kiln check` salga con 1).
+[ui]
+theme = "godot/ui/theme.tres"
+scripts = ["godot/ui/*.gd"]                # donde se buscan variaciones usadas y estilo fuera del tema
+# scenes = ["godot/ui/*.tscn"]             # escenas con UI, si las hay
+target = "ui_target.toml"           # estado de los criterios de UI
+
+[ui.contrast]
+normal = 4.5                               # texto normal
+large = 3.0                                # texto grande y lo que no es texto
+large_from_px = 18                         # desde este tamaño el texto cuenta como grande
+level = "warn"
+
+# El texto con contorno (HarborHud) se mide contra el contorno. El resto
+# necesita una pareja: la variación con `font_color` y la caja de estilo de fondo.
+[[ui.contrast.pairs]]
+fg = "HarborTitle"
+bg = "HarborPanel/panel"
+
+[[ui.contrast.pairs]]
+fg = "HarborBody"
+bg = "HarborPanel/panel"
+
+[ui.glyphs]
+level = "warn"
+[ui.theme_coherent]
+level = "warn"
+[ui.theme_only]
+level = "warn"

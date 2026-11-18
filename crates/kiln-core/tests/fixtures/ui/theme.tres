@@ -1,0 +1,33 @@
+[gd_resource type="Theme" format=3]
+
+[ext_resource type="FontFile" path="res://fonts/Sans-Regular.ttf" id="1_aaaaa"]
+[ext_resource type="FontFile" path="res://fonts/Sans-Bold.ttf" id="2_bbbbb"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_card"]
+content_margin_left = 8.0
+bg_color = Color(0.1, 0.2, 0.3, 0.9)
+border_width_left = 1
+border_color = Color(0.5, 0.6, 0.7, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_bar"]
+bg_color = Color(0, 0, 0, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_fill"]
+bg_color = Color(1, 0.5, 0, 1)
+draw_center = false
+
+[resource]
+Callout/base_type = &"CalloutBase"
+Callout/colors/font_color = Color(1, 1, 1, 1)
+CalloutBase/base_type = &"Tag"
+CalloutBase/colors/font_outline_color = Color(0, 0, 0, 0.5)
+CalloutBase/constants/outline_size = 4
+Card/base_type = &"PanelContainer"
+Card/styles/panel = SubResource("StyleBoxFlat_card")
+Gauge/base_type = &"ProgressBar"
+Gauge/styles/background = SubResource("StyleBoxFlat_bar")
+Gauge/styles/fill = SubResource("StyleBoxFlat_fill")
+Tag/base_type = &"Label"
+Tag/colors/font_color = Color(0.9, 0.9, 0.8, 1)
+Tag/font_sizes/font_size = 15
+Tag/fonts/font = ExtResource("1_aaaaa")

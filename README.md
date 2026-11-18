@@ -405,7 +405,7 @@ Son 30 herramientas. Empieza por `status`.
 
 | Grupo | Herramientas |
 |---|---|
-| Leer | `status` resumen y siguiente paso; `tree` árbol, un nivel cada vez; `catalog` kits, piezas, materiales o fichas; `check` hallazgos; `content` conjuntos de contenido; `spec_get` una ficha; `review_sheets` hojas de la revisión como imágenes |
+| Leer | `status` resumen y siguiente paso; `tree` árbol, un nivel cada vez; `catalog` kits, piezas, materiales, fichas o la UI del juego (`what=ui`); `check` hallazgos; `content` conjuntos de contenido; `spec_get` una ficha; `review_sheets` hojas de la revisión como imágenes |
 | Fichas | `spec_write` escribe una ficha si pasa la comprobación; `spec_layout` solo coloca piezas (`at`, `turn`) |
 | Contexto | `context_get` lee; `context_propose` la voz del agente; `context_edit` la voz de la persona |
 | Producción y trabajos | `build` monta con Blender; `paint` aplica materiales; `godot_measure` mide lo que solo Godot abre y exporta las piezas `.blend`; `review` revisa el montaje; `verify` comprueba el GLB montado; `publish` lo lleva al juego; `tools` dice qué herramientas externas hay y su versión; `job` y `jobs` siguen los trabajos |
@@ -940,6 +940,110 @@ La primera vista de la interfaz antigua también mejoró (379 a unos 70 ms) porq
 "Releer" fuerza una lectura nueva del disco con la cabecera explícita `X-Kiln-Fresh: 1`; `Cache-Control: no-cache` (recarga forzada del navegador, DevTools con la caché desactivada) no vacía la caché del servidor.
 
 La mejora está en lo que crece con el proyecto: el catálogo pinta solo las filas visibles, así que el filtro y el cambio de vista dejan de depender de las 5.000 piezas. Inicio tiene más nodos y la memoria es algo mayor porque la interfaz nueva dibuja más información.
+
+## Entrega 13: la UI del juego
+
+Si `kiln.toml` tiene un bloque `[ui]`, Kiln lee el tema de Godot (`.tres`) y los
+scripts de interfaz como texto, sin abrir Godot, y comprueba que la UI se lee
+y es coherente. Sin `[ui]` todo funciona como antes.
+
+- `catalog what=ui` (MCP) da las variaciones del tema con su `base_type`, la
+  cadena de herencia, el color, el tamaño de letra y dónde se usan
+  (`uses`: `fichero:línea`), además de las fuentes (`fonts`) y los colores
+  (`colors`) del tema.
+- Cuatro reglas, cada una con su código de hallazgo y su nivel
+  `level = "warn" | "error" | "off"` (por defecto `warn`; un `error` hace que
+  `kiln check` salga con 1):
+
+| Regla | Código | Qué mira |
+|---|---|---|
+| `contrast` | `ui-contrast`, `ui-contrast-unbacked` | contraste WCAG de cada variación con `font_color` contra su fondo |
+| `glyphs` | `ui-glyph` | cada carácter de un texto literal existe en la tabla `cmap` de las fuentes del tema |
+| `theme_coherent` | `ui-variation-missing`, `ui-variation-unused` | una variación usada que no existe, o definida y sin uso (ni como base de otra) |
+| `theme_only` | `ui-style-outside-theme` | `Color(`, `Color.html`, `add_theme_color_override`, `add_theme_font_size_override`, `add_theme_stylebox_override` y `StyleBoxFlat.new` en el código de los scripts de UI (no dentro de cadenas) |
+
+Una entrada del tema sin `base_type` (los estilos de un tipo de Godot como
+`Button/styles/normal`, o `default_font`) no es una variación y nunca sale como
+huérfana.
+
+Dos códigos más no dependen de ningún nivel:
+
+- `ui-theme` (error): el tema no se puede leer (un `.res` binario, por
+  ejemplo) o está fuera del proyecto. Es lo único que se informa de la UI.
+- `ui-files` (aviso): un patrón o una fuente fuera del proyecto, un glob que no
+  encuentra ningún fichero o un enlace que sale de la raíz. Una fuente que no
+  existe o no se lee sigue el nivel de `glyphs`.
+
+Todas las rutas (tema, `target`, globs y fuentes `res://`) se confinan a la raíz
+del proyecto, y los mensajes nunca citan el contenido de un fichero.
+
+```toml
+[ui]
+theme = "godot/ui/theme.tres"
+scripts = ["godot/ui/*.gd"]          # scripts de UI: variaciones usadas y estilo fuera del tema
+scenes = ["godot/ui/*.tscn"]         # escenas con UI (opcional)
+target = "ui_target.toml"            # estado de los criterios (opcional)
+
+[ui.contrast]
+normal = 4.5
+large = 3.0
+large_from_px = 18
+level = "warn"
+
+[[ui.contrast.pairs]]
+fg = "HarborBody"                    # variación con font_color
+bg = "HarborPanel/panel"             # <variación>/<caja de estilo>
+
+[ui.glyphs]
+level = "warn"
+```
+
+`examples/kiln.toml` lo muestra completo con Puerto Niebla (`examples/godot/ui/`).
+
+**Contra qué fondo se mide.** Si la variación tiene `font_outline_color` y
+`outline_size` mayor que 0 (propios o heredados), se mide contra el contorno,
+que también puede ser translúcido. El resto necesita una pareja `[[ui.contrast.pairs]]`; el fondo es el
+`bg_color` de una caja de estilo del tema. Si el fondo es translúcido se
+compone sobre negro y sobre blanco y gana la razón más baja. Una variación con
+`font_color` sin contorno ni pareja da un hallazgo `info` («sin fondo
+declarado») y no cuenta para el objetivo. Una pareja con `kind = "non_text"`
+mide dos cajas entre sí con el umbral `large`. Las cifras se truncan a un
+decimal, así que 4,46 sale como 4,4 y no aparenta cumplir 4,5.
+
+**El objetivo de UI (`ui_target.toml`).** Los criterios son afirmaciones
+fijadas del contexto cuyo texto empieza por `Cn ·` (por ejemplo «C1 · …»); no se
+escriben de nuevo en Kiln. El fichero `target` lo escribe el agente cuando el
+PO confirma, y Kiln solo lo lee. Una fila por criterio:
+
+```toml
+[[criteria]]
+id = "C1"
+marker = "kiln:contrast"     # po | test | kiln:<regla>
+
+[[criteria]]
+id = "C3"
+marker = "po"
+status = "pending"           # met | unmet | pending
+evidence = "hoja de revisión o prueba"
+```
+
+Para `kiln:<regla>` el estado lo calcula Kiln y el `status` del fichero se
+ignora:
+- cumple si la regla no da avisos ni errores;
+- no cumple si los da, o si hay un `ui-theme` o un `ui-files`, porque entonces
+  la regla no pudo medir;
+- queda pendiente, con un problema, si la regla está en `off`.
+
+Para `po` y `test` manda el `status` del fichero. Una regla, un `marker` o un
+`status` desconocidos dejan el criterio pendiente y añaden un problema. `status` (MCP) da `ui_target: {met, total, percent, open, problems}`,
+con `open` la lista de los que no cumplen o siguen pendientes y `problems` las
+filas sin afirmación o las afirmaciones sin fila.
+
+**Límites.** El texto que llega del servidor del juego no se mira, porque no
+está en el código; solo se miran los literales de los scripts y las propiedades
+`text` de las escenas, no las cadenas construidas en tiempo de ejecución. No hay
+vista nueva en la página: los hallazgos salen en `check` (CLI y MCP) y en la vista
+de comprobaciones que ya existe.
 
 ## Lo que viene
 

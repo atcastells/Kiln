@@ -39,6 +39,106 @@ pub struct Config {
     /// Where a verified asset is published for the game to use.
     #[serde(default)]
     pub publish: PublishSection,
+    /// The UI of the game: theme, scripts and scenes to check. None when left out.
+    #[serde(default)]
+    pub ui: Option<UiSection>,
+}
+
+/// How serious a finding of a rule is; `error` makes `kiln check` fail.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Level {
+    #[default]
+    Warn,
+    Error,
+    Off,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct UiSection {
+    /// The Godot theme (`.tres`), relative to the project.
+    pub theme: String,
+    /// Globs of the UI scripts.
+    #[serde(default)]
+    pub scripts: Vec<String>,
+    /// Globs of the scenes with UI.
+    #[serde(default)]
+    pub scenes: Vec<String>,
+    /// The file that says which check marks each criterion of the UI target.
+    #[serde(default)]
+    pub target: Option<String>,
+    #[serde(default)]
+    pub contrast: ContrastRule,
+    #[serde(default)]
+    pub glyphs: RuleLevel,
+    #[serde(default)]
+    pub theme_coherent: RuleLevel,
+    #[serde(default)]
+    pub theme_only: RuleLevel,
+}
+
+#[derive(Debug, Clone, Copy, Default, Deserialize)]
+pub struct RuleLevel {
+    #[serde(default)]
+    pub level: Level,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ContrastRule {
+    /// Smallest WCAG ratio of normal text.
+    #[serde(default = "default_contrast_normal")]
+    pub normal: f64,
+    /// Smallest ratio of large text and of what is not text.
+    #[serde(default = "default_contrast_large")]
+    pub large: f64,
+    /// Text from this size, in px, counts as large.
+    #[serde(default = "default_large_from_px")]
+    pub large_from_px: u32,
+    #[serde(default)]
+    pub level: Level,
+    /// Foreground and background to measure where the outline does not give one.
+    #[serde(default)]
+    pub pairs: Vec<ContrastPair>,
+}
+
+impl Default for ContrastRule {
+    fn default() -> Self {
+        ContrastRule {
+            normal: default_contrast_normal(),
+            large: default_contrast_large(),
+            large_from_px: default_large_from_px(),
+            level: Level::default(),
+            pairs: Vec::new(),
+        }
+    }
+}
+
+fn default_contrast_normal() -> f64 {
+    4.5
+}
+fn default_contrast_large() -> f64 {
+    3.0
+}
+fn default_large_from_px() -> u32 {
+    18
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ContrastPair {
+    /// A theme variation (text) or `<variation>/<style box>` (non text).
+    pub fg: String,
+    /// `<variation>/<style box>`.
+    pub bg: String,
+    #[serde(default)]
+    pub kind: PairKind,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PairKind {
+    #[default]
+    Text,
+    NonText,
 }
 
 #[derive(Debug, Clone, Default, Deserialize)]
@@ -438,5 +538,41 @@ mod tests {
         assert_eq!(c.anchors["doorway"].opening_m, Some([1.4, 2.2]));
         assert!(c.anchors["wall_gap"].fits.is_empty());
         assert_eq!(c.publish.dir.as_deref(), Some("godot/assets"));
+    }
+
+    #[test]
+    fn a_config_without_ui_loads_with_none() {
+        let c = Config::parse("[project]\nname = \"x\"\n").unwrap();
+        assert!(c.ui.is_none());
+    }
+
+    #[test]
+    fn reads_the_ui_section_and_defaults_the_levels_to_warn() {
+        let c = Config::parse(
+            "[project]\nname = \"x\"\n\
+             [ui]\ntheme = \"ui/theme.tres\"\nscripts = [\"ui/hud.gd\", \"ui/*_panel.gd\"]\n\
+             scenes = [\"ui/main.tscn\"]\ntarget = \"kiln/ui_target.toml\"\n\
+             [ui.contrast]\nnormal = 5.0\n\
+             [[ui.contrast.pairs]]\nfg = \"Body\"\nbg = \"Panel/panel\"\n\
+             [[ui.contrast.pairs]]\nfg = \"Bar/fill\"\nbg = \"Bar/back\"\nkind = \"non_text\"\n\
+             [ui.glyphs]\nlevel = \"error\"\n[ui.theme_only]\nlevel = \"off\"\n",
+        )
+        .unwrap();
+        let ui = c.ui.unwrap();
+        assert_eq!(ui.theme, "ui/theme.tres");
+        assert_eq!(ui.scripts, ["ui/hud.gd", "ui/*_panel.gd"]);
+        assert_eq!(ui.scenes, ["ui/main.tscn"]);
+        assert_eq!(ui.target.as_deref(), Some("kiln/ui_target.toml"));
+        assert_eq!(ui.contrast.normal, 5.0);
+        assert_eq!(ui.contrast.large, 3.0);
+        assert_eq!(ui.contrast.large_from_px, 18);
+        assert_eq!(ui.contrast.level, Level::Warn);
+        assert_eq!(ui.contrast.pairs.len(), 2);
+        assert_eq!(ui.contrast.pairs[0].kind, PairKind::Text);
+        assert_eq!(ui.contrast.pairs[1].kind, PairKind::NonText);
+        assert_eq!(ui.contrast.pairs[1].bg, "Bar/back");
+        assert_eq!(ui.glyphs.level, Level::Error);
+        assert_eq!(ui.theme_coherent.level, Level::Warn);
+        assert_eq!(ui.theme_only.level, Level::Off);
     }
 }
