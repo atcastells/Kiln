@@ -57,6 +57,8 @@ cargo test -p kiln-cli -- --ignored blender_contract blender_piece
 
 Build result (2026-11-18): red test measured 0.62 x 1.67 x 0.464 m; green after the fix. `cargo test --workspace` 423 passed; Clippy clean; ignored tests of `blender_rig` (4), `godot_verify` rig (3), `blender_contract`, `blender_piece`, `blender_turn` and `blender_anchor` green. In ASTRA: the technician rebuilt equals the published version 6; `crew_guard` and `crew_porter` pass `verify`.
 
+- **verifier**: every executed check green: 423 tests, Clippy clean, the four `blender_rig` and the three `godot_verify` rig tests with real Blender and Godot, `blender_contract` and `blender_piece`; in ASTRA the reported size of `crew_guard` and `crew_porter` equals the rest bounds of their GLBs and neither has a `glb_size` finding. Reported amber only because no default test runs `kiln index` on the examples project. Noted: `target/release/kiln` predates the fix; ASTRA uses `target/debug/kiln`.
+
 ## Outside this plan
 
 - Envolvente de animaciones, tolerancia de `glb_size`.
