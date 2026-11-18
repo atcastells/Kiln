@@ -153,6 +153,29 @@ carpeta; `[tools] build` no está confinado al proyecto, igual que antes de
 esta entrega; al pasar una ficha de receta a piezas no se borran
 `recipe.json` ni el guion publicados.
 
+### Cierre de riesgos antes del merge (2026-11-18)
+
+Resolución del product owner: conservar la extracción de `ops/publish.rs`,
+integrar K009 primero y cerrar validación obsoleta y concurrencia.
+
+- **K009** ya estaba en `origin/main` (PR #26 y #27) antes de crear esta
+  rama, que sale de ese punto: K011 se construyó y se probó encima de K009.
+  Las notas de este plan y de los informes que decían «K009 sigue sin unir»
+  eran un error de `main`, que no volvió a mirarlo tras unirse K010.
+- **Validación obsoleta**, hecha en `main` con test rojo primero: el informe
+  anterior se borra al empezar a verificar; el informe guarda `verify_seeds`
+  y `max_tris` y la puerta los compara.
+- **Concurrencia**, hecha en `main` con test rojo primero: cerrojo por asset
+  para generar, verificar y publicar.
+- Comprobado con Godot de verdad: con una verificación en marcha, otra
+  verificación, publicar y la vista previa se niegan; al terminar la
+  primera, publicar funciona y el cerrojo no queda en disco.
+- Sigue sin hacer, menor: un `validation.json` escrito a mano con los datos
+  correctos pasa la puerta; `[tools] build` no está confinado al proyecto;
+  al pasar una ficha de receta a piezas no se borra lo publicado antes. El
+  camino de los assets de piezas conserva su informe anterior si una
+  herramienta corta la verificación: no se ha tocado.
+
 ## Estimate vs actual
 
 De `actuals.jsonl`. Como en K010, los encargos salen en torno a la mitad del

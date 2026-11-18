@@ -123,6 +123,21 @@ el GLB y escribe las medidas.
 - Las reglas de carpeta de hoy (dentro del proyecto, sin seguir enlaces) se
   aplican igual.
 
+### Añadido tras la revisión, por resolución del product owner (2026-11-18)
+
+«Cerrar los riesgos de validación obsoleta y concurrencia antes del merge.»
+
+- **Validación obsoleta.** Verificar borra el informe anterior antes de
+  empezar: una tanda que una herramienta corta no deja un informe válido de
+  una ejecución anterior. El informe guarda `verify_seeds` y `max_tris`, y
+  publicar se niega si `kiln.toml` ya no dice lo mismo.
+- **Concurrencia.** Generar, verificar y publicar un asset generado toman
+  un cerrojo por asset en la caché. El segundo se niega con un mensaje. Un
+  cerrojo abandonado se toma cuando supera el plazo de una herramienta más
+  un minuto sin señales; la verificación da señal en cada semilla.
+- La extracción de la carpeta de destino en `ops/publish.rs` se conserva,
+  con el orden de errores de los assets de piezas como estaba.
+
 ## Policy applied
 
 - **Personal data**: ninguno.

@@ -80,6 +80,17 @@ cota del radio.
 - La vista previa de K010: `kiln generate --seed 5` sigue dejando su GLB y
   su `generated.json`, y verificar después no los toca.
 
+## Cierre de riesgos, con Godot de verdad
+
+- Con `kiln verify --asset asteroid` en marcha: una segunda verificación,
+  `kiln publish` y `kiln generate --seed 5` salen con 2 y el mensaje
+  «ya se está generando o verificando: espera a que termine». La primera
+  termina con 0 y no queda cerrojo en la caché. Después, publicar funciona.
+- El informe anterior se borra al empezar a verificar (test con un Godot que
+  falla: no queda informe).
+- Publicar tras cambiar `verify_seeds` o `max_tris` en `kiln.toml`: se niega
+  («las reglas de kiln.toml cambiaron») por test, sin Godot.
+
 ## Sin comprobar
 
 - La puerta por versión o hash del guion con un guion de verdad distinto

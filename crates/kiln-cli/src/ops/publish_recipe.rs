@@ -32,6 +32,8 @@ pub fn publish(
         .iter()
         .find(|s| s.asset.id == id)
         .ok_or_else(|| format!("no hay ficha con id «{id}»"))?;
+    // a verification under way may be about to replace the report the gate reads
+    let _lock = crate::generate::lock(project, &cfg, id)?;
     let verified = gate(project, &cfg, spec)?;
     let (dest, dir) = super::publish::dest_dir(project, &cfg, id)?;
     let r = &verified.recipe;
@@ -148,6 +150,12 @@ pub fn gate(
             "la verificación de «{id}» no generó ninguna semilla: vuelve a verificar"
         ));
     }
+    // what in kiln.toml decides the verdict: how many seeds and the triangle rule
+    if recipe["verify_seeds"] != cfg.generate.verify_seeds || recipe["max_tris"] != cfg.rules.max_tris {
+        return Err(format!(
+            "las reglas de kiln.toml cambiaron desde que se verificó «{id}»: vuelve a verificar"
+        ));
+    }
     Ok(Verified {
         recipe: recipe.clone(),
         checks: v["checks"].clone(),
@@ -203,7 +211,8 @@ mod tests {
     fn report(valid: bool, recipe_sha: &str, version: u64, script_sha: &str, seeds: Value) -> Value {
         json!({ "asset": "rock", "valid": valid, "checks": [{ "name": "tris", "ok": true }],
             "recipe": { "recipe_sha256": recipe_sha, "generator_version": version,
-                "script_sha256": script_sha, "seeds": seeds } })
+                "script_sha256": script_sha, "seeds": seeds,
+                "verify_seeds": 16, "max_tris": 20_000 } })
     }
 
     fn write(p: &Proj, cfg: &kiln_core::Config, v: &Value) {
@@ -491,5 +500,30 @@ mod tests {
         let (cfg, edited) = state(&p);
         let e = gate(&p.0, &cfg, &edited).err().unwrap();
         assert_eq!(e, "la receta de «rock» cambió después de verificarla: vuelve a verificar");
+    }
+
+    #[test]
+    fn refuses_when_the_rules_of_kiln_toml_changed_since_the_verification() {
+        for (tag, extra) in [("rules-seeds", "\n[generate]\nverify_seeds = 4\n"), ("rules-tris", "\n[rules]\nmax_tris = 50\n")] {
+            let (p, _) = ready(tag, true);
+            let toml = p.0.join("kiln.toml");
+            let mut t = std::fs::read_to_string(&toml).unwrap();
+            t.push_str(extra);
+            std::fs::write(&toml, t).unwrap();
+            let e = publish_it(&p).unwrap_err();
+            assert!(e.contains("cambiaron desde que se verificó"), "{tag}: {e}");
+            assert!(!p.0.join("godot").exists(), "{tag}");
+        }
+    }
+
+    #[test]
+    fn publish_is_refused_while_the_asset_is_locked() {
+        let (p, cfg) = ready("pub-lock", true);
+        let held = crate::generate::lock(&p.0, &cfg, "rock").unwrap();
+        let got = publish_it(&p);
+        drop(held);
+        assert!(got.is_err_and(|e| e.contains("ya se está generando o verificando")));
+        assert!(!p.0.join("godot").exists());
+        assert!(publish_it(&p).is_ok());
     }
 }

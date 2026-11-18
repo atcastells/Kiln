@@ -1180,8 +1180,8 @@ dan el mismo GLB byte a byte en la misma máquina y versión de Godot; entre
 máquinas no está comprobado. `generated.json` es el de la última semilla
 generada, y cada semilla deja su GLB en la caché sin que nada los borre. La
 carpeta de trabajo de Godot (`<cache>/generated/<id>/.project`) se vacía en
-cada ejecución. Dos trabajos a la vez sobre el mismo asset comparten esa
-carpeta: lánzalos de uno en uno. No hay cráteres, varios materiales ni
+cada ejecución. Dos trabajos a la vez sobre el mismo asset no se pisan: el
+segundo se niega (entrega 16). No hay cráteres, varios materiales ni
 colisión.
 
 ## Entrega 16: verificar y publicar una receta (K011)
@@ -1251,10 +1251,19 @@ semillas publicadas son las de la tanda: para otra semilla, el juego tiene
 que repetir el sorteo de la entrega 15. La semilla número `k` de la tanda
 (desde 1) son los 32 bits bajos de `mix("<semilla>/verify/<k>")`; si
 repite una anterior, se prueba con `"<semilla>/verify/<k>/<j>"` para `j`
-desde 1. Si Godot no arranca a media tanda, el informe anterior se queda en
-disco: sigue valiendo solo si la receta no cambió. Dos verificaciones a la
-vez del mismo asset comparten carpeta: una cada vez. La malla no lleva
-colisión. Entre
+desde 1. La malla no lleva colisión.
+
+**Un informe viejo no vale.** Verificar borra primero el informe anterior,
+así que una tanda que una herramienta corta a medias no deja ninguno en pie
+y publicar pide verificar de nuevo. Además de la receta y el generador,
+publicar comprueba que `[generate] verify_seeds` y `[rules] max_tris` son
+los de cuando se verificó.
+
+**Una cosa cada vez por asset.** Generar, verificar y publicar un asset
+generado toman un cerrojo (`<cache>/generated/<id>/.lock`); mientras uno
+está en marcha, los otros se niegan y lo dicen. Si un proceso muere sin
+soltarlo, el siguiente lo toma cuando lleva sin dar señales más que el
+plazo de una herramienta (`[tools] timeout_s`) y un minuto. Entre
 máquinas o versiones de Godot no está comprobado que la misma semilla dé la
 misma malla.
 

@@ -37,6 +37,17 @@ pub fn verify(
         .find(|s| s.asset.id == id)
         .ok_or(format!("no hay ficha con id «{id}»"))?;
     let palette: Vec<&str> = cat.materials.iter().map(|m| m.key.as_str()).collect();
+    let lock = crate::generate::lock(project, &cfg, id)?;
+    // the earlier verdict goes first: a run that a tool cuts short must leave
+    // no report standing, least of all a valid one
+    let report_file = kiln_core::build::out_dir(project, &cfg, id).join("validation.json");
+    if std::fs::symlink_metadata(&report_file).is_ok() {
+        std::fs::remove_file(&report_file).map_err(|e| e.to_string())?;
+    }
+    let say = &mut |line: String| {
+        lock.touch();
+        say(line)
+    };
     let mut outcome = run(project, &cfg, spec, &palette, say)?;
     let subject = format!("asset:{id}");
     let mut outside = Vec::new();
@@ -100,6 +111,7 @@ pub fn verify(
         "generator_version": crate::generate::GENERATOR_VERSION,
         "script_sha256": crate::generate::builder_sha256(),
         "verify_seeds": cfg.generate.verify_seeds,
+        "max_tris": cfg.rules.max_tris,
         "seeds": seeds,
         "worst": worst,
     }));
@@ -481,5 +493,32 @@ mod tests {
         let out = got.unwrap();
         assert!(codes(&out, "generator_budget") > 0, "{:?}", out.findings);
         assert!(out.seeds.is_empty() && !ran);
+    }
+
+    #[test]
+    fn a_verification_that_cannot_run_leaves_no_report_behind() {
+        let p = setup("vr-stale", &spec_text("", 200), &sphere_glb(8, false), "");
+        verify(&p, None, "rock", &mut |_| {}).unwrap();
+        let (f, before) = report_of(&p);
+        std::fs::write(p.join("fake-godot"), "#!/bin/sh\nexit 3\n").unwrap();
+        let again = verify(&p, None, "rock", &mut |_| {});
+        let left = f.exists();
+        std::fs::remove_dir_all(&p).unwrap();
+        assert_eq!(before["valid"], true);
+        assert!(again.is_err());
+        assert!(!left, "the report of the earlier run still stands as valid");
+    }
+
+    #[test]
+    fn verify_is_refused_while_the_asset_is_locked() {
+        let p = setup("vr-lock", &spec_text("", 200), &sphere_glb(8, false), "");
+        let cfg = crate::production::config(&p, None).unwrap();
+        let held = crate::generate::lock(&p, &cfg, "rock").unwrap();
+        let got = verify(&p, None, "rock", &mut |_| {});
+        let ran = p.join("ran").exists();
+        drop(held);
+        std::fs::remove_dir_all(&p).unwrap();
+        assert!(got.is_err_and(|e| e.contains("ya se está generando o verificando")));
+        assert!(!ran);
     }
 }

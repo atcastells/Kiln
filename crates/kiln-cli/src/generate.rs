@@ -81,6 +81,7 @@ pub fn generate_asset(
     let seed = seed.unwrap_or(g.seed);
     let resolved = resolve(g, seed);
 
+    let _lock = lock(project, &cfg, id)?;
     let out_dir = cache_dir(project, &cfg.tools.cache, &Path::new("generated").join(id))?;
     let report_file = out_dir.join("generated.json");
     remove_entry(&report_file)?;
@@ -122,6 +123,62 @@ fn remove_entry(path: &Path) -> Result<(), String> {
         Err(_) => Ok(()),
     }
     .map_err(|e| e.to_string())
+}
+
+/// Held while an asset is generated, verified or published: its folders in
+/// the cache are shared, so one run at a time. Dropping it frees the asset.
+#[derive(Debug)]
+pub struct AssetLock(PathBuf);
+
+impl Drop for AssetLock {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.0);
+    }
+}
+
+impl AssetLock {
+    /// Says the run is still alive: a lock is only taken over when it is
+    /// older than any single tool run can be.
+    pub fn touch(&self) {
+        if let Ok(f) = std::fs::File::options().write(true).open(&self.0) {
+            let _ = f.set_modified(std::time::SystemTime::now());
+        }
+    }
+}
+
+/// Takes the lock of `id` or says who must end first. A run that died
+/// without freeing it is not obeyed for ever: past the time limit of a tool
+/// plus a margin with no sign of life, the lock is taken over.
+pub fn lock(project: &Path, cfg: &kiln_core::Config, id: &str) -> Result<AssetLock, String> {
+    crate::ops::check_id("el asset", id)?;
+    let dir = cache_dir(project, &cfg.tools.cache, &Path::new("generated").join(id))?;
+    let file = dir.join(".lock");
+    for attempt in 0..2 {
+        // created only if nothing is there: a link left in its place is not followed
+        match std::fs::File::options().write(true).create_new(true).open(&file) {
+            Ok(mut f) => {
+                use std::io::Write;
+                let _ = write!(f, "{}", std::process::id());
+                return Ok(AssetLock(file));
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                let idle = std::fs::symlink_metadata(&file)
+                    .and_then(|m| m.modified())
+                    .ok()
+                    .and_then(|t| t.elapsed().ok());
+                if attempt == 0 && idle.is_some_and(|a| a.as_secs() > cfg.tools.timeout_s + 60) {
+                    let _ = std::fs::remove_file(&file);
+                    continue;
+                }
+                return Err(format!(
+                    "«{id}» ya se está generando o verificando: espera a que termine (si no hay nada en marcha, borra {}/generated/{id}/.lock)",
+                    cfg.tools.cache
+                ));
+            }
+            Err(e) => return Err(format!("no se puede bloquear «{id}»: {e}")),
+        }
+    }
+    Err(format!("no se puede bloquear «{id}»"))
 }
 
 /// `<cache>/generated/<id>/verify`, created empty.
@@ -383,5 +440,50 @@ pub(crate) mod tests {
         std::fs::remove_dir_all(&p).unwrap();
         assert_eq!(parts, "«crate» no es un asset generado");
         assert!(!bad.is_empty() && !ran);
+    }
+
+    #[test]
+    fn an_asset_is_locked_by_one_run_at_a_time() {
+        let p = project("lock");
+        let cfg = crate::production::config(&p, None).unwrap();
+        let first = lock(&p, &cfg, "rock").unwrap();
+        let second = lock(&p, &cfg, "rock").map(|_| ());
+        let other = lock(&p, &cfg, "stone").is_ok();
+        drop(first);
+        let third = lock(&p, &cfg, "rock").is_ok();
+        std::fs::remove_dir_all(&p).unwrap();
+        assert!(second.is_err_and(|e| e.contains("ya se está generando o verificando")));
+        assert!(other, "another asset was locked too");
+        assert!(third, "the lock outlived its run");
+    }
+
+    #[test]
+    fn a_lock_left_by_a_dead_run_is_taken_over() {
+        let p = project("lock-stale");
+        let cfg = crate::production::config(&p, None).unwrap();
+        std::mem::forget(lock(&p, &cfg, "rock").unwrap());
+        let file = p.join("kiln/cache/generated/rock/.lock");
+        let fresh = lock(&p, &cfg, "rock").is_err();
+        let long_ago = std::time::SystemTime::now() - std::time::Duration::from_secs(cfg.tools.timeout_s + 3600);
+        std::fs::File::options().write(true).open(&file).unwrap().set_modified(long_ago).unwrap();
+        let taken = lock(&p, &cfg, "rock").is_ok();
+        std::fs::remove_dir_all(&p).unwrap();
+        assert!(fresh, "a lock just taken was ignored");
+        assert!(taken, "a lock older than any run was respected");
+    }
+
+    #[test]
+    fn generate_asset_is_refused_while_the_asset_is_locked() {
+        let p = project("lock-generate");
+        let cfg = crate::production::config(&p, None).unwrap();
+        let held = lock(&p, &cfg, "rock").unwrap();
+        let got = generate_asset(&p, None, "rock", None, |_| {}).map(|_| ());
+        let ran = p.join("ran").exists();
+        drop(held);
+        let after = generate_asset(&p, None, "rock", None, |_| {}).is_ok();
+        std::fs::remove_dir_all(&p).unwrap();
+        assert!(got.is_err_and(|e| e.contains("ya se está generando o verificando")));
+        assert!(!ran, "Godot ran under somebody else's lock");
+        assert!(after);
     }
 }
