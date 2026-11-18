@@ -14,7 +14,7 @@ n; «D-n», la fila n de la tabla de decisiones del intent.
 | R1 | ASTRA lleva tres fichas de receta del mismo asteroide, de 32, 64 y 128 segmentos, verificadas y publicadas con Kiln. | P-2, D-3, D-6, K12-1 | `kiln check` sin errores de esas fichas; `kiln verify` válido para las tres; en `godot/assets/kiln/asteroid_{32,64,128}/` están `recipe.json`, `kiln_generator.gd` y `asset.json`, y ningún GLB. |
 | R2 | Un consumidor en Godot localiza un paquete, comprueba que es el que dice su contrato y que sabe leerlo, y construye la malla de una semilla de la tanda. | P-2, D-2, K12-1, K12-2 | Prueba sin ventana y sin servidor: para cada paquete y cada una de sus 16 semillas devuelve una malla; en la carpeta publicada no hay ningún `.glb`. |
 | R3 | La malla construida es la que Kiln verificó. | P-4, D-4, K12-5 | Para cada semilla: los triángulos son exactamente los de `recipe.json` y cada medida difiere menos de 1 parte en 100 000. Medido antes: 6 partes en 100 millones. |
-| R4 | La misma semilla da siempre la misma malla en el entorno probado; semillas distintas dan mallas distintas. | P-4, K12-3, K12-4 | Construir dos veces la misma semilla da el mismo hash de vértices e índices; tres semillas dan tres hashes y tres juegos de medidas distintos. Los hashes de este Mac se anotan; no se promete que coincidan en otro sistema o versión de Godot. |
+| R4 | La misma semilla da siempre la misma malla en el entorno probado; semillas distintas dan mallas distintas. | P-4, K12-3, K12-4 | Construir dos veces la misma semilla da el mismo hash de vértices e índices; tres semillas dan tres hashes y tres juegos de medidas distintos. Los hashes de este Mac se anotan; no se promete ni se comprueba que coincidan en otro sistema o versión de Godot. |
 | R5 | Un paquete ausente, roto o que el consumidor no sabe leer da un error controlado, sin error de guion. | P-2, K12-7 | Un caso de prueba por cada negativa de la lista de abajo; el registro de la prueba no contiene `SCRIPT ERROR`. |
 | R6 | Una escena independiente enseña el asteroide: cámara que gira alrededor, luz, referencia de escala, semilla y paquete por parámetro, y en pantalla sus dimensiones, triángulos, vértices y tiempo de generación. | P-3, K12-6 | `godot --path godot res://tests/asteroid_procedural.tscn -- --asset=asteroid_64 --seed=42` abre, dibuja y enseña los datos; con un paquete que no existe enseña el error y no se cierra. Prueba sin ventana de que la escena carga y rellena sus datos. |
 | R7 | Capturas de tres semillas por resolución desde varios ángulos, y métricas: tiempo de generación, triángulos, vértices, memoria aproximada, coste de dibujo y comportamiento al reconstruir la misma semilla. | P-6, D-5, D-7, D-8, K12-10 | `scripts/godot_station.sh --asteroid-shots DIR` deja las PNG y un `cost.json` con todo lo anterior, el equipo y el renderizador. |
@@ -172,10 +172,9 @@ servidor. Parámetros tras `--`: `--asset=ID` (por defecto `asteroid_64`) y
   - reconstruir 200 veces la misma semilla: tiempos y si la memoria crece;
   - equipo, sistema, versión de Godot y renderizador.
 - **Dónde se mide.** Todo en este Mac: sin ventana para generación y
-  comparación, con ventana (Metal) para capturas y coste de dibujo. El
-  contenedor Linux queda solo para una pasada sin ventana que compare los
-  hashes de malla con los del Mac; su resultado se anota, sea cual sea, y no
-  condiciona la aceptación.
+  comparación, con ventana (Metal) para capturas y coste de dibujo, fuera
+  del horario laboral. Docker es el sustituto de las ventanas en horario
+  laboral, no una medida de este piloto: no se compara la malla con Linux.
 
 ### Dónde va cada cosa
 
@@ -214,7 +213,7 @@ servidor. Parámetros tras `--`: `--asset=ID` (por defecto `asteroid_64`) y
 | Risk | Impact | Mitigation |
 |------|--------|------------|
 | Los polos de la esfera se notan, más a 128 segmentos | El asteroide tiene una estrella visible arriba y abajo | Es un límite conocido del vocabulario de Kiln; se enseña en las capturas y se anota para decidir si hace falta otra forma base. |
-| La malla no coincide entre el Mac y Linux | No hay reproducibilidad entre sistemas | La aceptación solo pide el entorno probado; la comparación se hace y se anota. |
+| La malla no coincide entre sistemas o versiones de Godot | No hay reproducibilidad fuera de este Mac | La aceptación solo pide el entorno probado. No se mide en este piloto; el handoff lo deja dicho como no comprobado. |
 | El tiempo de cuadro en una escena casi vacía dice poco | El coste de dibujo se lee de más | Se da junto a llamadas y primitivas y con la escena sin asteroide como referencia; no se fija ningún presupuesto. |
 | Meter la fase nueva entre las de por defecto alarga la regresión de ASTRA | Segundos de más en cada pasada | No arranca servidor; si pasa de 10 s se saca de las fases por defecto. |
 | Otra sesión trabaja en la copia de ASTRA | Cambios pisados | Antes de cambiar de rama en ASTRA se mira su estado; lo ajeno no se toca. |

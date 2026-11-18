@@ -199,6 +199,7 @@ Los criterios K12-1 a K12-10 y la condición de cierre, citados arriba.
 | 2026-11-18 | Receta del asteroide | Sus parámetros se proponen y se miden en la spec; el intent solo fija una ficha por resolución | Aaron Castells |
 | 2026-11-18 | Cómo se enseña el progreso | Con capturas en cada avance, no solo al cierre. Se guardan en `.sdlc/k012-asteroid-pilot/shots/`, numeradas por avance | Aaron Castells |
 | 2026-11-18 | Godot con ventana | «We can work without container now»: las capturas y el coste de dibujo se sacan con ventana en el escritorio, sin contenedor. Sustituye a la parte de contenedor de la fila «Entorno» para las ventanas | Aaron Castells |
+| 2026-11-18 | Docker | «Docker es para horario laboral»: es el sustituto de las ventanas de 08:00 a 17:00, no una medida del piloto. Fuera de ese horario se trabaja en el escritorio. Se retira la comparación de la malla entre este Mac y Linux | Aaron Castells |
 | 2026-11-18 | Documentación que falte de ASTRA | Se busca en el repo de ASTRA; si el documento no está, se lee el código. El de AST-EST y la hoja de ruta se añadieron al repo ese día | Aaron Castells |
 
 ---
