@@ -197,6 +197,8 @@ Los criterios K12-1 a K12-10 y la condición de cierre, citados arriba.
 | 2026-11-18 | Cómo se comprueba la malla hecha en ASTRA | Comparándola con el paquete: mismos triángulos y medidas que `recipe.json` da para esa semilla. Los errores geométricos los juzgó `kiln verify` al publicar. No se exporta GLB ni se añade nada a Kiln | Aaron Castells |
 | 2026-11-18 | Entorno | Generación, medidas y tiempos en este Mac sin ventana y en el contenedor Linux; coste de dibujo con Metal en el escritorio, con ventana, solo entre las 17:00 y las 08:00 (interpretación de quien escribe: la opción elegida se suma a Mac y contenedor) | Aaron Castells |
 | 2026-11-18 | Receta del asteroide | Sus parámetros se proponen y se miden en la spec; el intent solo fija una ficha por resolución | Aaron Castells |
+| 2026-11-18 | Cómo se enseña el progreso | Con capturas en cada avance, no solo al cierre. Se guardan en `.sdlc/k012-asteroid-pilot/shots/`, numeradas por avance | Aaron Castells |
+| 2026-11-18 | Godot con ventana | «We can work without container now»: las capturas y el coste de dibujo se sacan con ventana en el escritorio, sin contenedor. Sustituye a la parte de contenedor de la fila «Entorno» para las ventanas | Aaron Castells |
 | 2026-11-18 | Documentación que falte de ASTRA | Se busca en el repo de ASTRA; si el documento no está, se lee el código. El de AST-EST y la hoja de ruta se añadieron al repo ese día | Aaron Castells |
 
 ---
