@@ -185,12 +185,43 @@ Hallazgos importantes, todos corregidos con su prueba:
   sincronía vertical, memoria que no seguía a la malla). Se midieron de otro
   modo y el fichero dice qué es cada una.
 
-Queda sin hacer, menor: la caché de guiones de Godot sirve el primer guion
-cargado aunque el fichero cambie después dentro del mismo proceso; la
-limpieza de la prueba seguiría un enlace plantado en `user://`; el modo de
-capturas cuenta ficheros viejos si se reutiliza la carpeta; `kiln check` no
-imprime ninguna línea propia de las fichas de receta cuando no tienen
-hallazgos.
+Queda documentado para un incremento posterior, por decisión del product
+owner: la caché de guiones de Godot sirve el primer guion cargado aunque el
+fichero cambie después dentro del mismo proceso; el modo de capturas cuenta
+ficheros viejos si se reutiliza la carpeta; no hay prueba con un proyecto
+exportado. Menor: `kiln check` no imprime ninguna línea propia de las fichas
+de receta cuando no tienen hallazgos.
+
+### Limpieza recursiva de las pruebas y enlaces simbólicos
+
+Comprobado aparte, a petición del product owner, después de unir el PR del
+piloto: que ninguna limpieza recursiva de pruebas pueda borrar fuera de su
+carpeta temporal.
+
+- **Se reproducía en ASTRA.** `_remove_tree` de
+  `godot/tests/asteroid_recipe_test.gd` recorría `get_directories()`, que
+  lista un enlace a una carpeta como si fuera una carpeta: entraba en él y
+  borraba lo de fuera. Con la función real, un enlace dentro de
+  `user://k012_test/` hacia otra carpeta dejó borrados sus dos ficheros; y
+  la función aceptaba cualquier ruta, también fuera de la carpeta de prueba.
+- **Corregido** en el commit `fix: the cleanup of the asteroid test…` de
+  ASTRA: la función solo trabaja dentro de `user://k012_test/`, y un enlace
+  se quita como enlace, sin entrar.
+- **Prueba de regresión**, dentro de la fase `asteroid`: planta un enlace a
+  una carpeta y otro a un fichero, limpia, y exige que lo de fuera siga
+  intacto, que la carpeta de prueba desaparezca y que pedir la limpieza de
+  una carpeta ajena no borre nada. Falló antes del arreglo con tres líneas
+  `FAIL` y pasa después.
+- **Las demás limpiezas recursivas de pruebas, sin cambio:**
+  - Kiln: todas son `std::fs::remove_dir_all`. Comprobado con un programa
+    aparte y rustc 1.94.0: con enlaces dentro de la carpeta, y con la propia
+    ruta siendo un enlace, lo de fuera queda intacto.
+  - ASTRA: tres guiones (`godot_e2e.sh`, `godot_ui_flow.sh`,
+    `godot_window.sh`) borran con `rm -rf` una carpeta que ellos mismos
+    crean con `mktemp -d`. `rm` no sigue enlaces al recorrer. No se ejecutó
+    aquí: `rm -rf` está denegado en los permisos del agente.
+- El borrado por enlaces que encontró K011 era de código de producto
+  (`verify_dir`), no de una prueba, y ya tenía su arreglo y su prueba.
 
 ## Estado Git
 
