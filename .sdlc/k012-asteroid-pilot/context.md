@@ -51,3 +51,12 @@ branch `k012-asteroid-pilot`. This file and the chain live in Kiln.
 
 ## Learned
 
+- The consumer, `godot/procedural/recipe_package.gd` (load it with `const Package := preload("res://procedural/recipe_package.gd")`):
+  - `Package.open(id: String, base := Package.PUBLISHED) -> Dictionary`: `{"error": String}` or `{"id", "dir", "contract", "recipe", "generator", "seeds": Array[int]}`.
+  - `Package.build(package, seed: int) -> Dictionary`: `{"error": String}` or `{"mesh": ArrayMesh, "seed", "tris", "vertices", "size_m": Vector3, "ms": float, "hash": String, "expected_tris", "expected_size_m"}`. It refuses a seed outside the batch, a malformed entry and a mesh that does not match the package.
+- Measured on this Mac, headless: average build 0.7 ms (32 segments, 3 264 vertices), 2.6 ms (64, 12 672), 9.9 ms (128, 49 920). The asteroids are 2.0 to 3.3 km long.
+- The published script sets a default white `StandardMaterial3D` on surface 0: a scene gives the look with `material_override`.
+- JSON numbers arrive as float: use `int()`. `:=` cannot infer from untyped loop variables: write the type.
+- Copying into `user://`: `FileAccess.get_file_as_bytes` then `FileAccess.open(path, WRITE).store_buffer`, after `DirAccess.make_dir_recursive_absolute`; `load()` of a `.gd` in `user://` works.
+- A windowed capture that works here (Metal): add the nodes under `root`, `await process_frame` a few times, `await RenderingServer.frame_post_draw`, then `root.get_texture().get_image().save_png(path)`. For objects kilometres across set `Camera3D.far` and `DirectionalLight3D.directional_shadow_max_distance` accordingly.
+

@@ -1,0 +1,223 @@
+{
+  "assets": {
+    "asteroid_128": {
+      "build_ms": {
+        "max": 13.975,
+        "mean": 13.4845,
+        "min": 13.114,
+        "runs": 20
+      },
+      "first_build_ms": 16.047,
+      "memory": {
+        "video_buffer_delta": 0,
+        "video_total_delta": 0
+      },
+      "mesh_bytes": 2396160,
+      "rebuild": {
+        "first_10_mean_ms": 13.4496,
+        "growth_note": "static_growth es la diferencia de la memoria estática del motor antes y después de 200 construcciones de la misma semilla, con cada malla descartada.",
+        "last_10_mean_ms": 13.8143,
+        "max_ms": 15.029,
+        "mean_ms": 13.62158,
+        "runs": 200,
+        "same_hash": true,
+        "static_after": 99614444,
+        "static_before": 99614052,
+        "static_growth": 392
+      },
+      "render": {
+        "empty": {
+          "draw_calls": 0,
+          "fps_mean": 249.581950233359,
+          "frame_ms_max": 10.884,
+          "frame_ms_mean": 4.0067,
+          "frame_ms_median": 4.01,
+          "primitives": 0
+        },
+        "frames_measured": 120,
+        "primitives_note": "Con sombras se dibujan 33280 primitivas, sin sombras 16640; la malla tiene 16640 triángulos.",
+        "vsync_during_measure": "disabled",
+        "warmup_frames": 10,
+        "with_asteroid": {
+          "draw_calls": 2,
+          "fps_mean": 224.114328189287,
+          "frame_ms_max": 10.451,
+          "frame_ms_mean": 4.46200833333333,
+          "frame_ms_median": 4.316,
+          "primitives": 33280
+        },
+        "with_asteroid_no_shadows": {
+          "draw_calls": 1,
+          "fps_mean": 233.125139632245,
+          "frame_ms_max": 11.187,
+          "frame_ms_mean": 4.28954166666666,
+          "frame_ms_median": 4.238,
+          "primitives": 16640
+        }
+      },
+      "script_ms_mean": 10.85335,
+      "seed": 42,
+      "size_m": [
+        2631.11645507812,
+        1689.02783203125,
+        2102.01489257812
+      ],
+      "timing_note": "build_ms es la llamada completa del consumidor (comprobación de la forma, el script publicado y la lectura de la malla para medirla y calcular su hash); script_ms_mean es solo el script publicado. first_build_ms es la primera construcción de este paquete en el proceso, medida antes de las 20 y más lenta que las siguientes.",
+      "tris": 16640,
+      "vertices": 49920
+    },
+    "asteroid_32": {
+      "build_ms": {
+        "max": 1.797,
+        "mean": 1.64185,
+        "min": 1.525,
+        "runs": 20
+      },
+      "first_build_ms": 10.252,
+      "memory": {
+        "video_buffer_delta": 0,
+        "video_total_delta": 1048576
+      },
+      "mesh_bytes": 156672,
+      "rebuild": {
+        "first_10_mean_ms": 1.4987,
+        "growth_note": "static_growth es la diferencia de la memoria estática del motor antes y después de 200 construcciones de la misma semilla, con cada malla descartada.",
+        "last_10_mean_ms": 1.4867,
+        "max_ms": 1.671,
+        "mean_ms": 1.42208,
+        "runs": 200,
+        "same_hash": true,
+        "static_after": 43696576,
+        "static_before": 43696184,
+        "static_growth": 392
+      },
+      "render": {
+        "empty": {
+          "draw_calls": 0,
+          "fps_mean": 202.961890522356,
+          "frame_ms_max": 26.529,
+          "frame_ms_mean": 4.92703333333333,
+          "frame_ms_median": 3.4355,
+          "primitives": 0
+        },
+        "frames_measured": 120,
+        "primitives_note": "Con sombras se dibujan 2176 primitivas, sin sombras 1088; la malla tiene 1088 triángulos.",
+        "vsync_during_measure": "disabled",
+        "warmup_frames": 10,
+        "with_asteroid": {
+          "draw_calls": 2,
+          "fps_mean": 228.563592105413,
+          "frame_ms_max": 11.858,
+          "frame_ms_mean": 4.37515,
+          "frame_ms_median": 4.1805,
+          "primitives": 2176
+        },
+        "with_asteroid_no_shadows": {
+          "draw_calls": 1,
+          "fps_mean": 242.278875099183,
+          "frame_ms_max": 11.959,
+          "frame_ms_mean": 4.127475,
+          "frame_ms_median": 4.0385,
+          "primitives": 1088
+        }
+      },
+      "script_ms_mean": 1.1718,
+      "seed": 42,
+      "size_m": [
+        2565.24975585938,
+        1675.59338378906,
+        2050.12890625
+      ],
+      "timing_note": "build_ms es la llamada completa del consumidor (comprobación de la forma, el script publicado y la lectura de la malla para medirla y calcular su hash); script_ms_mean es solo el script publicado. first_build_ms es la primera construcción de este paquete en el proceso, medida antes de las 20 y más lenta que las siguientes.",
+      "tris": 1088,
+      "vertices": 3264
+    },
+    "asteroid_64": {
+      "build_ms": {
+        "max": 4.322,
+        "mean": 4.07505,
+        "min": 3.801,
+        "runs": 20
+      },
+      "first_build_ms": 6.45,
+      "memory": {
+        "video_buffer_delta": 0,
+        "video_total_delta": 0
+      },
+      "mesh_bytes": 608256,
+      "rebuild": {
+        "first_10_mean_ms": 4.019,
+        "growth_note": "static_growth es la diferencia de la memoria estática del motor antes y después de 200 construcciones de la misma semilla, con cada malla descartada.",
+        "last_10_mean_ms": 4.124,
+        "max_ms": 4.44,
+        "mean_ms": 4.1089,
+        "runs": 200,
+        "same_hash": true,
+        "static_after": 99571353,
+        "static_before": 99570961,
+        "static_growth": 392
+      },
+      "render": {
+        "empty": {
+          "draw_calls": 0,
+          "fps_mean": 240.871956482467,
+          "frame_ms_max": 12.557,
+          "frame_ms_mean": 4.15158333333333,
+          "frame_ms_median": 4.1535,
+          "primitives": 0
+        },
+        "frames_measured": 120,
+        "primitives_note": "Con sombras se dibujan 8448 primitivas, sin sombras 4224; la malla tiene 4224 triángulos.",
+        "vsync_during_measure": "disabled",
+        "warmup_frames": 10,
+        "with_asteroid": {
+          "draw_calls": 2,
+          "fps_mean": 237.627526772701,
+          "frame_ms_max": 13.314,
+          "frame_ms_mean": 4.20826666666667,
+          "frame_ms_median": 3.6185,
+          "primitives": 8448
+        },
+        "with_asteroid_no_shadows": {
+          "draw_calls": 1,
+          "fps_mean": 263.362925084221,
+          "frame_ms_max": 12.318,
+          "frame_ms_mean": 3.79704166666667,
+          "frame_ms_median": 3.564,
+          "primitives": 4224
+        }
+      },
+      "script_ms_mean": 3.0026,
+      "seed": 42,
+      "size_m": [
+        2600.78857421875,
+        1680.74291992188,
+        2075.9658203125
+      ],
+      "timing_note": "build_ms es la llamada completa del consumidor (comprobación de la forma, el script publicado y la lectura de la malla para medirla y calcular su hash); script_ms_mean es solo el script publicado. first_build_ms es la primera construcción de este paquete en el proceso, medida antes de las 20 y más lenta que las siguientes.",
+      "tris": 4224,
+      "vertices": 12672
+    }
+  },
+  "environment": {
+    "cores": 16,
+    "cpu": "Apple M4 Max",
+    "godot": "4.7.1-stable (official)",
+    "headless": false,
+    "os": "macOS",
+    "os_version": "27.0.0",
+    "renderer": "forward_plus",
+    "video_adapter": "Apple M4 Max (Apple9)",
+    "video_api": "4.0",
+    "window": [
+      960,
+      720
+    ]
+  },
+  "notes": [
+    "Medido en un solo equipo: no vale para otro sistema ni otra versión de Godot.",
+    "El tiempo de cuadro de una escena casi vacía no es un presupuesto.",
+    "Las medidas con ventana y sin ventana (headless) no son comparables entre sí.",
+    "Todos los números salen de un solo equipo."
+  ]
+}
