@@ -181,6 +181,11 @@ pub struct MeshInfo {
     pub materials: Vec<String>,
 }
 
+/// Joints read per skin and characters kept per joint name: far above any real
+/// rig, and a bound on what a crafted file can make Kiln hold.
+pub const MAX_JOINTS: usize = 1024;
+pub const MAX_JOINT_NAME: usize = 128;
+
 #[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Skin {
     pub name: String,
@@ -339,7 +344,13 @@ pub fn structure_of(doc: &Value) -> Structure {
                 .and_then(Value::as_array)
                 .unwrap_or(&empty)
                 .iter()
-                .map(|j| name_of(j.as_u64().and_then(|j| nodes.get(j as usize))))
+                .take(MAX_JOINTS)
+                .map(|j| {
+                    name_of(j.as_u64().and_then(|j| nodes.get(j as usize)))
+                        .chars()
+                        .take(MAX_JOINT_NAME)
+                        .collect()
+                })
                 .collect(),
         })
         .collect();
@@ -703,6 +714,17 @@ mod tests {
         let mut doc: Value = serde_json::from_str(RIGGED).unwrap();
         mutate(&mut doc);
         structure_of(&doc)
+    }
+
+    /// A crafted skin (one long name, repeated) cannot blow the memory up.
+    #[test]
+    fn joint_names_are_bounded() {
+        let s = rigged(|d| {
+            d["nodes"][1]["name"] = "n".repeat(10_000).into();
+            d["skins"][0]["joints"] = vec![1; 50_000].into();
+        });
+        let chars: usize = s.skins[0].joints.iter().map(String::len).sum();
+        assert!(chars <= MAX_JOINTS * MAX_JOINT_NAME, "{chars}");
     }
 
     #[test]

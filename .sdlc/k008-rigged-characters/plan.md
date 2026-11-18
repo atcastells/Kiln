@@ -106,9 +106,39 @@ cargo clippy --workspace --all-targets -- -D warnings
 
 Filled in Deploy. A plan is not closed while this section is empty.
 
-- **bugs**:
-- **security**:
-- **conformance**:
+Tres pasadas sobre el commit `de855da` (2026-11-18); el repo no tiene
+`REVIEW.md`, se usó el criterio del skill. Todo lo importante está corregido
+en el commit siguiente, con test.
+
+- **bugs**: sin bloqueos; 1 importante de criterio, corregido. Una pieza con
+  esqueleto perdía `kiln_moves`, `kiln_only_in` y `kiln_todo` (ahora los
+  lleva, misma función que el resto). También corregido: la raíz y la malla
+  ya no chocan de nombre (`<pieza>_mesh`), una pieza con esqueleto sin malla
+  detiene el montaje, y la detección no depende del tipo del nodo raíz.
+- **security**: 2 importantes, corregidos. Un GLB de pocos KB multiplicaba
+  hallazgos (nodos x primitivas): ahora uno por malla y atributo
+  (`validate::tests::a_skinned_mesh_is_reported_once`). Los nombres de hueso
+  se copiaban sin límite: ahora 1024 huesos y 128 caracteres por nombre
+  (`glb::tests::joint_names_are_bounded`). Sin hallazgos: los scripts y
+  drivers de un `.blend` siguen sin ejecutarse al exportar acciones
+  (comprobado con un driver hostil) y Godot no ejecuta nada del GLB.
+- **conformance**: R1-R5 y R7 cumplidos; 3 importantes, corregidos o
+  anotados. «Mueve algún hueso» no tenía test que pudiera fallar: ahora
+  `godot_verify` exige cero avisos con el humanoide y un aviso con una
+  animación quieta. Faltaba en la documentación el límite del `.blend`
+  dentro de `godot/`: añadido. «Mismo hash de `hoist`» descansa en evidencia
+  manual (`e2e.md`, repetida tras las correcciones), no en un test: el test
+  `blender_contract` solo compara dos montajes del mismo binario.
+
+Fuera de plan, con origen en la verificación (T12): la caja de una malla con
+piel ignora la transformación de su nodo (`glb.rs`), con su test.
+
+Nits que quedan: `rig_count` más estricto que el montaje; el tamaño que mide
+`import_check.gd` aplica el nodo a las mallas con piel (informativo, `verify`
+no lo compara); nombres del glTF sin escapar en el texto del hash;
+`actuals.jsonl` lleva nombres de modelo porque lo escribe el hook de medida.
+Sin confirmar: GLB de terceros cuyos vértices con piel no estén en el espacio
+del esqueleto; ejecución en Godot por extensiones KHR.
 
 ## Estimate vs actual
 

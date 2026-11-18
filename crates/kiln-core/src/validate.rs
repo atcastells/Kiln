@@ -145,6 +145,7 @@ pub fn glb_findings(subject: &str, bytes: &[u8]) -> Vec<Finding> {
     }
     let meshes = arr(&doc, "meshes");
     let mut rig: Vec<(&str, String)> = Vec::new();
+    let mut skinned = std::collections::BTreeSet::new();
     for (i, n) in arr(&doc, "nodes").iter().enumerate() {
         let Some(skin) = n.get("skin") else { continue };
         broken(format!("/nodes/{i}/skin"), "skins", skin);
@@ -152,20 +153,25 @@ pub fn glb_findings(subject: &str, bytes: &[u8]) -> Vec<Finding> {
         let Some(m) = mesh.and_then(|m| meshes.get(m as usize)) else {
             continue;
         };
+        // once per mesh and attribute: a crafted file must not multiply findings
+        if !skinned.insert(mesh.unwrap_or_default()) {
+            continue;
+        }
         for (attr, code) in [
             ("JOINTS_0", "skin_no_joints_attr"),
             ("WEIGHTS_0", "skin_no_weights_attr"),
         ] {
-            for (j, p) in arr(m, "primitives").iter().enumerate() {
-                if p.pointer(&format!("/attributes/{attr}")).is_none() {
-                    rig.push((
-                        code,
-                        format!(
-                            "/meshes/{}/primitives/{j} se usa con una skin (/nodes/{i}) pero no tiene {attr}",
-                            mesh.unwrap_or_default()
-                        ),
-                    ));
-                }
+            let lacks = arr(m, "primitives")
+                .iter()
+                .position(|p| p.pointer(&format!("/attributes/{attr}")).is_none());
+            if let Some(j) = lacks {
+                rig.push((
+                    code,
+                    format!(
+                        "/meshes/{}/primitives/{j} se usa con una skin (/nodes/{i}) pero no tiene {attr}",
+                        mesh.unwrap_or_default()
+                    ),
+                ));
             }
         }
     }
@@ -748,6 +754,19 @@ mod tests {
     #[test]
     fn well_formed_rig_has_no_findings() {
         assert!(run(&rigged()).is_empty());
+    }
+
+    /// A hostile GLB cannot multiply findings: one per mesh and attribute,
+    /// however many nodes use the mesh and however many primitives it has.
+    #[test]
+    fn a_skinned_mesh_is_reported_once() {
+        let mut d = rigged();
+        let bad = json!({"attributes": {"POSITION": 0}, "material": 0});
+        d["meshes"][0]["primitives"] = json!([bad.clone(), bad.clone(), bad]);
+        d["nodes"][2] = json!({"name": "hip", "mesh": 0, "skin": 0});
+        d["nodes"][3] = json!({"name": "leg", "mesh": 0, "skin": 0});
+        let codes: Vec<String> = run(&d).into_iter().map(|f| f.code).collect();
+        assert_eq!(codes, ["skin_no_joints_attr", "skin_no_weights_attr"]);
     }
 
     #[test]

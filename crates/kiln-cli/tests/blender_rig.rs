@@ -124,6 +124,10 @@ fn build_keeps_rig() {
     );
     let built = p.path().join("kiln/build/crew_member/crew_member.glb");
     assert_rig(&built);
+    let nodes = kiln_core::glb::structure(&built).unwrap().nodes;
+    let root = nodes.iter().find(|n| n.name == "body").expect("the root is named after the part");
+    assert!(root.mesh.is_none() && root.extras["kiln_part"] == "body", "{root:?}");
+    assert!(nodes.iter().any(|n| n.name == "body_mesh" && n.mesh.is_some()));
 
     let d = deform(&piece, &built);
     assert_eq!(d["verts"][0], d["verts"][1], "{d}");

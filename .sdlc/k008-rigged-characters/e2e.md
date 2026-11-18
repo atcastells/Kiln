@@ -77,6 +77,14 @@ rojo `glb::tests::a_skinned_mesh_ignores_its_node_transform` y, con
 herramientas reales, `godot_verify::a_moved_and_turned_rig_still_verifies`.
 Los tests ignorados son ahora 13.
 
+Tras las correcciones de la revisión (ver *Review* en `plan.md`) se repitió
+todo: `cargo test --workspace` 423 en verde, Clippy limpio, 14 tests
+ignorados en verde con Blender y Godot reales, y los cuatro hashes
+estructurales frente a `main` siguen idénticos.
+
+El verificador montó también una variante de color de un asset con
+esqueleto (`variant--alt.glb`): conserva piel y animaciones. No hay test.
+
 El verificador confirmó además: el recorrido en positivo y en negativo, el
 personaje sin `animations` declaradas (conserva el esqueleto), animaciones
 declaradas sobre una pieza estática (`rig_no_skeleton`), dos copias y cambio
@@ -94,7 +102,6 @@ formados, y que `hoist` y `kiln index` dan lo mismo que con el binario de
   ese tamaño es informativo y `verify` no lo compara.
 
 - La raíz de la pieza con esqueleto toma el nombre de la pieza en el
-  montaje (`body`); si la malla se llamaba igual, Blender la renombra
-  (`body.001`).
+  montaje (`body`); una malla que se llamara igual pasa a `body_mesh`.
 - `cargo fmt --check` ya da diferencias en `main` en muchos ficheros; no es
   una puerta de este repo y no se ha tocado.

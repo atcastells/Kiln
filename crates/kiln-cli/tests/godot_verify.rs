@@ -140,6 +140,11 @@ const HUMANOID: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/rig_
 
 /// Builds and verifies the test humanoid with a spec that declares `animations`.
 fn verify_rig(animations: &str, placement: &str) -> (bool, Value) {
+    verify_rig_with(animations, placement, &[])
+}
+
+/// `extra` goes to the fixture script (`still` adds an action that moves nothing).
+fn verify_rig_with(animations: &str, placement: &str, extra: &[&str]) -> (bool, Value) {
     let p = temp_project("");
     let kit = p.path().join("godot/kits/crew");
     std::fs::create_dir_all(&kit).unwrap();
@@ -151,6 +156,7 @@ fn verify_rig(animations: &str, placement: &str) -> (bool, Value) {
     let blend = Command::new("blender")
         .args(["--background", "--factory-startup", "--python", HUMANOID, "--"])
         .arg(kit.join("humanoid.blend"))
+        .args(extra)
         .output()
         .expect("blender");
     assert!(blend.status.success(), "{}", err(&blend));
@@ -173,7 +179,24 @@ fn verify_rig(animations: &str, placement: &str) -> (bool, Value) {
 fn rig_passes_with_its_declared_animations() {
     let (ok, report) = verify_rig("[\"idle\", \"walk\"]", "at = [[0, 0, 0]]");
     assert!(ok && report["valid"] == true, "{report}");
-    assert_eq!(check(&report, "godot_import")["status"], "passed", "{report}");
+    let godot = check(&report, "godot_import");
+    assert_eq!(godot["status"], "passed", "{report}");
+    assert_eq!(godot["warnings"], 0, "both animations move bones: {report}");
+}
+
+#[test]
+#[ignore]
+fn a_declared_animation_that_moves_nothing_is_a_warning() {
+    let (ok, report) = verify_rig_with("[\"idle\", \"still\"]", "at = [[0, 0, 0]]", &["still"]);
+    assert!(ok && report["valid"] == true, "{report}");
+    let statics: Vec<&str> = report["findings"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|f| f["code"] == "godot_animation_static")
+        .filter_map(|f| f["message"].as_str())
+        .collect();
+    assert!(statics.len() == 1 && statics[0].contains("still"), "{report}");
 }
 
 #[test]

@@ -66,7 +66,9 @@ def dress(o, item):
 
 def meshes_of(o):
     """The meshes of a piece: itself, or those under the root of a rigged one."""
-    return [o] if o.type == "MESH" else [c for c in o.children_recursive if c.type == "MESH"]
+    if not o.get("kiln_rig"):
+        return [o]
+    return ([o] if o.type == "MESH" else []) + [c for c in o.children_recursive if c.type == "MESH"]
 
 
 def import_model(path):
@@ -80,12 +82,13 @@ def import_model(path):
     new = [o for o in bpy.data.objects if o not in before]
     if any(o.type == "ARMATURE" for o in new):
         roots = [o for o in new if o.parent is None]
-        if len(roots) == 1:
-            return roots[0]
-        root = bpy.data.objects.new("rig_root", None)
-        bpy.context.scene.collection.objects.link(root)
-        for o in roots:
-            o.parent = root
+        root = roots[0]
+        if len(roots) > 1:
+            root = bpy.data.objects.new("rig_root", None)
+            bpy.context.scene.collection.objects.link(root)
+            for o in roots:
+                o.parent = root
+        root["kiln_rig"] = True
         return root
     meshes = [o for o in new if o.type == "MESH"]
     for o in new:
@@ -139,12 +142,30 @@ def collection(name):
     return c
 
 
+def tag(o, item):
+    """What the spec says of the part, as custom properties the GLB carries as extras."""
+    o["kiln_part"] = item["part"]
+    o["kiln_kind"] = item["kind"]
+    if item.get("moves"):
+        o["kiln_moves"] = item["moves"]
+    if item.get("only_in"):
+        o["kiln_only_in"] = ",".join(item["only_in"])
+    if item.get("todo"):
+        o["kiln_todo"] = item["todo"]
+
+
 def build_rig(item, o):
     """Places a rigged piece once, where and how it was authored: no bake, no fit, no recentring."""
     if item["fit"] or item.get("split"):
         raise SystemExit(
             "assemble.py: una pieza con esqueleto no se ajusta de tamaño ni se divide: " + item["part"]
         )
+    if not meshes_of(o):
+        raise SystemExit("assemble.py: la pieza con esqueleto no tiene ninguna malla: " + item["part"])
+    # the root takes the name of the copy; a child that had it keeps a name of its own
+    for c in o.children_recursive:
+        if c.name == item["name"]:
+            c.name = item["name"] + "_mesh"
     o.name = item["name"]
     rx, ry, rz = (math.radians(a) for a in item["turn"])
     turn = Euler((rx, -rz, ry), "XYZ").to_matrix().to_4x4()
@@ -158,8 +179,7 @@ def build_rig(item, o):
     for m in meshes_of(o):
         dress(m, item)
     for x in [o] + meshes_of(o):
-        x["kiln_part"] = item["part"]
-        x["kiln_kind"] = item["kind"]
+        tag(x, item)
     return o
 
 
@@ -173,7 +193,7 @@ def build(item, cache):
             )
         if model not in cache:
             src = import_model(model)
-            if src is not None and src.type != "MESH":
+            if src is not None and src.get("kiln_rig"):
                 RIGS.add(model)
                 return build_rig(item, src)
             if src is not None:
@@ -217,14 +237,7 @@ def build(item, cache):
     )
     o.location = to_blender(item["at"]) - base
     dress(o, item)
-    o["kiln_part"] = item["part"]
-    o["kiln_kind"] = item["kind"]
-    if item.get("moves"):
-        o["kiln_moves"] = item["moves"]
-    if item.get("only_in"):
-        o["kiln_only_in"] = ",".join(item["only_in"])
-    if item.get("todo"):
-        o["kiln_todo"] = item["todo"]
+    tag(o, item)
     return o
 
 

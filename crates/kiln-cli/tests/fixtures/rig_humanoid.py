@@ -1,15 +1,16 @@
 """Test fixture: a minimal humanoid saved as a .blend.
 
-    blender --background --factory-startup --python rig_humanoid.py -- out.blend
+    blender --background --factory-startup --python rig_humanoid.py -- out.blend [still]
 
 Six bones, one skinned mesh of 72 triangles (24 of its 48 vertices blend two
-bones), feet on the origin, facing -Y, and the actions idle and walk.
+bones), feet on the origin, facing -Y, and the actions idle and walk. A second
+argument `still` adds an action of that name that moves nothing.
 """
 import math, sys
 import bpy
 from mathutils import Vector
 
-out_blend = sys.argv[sys.argv.index("--") + 1]
+out_blend, *extra = sys.argv[sys.argv.index("--") + 1:]
 bpy.ops.wm.read_factory_settings(use_empty=True)
 
 # boxes: (bone, centre, size) in Blender axes (Z up, facing -Y)
@@ -90,4 +91,6 @@ action("walk", [
     (12, {"leg_l": -sw, "leg_r": sw, "arm_l": sw, "arm_r": -sw}),
     (24, {"leg_l": sw, "leg_r": -sw, "arm_l": -sw, "arm_r": sw}),
 ])
+if "still" in extra:
+    action("still", [(1, {}), (24, {})])
 bpy.ops.wm.save_as_mainfile(filepath=out_blend)

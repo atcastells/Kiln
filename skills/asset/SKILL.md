@@ -126,6 +126,7 @@ armadura), declara en `[asset]` las animaciones que debe traer, con el nombre
 de las acciones: `animations = ["idle", "walk"]`. Esa pieza va una sola vez
 (`count` 1), con `kind = "reuse"` y sin cambiar de tamaño; `at` es donde
 queda el origen de su fuente (los pies, si el `.blend` los tiene en el origen).
+El kit de un personaje vive fuera del proyecto de Godot.
 
 Escribe la ficha una sola vez, completa. Termina con una línea que resuma
 cuántas piezas reutilizas y cuántas hay que buscar.
