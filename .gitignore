@@ -1,2 +1,7 @@
 /target
 /examples/kiln/
+
+# Secrets and keystores
+.env*
+*.keystore
+*.p12
