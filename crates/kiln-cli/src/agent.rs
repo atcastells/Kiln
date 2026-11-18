@@ -372,6 +372,38 @@ fn run_chat(
     Ok((reply, offer))
 }
 
+fn ask_prompt(asked: &str, config: &str, context: &str, cat_path: &Path, specs: &Path) -> String {
+    format!(
+        "Petición de la persona: «{asked}»\n\n{config}\n{context}\nCatálogo del proyecto: {}\nEscribe la ficha en la carpeta {} (fichero <id>.toml), siguiendo las instrucciones de la skill kiln-asset que tienes en tu prompt de sistema. No toques ningún otro fichero salvo para añadir preguntas al contexto.\n\nVocabulario de generación:\n{}",
+        cat_path.display(),
+        specs.display(),
+        generator_vocabulary()
+    )
+}
+
+/// The recipe vocabulary as text for the agent, rendered from the one table.
+pub fn generator_vocabulary() -> String {
+    let mut out = String::new();
+    for op in kiln_core::generate::vocab::OPS {
+        let again = if op.repeatable { "se puede repetir" } else { "una sola vez" };
+        out.push_str(&format!("- {} ({}), {again}", op.id, op.label));
+        if op.params.is_empty() {
+            out.push_str(", sin parámetros");
+        }
+        for p in op.params {
+            let unit = if p.unit.is_empty() { String::new() } else { format!(" {}", p.unit) };
+            let int = if p.integer { ", entero" } else { "" };
+            out.push_str(&format!(
+                "; {} ({}): mín {}{unit}, máx {}{unit}, por defecto {}{unit}{int}",
+                p.id, p.label, p.min, p.max, p.default
+            ));
+        }
+        out.push('\n');
+    }
+    out.push_str("Cada parámetro es un número fijo o un rango `[mín, máx]` que sortea la semilla. `sphere` debe ser la primera operación.");
+    out
+}
+
 fn run(jobs: &Jobs, id: u64, ctx: &Ctx, task: &Task) -> Result<Option<String>, String> {
     let cat = crate::load(&ctx.project, ctx.config.as_deref())?;
     let summary = serde_json::json!({
@@ -420,11 +452,7 @@ fn run(jobs: &Jobs, id: u64, ctx: &Ctx, task: &Task) -> Result<Option<String>, S
                 .unwrap_or_default(),
             cat_path.display()
         ),
-        Task::Ask(asked) => format!(
-            "Petición de la persona: «{asked}»\n\n{config}\n{context}\nCatálogo del proyecto: {}\nEscribe la ficha en la carpeta {} (fichero <id>.toml), siguiendo las instrucciones de la skill kiln-asset que tienes en tu prompt de sistema. No toques ningún otro fichero salvo para añadir preguntas al contexto.",
-            cat_path.display(),
-            specs.display()
-        ),
+        Task::Ask(asked) => ask_prompt(asked, &config, &context, &cat_path, &specs),
         Task::Layout(file) => format!(
             "Coloca las piezas de la ficha {} (solo el paso 4, montaje, de la skill kiln-asset que tienes en tu prompt de sistema).\n\n{config}\nCatálogo del proyecto: {}\nEdita solo esa ficha.\n{context}",
             ctx.project.join(file).display(),
@@ -622,6 +650,24 @@ pub fn describe(line: &str, project: &Path) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn vocabulary_lists_every_op_and_param() {
+        let v = generator_vocabulary();
+        for op in kiln_core::generate::vocab::OPS {
+            assert!(v.contains(op.id), "{v}");
+            for p in op.params {
+                assert!(v.contains(p.id), "{v}");
+            }
+        }
+    }
+
+    #[test]
+    fn vocabulary_in_the_ask_prompt() {
+        let p = ask_prompt("una roca", "cfg", "ctx", Path::new("cat.json"), Path::new("specs"));
+        assert!(p.contains("Vocabulario de generación"), "{p}");
+        assert!(p.contains("sphere"), "{p}");
+    }
 
     #[test]
     fn final_text_of_a_success_result() {

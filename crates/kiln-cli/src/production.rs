@@ -31,7 +31,11 @@ pub fn build_asset(
 ) -> Result<PathBuf, String> {
     let cfg = config(project, config_file)?;
     let cat = crate::load(project, config_file)?;
+    crate::ops::refuse_generated(&cat.specs, id)?;
     let order = kiln_core::spec::order(&cat.specs, id)?;
+    for c in &order {
+        crate::ops::refuse_generated(&cat.specs, c)?;
+    }
     let mut rebuilt: Vec<&str> = Vec::new();
     for c in &order[..order.len() - 1] {
         let spec = cat.specs.iter().find(|s| &s.asset.id == c);
@@ -205,6 +209,7 @@ pub fn paint_asset(
 ) -> Result<PathBuf, String> {
     let cfg = config(project, config_file)?;
     let cat = crate::load(project, config_file)?;
+    crate::ops::refuse_generated(&cat.specs, id)?;
     let spec = cat
         .specs
         .iter()

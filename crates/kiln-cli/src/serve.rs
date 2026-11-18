@@ -33,6 +33,7 @@ const UI_FILES: &[(&str, &str)] = &[
     ("app/search.js", include_str!("../ui/app/search.js")),
     ("app/ui/palette.js", include_str!("../ui/app/ui/palette.js")),
     ("app/views/common.js", include_str!("../ui/app/views/common.js")),
+    ("app/views/generator.js", include_str!("../ui/app/views/generator.js")),
     ("app/views/catalog.js", include_str!("../ui/app/views/catalog.js")),
     ("app/views/materials.js", include_str!("../ui/app/views/materials.js")),
     ("app/views/content.js", include_str!("../ui/app/views/content.js")),
@@ -345,6 +346,28 @@ fn handle(stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result<()>
             }
         }
         ("POST", "/api/build") => started(ops::production::build(jobs, ctx.clone(), &field("asset"))),
+        ("POST", "/api/generate") => {
+            let seed = match body.get("seed") {
+                Some(serde_json::Value::Number(n)) => n.to_string(),
+                _ => field("seed"),
+            };
+            let seed = match seed.as_str() {
+                "" => Ok(None),
+                s => s.parse::<u32>().map(Some),
+            };
+            let recipe = Some(field("recipe")).filter(|r| !r.is_empty());
+            match seed {
+                // the catalog is dropped for every POST after this match
+                Ok(seed) => started(ops::production::generate(
+                    jobs,
+                    ctx.clone(),
+                    &field("asset"),
+                    seed,
+                    recipe.as_deref(),
+                )),
+                Err(_) => bad("la semilla debe ser un número entero entre 0 y 4294967295"),
+            }
+        }
         ("POST", "/api/review") => started(ops::production::review(jobs, ctx.clone(), &field("asset"))),
         ("POST", "/api/godot") => started(Ok(ops::production::godot_measure(jobs, ctx.clone()))),
         ("POST", "/api/search") => answer(ops::sources::search(ctx, &field("asset"), &field("part"))),
@@ -627,6 +650,23 @@ fn etag_matches(header: &str, etag: &str) -> bool {
         .any(|t| t == "*" || t.strip_prefix("W/").unwrap_or(t) == etag)
 }
 
+/// Asset id -> the GLB already in the cache for the seed its recipe holds,
+/// relative to the project: what the page shows before anyone presses Aplicar.
+fn generated_glbs(ctx: &Ctx, cat: &kiln_core::Catalog) -> serde_json::Value {
+    let mut out = serde_json::Map::new();
+    let Ok(cfg) = crate::production::config(&ctx.project, ctx.config.as_deref()) else {
+        return out.into();
+    };
+    for s in &cat.specs {
+        let Some(g) = &s.generator else { continue };
+        let rel = format!("{}/generated/{}/{}.glb", cfg.tools.cache, s.asset.id, g.seed);
+        if ctx.project.join(&rel).is_file() {
+            out.insert(s.asset.id.clone(), rel.into());
+        }
+    }
+    out.into()
+}
+
 /// The catalog answer: `200` with its `ETag`, or `304` when the caller's
 /// `If-None-Match` is the current one. The catalog is loaded again only when
 /// the fingerprint of the project files changed or a write dropped it.
@@ -646,7 +686,15 @@ fn catalog_reply(ctx: &Ctx, if_none_match: Option<&str>) -> (&'static str, Optio
         entry.loads += 1;
         match crate::load(&ctx.project, ctx.config.as_deref()) {
             Ok(cat) => {
-                let body = serde_json::to_vec(&cat).unwrap_or_default();
+                let mut value = serde_json::to_value(&cat).unwrap_or_default();
+                if let Some(o) = value.as_object_mut() {
+                    o.insert(
+                        "generator_ops".into(),
+                        serde_json::to_value(kiln_core::generate::vocab::OPS).unwrap_or_default(),
+                    );
+                    o.insert("generated".into(), generated_glbs(ctx, &cat));
+                }
+                let body = serde_json::to_vec(&value).unwrap_or_default();
                 let mut h = std::collections::hash_map::DefaultHasher::new();
                 body.hash(&mut h);
                 entry.reply = Some((Arc::new(body), format!("\"{:016x}\"", h.finish())));
@@ -746,6 +794,31 @@ mod tests {
     #[test]
     fn catalog_without_content_serves_an_empty_list() {
         assert_eq!(served("")["content"].as_array().unwrap().len(), 0);
+    }
+
+    #[test]
+    fn catalog_lists_the_glb_already_generated_for_the_seed_of_a_recipe() {
+        let dir = crate::generate::tests::project("served");
+        let out = dir.join("kiln/cache/generated/rock");
+        std::fs::create_dir_all(&out).unwrap();
+        std::fs::write(out.join("7.glb"), b"x").unwrap();
+        std::fs::write(out.join("8.glb"), b"x").unwrap();
+        let ctx = make_ctx(&dir, None).unwrap();
+        let (_, _, body) = catalog_response(&ctx);
+        std::fs::remove_dir_all(&dir).unwrap();
+        let cat: serde_json::Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(cat["generated"]["rock"], "kiln/cache/generated/rock/7.glb");
+        assert_eq!(cat["generated"].as_object().unwrap().len(), 1);
+    }
+
+    #[test]
+    fn catalog_serves_the_generator_ops() {
+        let cat = served("");
+        let ops = cat["generator_ops"].as_array().unwrap();
+        let ids: Vec<&str> = ops.iter().map(|o| o["id"].as_str().unwrap()).collect();
+        assert_eq!(ids, ["sphere", "stretch", "noise", "facet"]);
+        assert_eq!(ops[0]["params"][1]["id"], "segments");
+        assert_eq!(ops[0]["params"][1]["integer"], true);
     }
 
     // ---- UI modules (T4)

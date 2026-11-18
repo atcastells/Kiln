@@ -24,6 +24,7 @@ const TABLE: &[(&str, Cover)] = &[
     ("GET /api/context", Tool(&["context_get"])),
     ("POST /api/ask", Prompt("kiln-asset", &["spec_write", "spec_layout"])),
     ("POST /api/build", Tool(&["build"])),
+    ("POST /api/generate", Tool(&["generate"])),
     ("POST /api/review", Tool(&["review", "review_sheets"])),
     ("POST /api/godot", Tool(&["godot_measure"])),
     ("POST /api/search", Tool(&["search"])),

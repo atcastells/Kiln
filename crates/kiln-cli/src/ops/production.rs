@@ -55,6 +55,33 @@ pub fn publish(jobs: &Jobs, ctx: Arc<Ctx>, asset: &str) -> Result<u64, String> {
     }))
 }
 
+/// Generates the GLB of a generated asset. `recipe` is a spec as TOML text
+/// whose `[generator]` is saved first: it replaces the recipe of the spec on
+/// disk and leaves the rest of that file alone (with no spec yet, the text is
+/// the new spec). An invalid one is refused and no job starts. The job's file
+/// is the relative path of the GLB.
+pub fn generate(
+    jobs: &Jobs,
+    ctx: Arc<Ctx>,
+    asset: &str,
+    seed: Option<u32>,
+    recipe: Option<&str>,
+) -> Result<u64, String> {
+    super::check_id("el asset", asset)?;
+    if let Some(text) = recipe {
+        let text = super::specs::with_recipe(&ctx, asset, text)?;
+        super::specs::spec_write(&ctx, asset, &text).map_err(|r| {
+            let found: Vec<String> = r.findings.iter().map(|f| format!("{}: {}", f.code, f.message)).collect();
+            if found.is_empty() { r.error } else { format!("{}: {}", r.error, found.join("; ")) }
+        })?;
+    }
+    let id = asset.to_string();
+    Ok(agent::job(jobs, format!("generar {id}"), move |say| {
+        let got = crate::generate::generate_asset(&ctx.project, ctx.config.as_deref(), &id, seed, say)?;
+        Ok(Some(got.rel))
+    }))
+}
+
 pub fn godot_measure(jobs: &Jobs, ctx: Arc<Ctx>) -> u64 {
     agent::job(jobs, "medir con Godot".into(), move |say| {
         crate::production::measure(&ctx.project, ctx.config.as_deref(), say).map(|_| None)
@@ -200,7 +227,65 @@ pub fn review_sheets(ctx: &Ctx, asset: &str, round: Option<u32>) -> Result<Sheet
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::generate::tests::{project, ROCK};
     use crate::ops::testing;
+
+    fn finish(jobs: &Jobs, id: u64) -> Job {
+        for _ in 0..200 {
+            let j = job_get(jobs, id).unwrap();
+            if j.status != "running" {
+                return j;
+            }
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        panic!("the job did not finish");
+    }
+
+    #[test]
+    fn generate_refuses_an_invalid_recipe_without_writing_or_starting() {
+        let p = project("op-bad");
+        let ctx = Arc::new(crate::ops::ctx(&p, None).unwrap());
+        let jobs: Jobs = Default::default();
+        let bad = format!("{ROCK}\n[[generator.ops]]\nop = \"crater\"\n");
+        let err = generate(&jobs, ctx, "rock", None, Some(&bad)).unwrap_err();
+        let spec = std::fs::read_to_string(p.join("specs/rock.toml")).unwrap();
+        let (started, ran) = (jobs.lock().unwrap().len(), p.join("ran").exists());
+        std::fs::remove_dir_all(&p).unwrap();
+        assert!(err.contains("generator_op"), "{err}");
+        assert_eq!((spec.as_str(), started, ran), (ROCK, 0, false));
+    }
+
+    #[test]
+    fn generate_saves_a_valid_recipe_then_runs_with_the_seed() {
+        let p = project("op-ok");
+        let ctx = Arc::new(crate::ops::ctx(&p, None).unwrap());
+        let jobs: Jobs = Default::default();
+        let edited = ROCK.replace("seed = 7", "seed = 9");
+        let id = generate(&jobs, ctx.clone(), "rock", Some(3), Some(&edited)).unwrap();
+        let first = finish(&jobs, id);
+        let id = generate(&jobs, ctx, "rock", None, Some(&edited)).unwrap();
+        let second = finish(&jobs, id);
+        let spec = std::fs::read_to_string(p.join("specs/rock.toml")).unwrap();
+        let glbs = ["3", "9"].map(|s| p.join(format!("kiln/cache/generated/rock/{s}.glb")).is_file());
+        std::fs::remove_dir_all(&p).unwrap();
+        assert!(spec.contains("seed = 9"));
+        assert_eq!(glbs, [true, true]);
+        assert_eq!(first.spec.as_deref(), Some("kiln/cache/generated/rock/3.glb"));
+        assert_eq!(second.spec.as_deref(), Some("kiln/cache/generated/rock/9.glb"));
+    }
+
+    #[test]
+    fn generate_without_recipe_keeps_the_spec_bytes() {
+        let p = project("op-keep");
+        let ctx = Arc::new(crate::ops::ctx(&p, None).unwrap());
+        let jobs: Jobs = Default::default();
+        let id = generate(&jobs, ctx, "rock", None, None).unwrap();
+        let done = finish(&jobs, id);
+        let spec = std::fs::read_to_string(p.join("specs/rock.toml")).unwrap();
+        std::fs::remove_dir_all(&p).unwrap();
+        assert_eq!((done.status.as_str(), spec.as_str()), ("done", ROCK));
+        assert_eq!(done.spec.as_deref(), Some("kiln/cache/generated/rock/7.glb"));
+    }
 
     fn slow_job(jobs: &Jobs) -> u64 {
         agent::job(jobs, "x".into(), |say| {
@@ -282,5 +367,34 @@ mod tests {
         assert_eq!(s.review.unwrap()["verdict"], "pass");
         assert!(review_sheets(&c, "old_hoist", Some(1)).unwrap().sheets.is_empty());
         assert!(review_sheets(&c, "old_hoist", Some(9)).is_err());
+    }
+
+    #[test]
+    fn generate_replaces_only_the_recipe_of_an_existing_spec() {
+        use crate::generate::tests::{ROCK, project};
+        let p = project("keep");
+        let file = p.join("specs/rock.toml");
+        std::fs::write(&file, format!("{ROCK}\n[[variants]]\nid = \"dark\"\n")).unwrap();
+        std::fs::write(
+            p.join("specs/crate.toml"),
+            "[asset]\nid = \"crate\"\nname = \"Crate\"\n\n[[parts]]\nid = \"b\"\nwhat = \"a box\"\nsource = { kind = \"search\", query = \"box\" }\n",
+        )
+        .unwrap();
+        let c = Arc::new(crate::ops::ctx(&p, None).unwrap());
+        let jobs: Jobs = Default::default();
+        let sent = ROCK.replace("seed = 7", "seed = 9");
+        let ok = generate(&jobs, c.clone(), "rock", None, Some(&sent));
+        let saved = std::fs::read_to_string(&file).unwrap();
+        let before = std::fs::read(p.join("specs/crate.toml")).unwrap();
+        let onto_parts = generate(&jobs, c, "crate", None, Some(&sent.replace("\"rock\"", "\"crate\"")));
+        let after = std::fs::read(p.join("specs/crate.toml")).unwrap();
+        if let Ok(id) = ok {
+            let _ = job_wait(&jobs, id, 0, Duration::from_secs(30));
+        }
+        std::fs::remove_dir_all(&p).unwrap();
+        assert!(ok.is_ok(), "{ok:?}");
+        assert!(saved.contains("seed = 9") && saved.contains("dark"), "{saved}");
+        assert!(onto_parts.unwrap_err().contains("generator_and_parts"));
+        assert_eq!(before, after);
     }
 }

@@ -19,6 +19,9 @@ pub struct Spec {
     /// Mount points: where the asset joins something else.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub anchors: Vec<Anchor>,
+    /// The recipe of an asset generated in the game (instead of parts).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generator: Option<crate::generate::Generator>,
     /// Relative path of the file it was read from (set by Kiln).
     #[serde(default, skip_deserializing)]
     pub file: String,
@@ -337,12 +340,20 @@ pub fn check(s: &Spec, rules: &crate::config::Rules, cat: &mut Catalog) {
                 .into(),
         );
     }
-    if s.parts.is_empty() {
+    if s.parts.is_empty() && s.generator.is_none() {
         push(
             Severity::Error,
             id.clone(),
             "no_parts",
             "la ficha no tiene piezas".into(),
+        );
+    }
+    if s.generator.is_some() && !s.parts.is_empty() {
+        push(
+            Severity::Error,
+            id.clone(),
+            "generator_and_parts",
+            "la ficha lleva receta y piezas: es una cosa o la otra".into(),
         );
     }
     let mut parts_tris = 0u64;
@@ -562,6 +573,10 @@ pub fn check(s: &Spec, rules: &crate::config::Rules, cat: &mut Catalog) {
             "budget",
             format!("las piezas reutilizadas ya suman {parts_tris} triángulos, por encima de {b}"),
         );
+    }
+    if let Some(g) = &s.generator {
+        let palette: Vec<&str> = cat.materials.iter().map(|m| m.key.as_str()).collect();
+        out.extend(crate::generate::check::check(&s.asset.id, g, s.asset.budget_tris, &palette));
     }
     cat.findings.extend(out);
 }

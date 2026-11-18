@@ -38,6 +38,12 @@ pieza, pon `status = "layout"` y no cambies nada más.
 
 ## 2. Desglose: piezas
 
+Primero decide cómo se hace. Si la forma del asset debe ser distinta en cada
+copia que haga el juego (rocas, asteroides, cantos rodados: orgánico, una sola
+malla, sin partes que se muevan), es un asset **generado**: escribe una receta
+en vez de piezas y salta los pasos 3 y 4 (mira «Un asset generado»). Si no,
+sigue con piezas.
+
 Tres preguntas, en este orden:
 
 1. Cuánto mide el objeto entero (metros reales).
@@ -128,5 +134,47 @@ de las acciones: `animations = ["idle", "walk"]`. Esa pieza va una sola vez
 queda el origen de su fuente (los pies, si el `.blend` los tiene en el origen).
 El kit de un personaje vive fuera del proyecto de Godot.
 
+## Un asset generado
+
+La ficha lleva `[asset]` como siempre (con `budget_tris`), ninguna
+`[[parts]]` y una tabla `[generator]` con `seed`, `material` (una clave de la
+paleta) y `[[generator.ops]]`. Pon `status = "layout"` como en una ficha
+colocada.
+
+```toml
+[asset]
+id = "asteroid"
+name = "Asteroide"
+budget_tris = 6000
+
+[generator]
+seed = 42                    # la semilla de la vista previa
+material = "basalt"          # clave de la paleta
+
+[[generator.ops]]
+op = "sphere"
+radius_m = [8, 40]           # rango: lo sortea la semilla
+segments = 64                # valor fijo
+
+[[generator.ops]]
+op = "stretch"
+x = [1.0, 1.8]
+
+[[generator.ops]]
+op = "noise"
+amplitude = [0.2, 0.5]
+size = 0.6
+
+[[generator.ops]]
+op = "facet"
+```
+
+Las operaciones y sus límites son los que Kiln lista en la petición
+(«Vocabulario de generación»); no uses nada fuera de esa lista. Un rango es
+para lo que debe variar entre copias; un valor fijo, para lo que define la
+familia. El peor caso de `segments` debe caber en `budget_tris`: triángulos =
+2 · segments · (segments / 2 + 1).
+
 Escribe la ficha una sola vez, completa. Termina con una línea que resuma
-cuántas piezas reutilizas y cuántas hay que buscar.
+cuántas piezas reutilizas y cuántas hay que buscar; si es un asset generado,
+con una línea que diga que es generado y cuántas operaciones tiene.

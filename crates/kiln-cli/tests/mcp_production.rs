@@ -67,6 +67,48 @@ fn review_sheets_returns_one_image_per_sheet() {
     assert!(r.is_error, "{}", r.text);
 }
 
+const ROCK: &str = "[asset]\nid = \"rock\"\nname = \"Rock\"\n\n[generator]\nseed = 7\n\n\
+[[generator.ops]]\nop = \"sphere\"\nradius_m = 2.0\nsegments = 16\n";
+
+#[test]
+fn mcp_generate_is_listed() {
+    let p = temp_project("");
+    let mut m = Mcp::start(p.path());
+    tool(&mut m, "generate");
+}
+
+#[test]
+fn mcp_generate_refuses_an_unknown_op_and_writes_nothing() {
+    let p = temp_project("");
+    let mut m = Mcp::start(p.path());
+    let bad = ROCK.replace("\"sphere\"", "\"crater\"");
+    let r = m.call("generate", json!({"asset": "rock", "recipe": bad}));
+    assert!(r.is_error && r.text.contains("generator_op"), "{}", r.text);
+    assert!(!p.exists("specs/rock.toml"));
+}
+
+#[test]
+fn mcp_generate_starts_a_job_that_fails_when_godot_is_missing() {
+    let p = temp_project("");
+    let cfg = p.read("kiln.toml").replace("[tools]\n", "[tools]\ngodot = \"/nonexistent/godot\"\n");
+    std::fs::write(p.path().join("kiln.toml"), cfg).unwrap();
+    let mut m = Mcp::start(p.path());
+    let r = m.call("generate", json!({"asset": "rock", "seed": 3, "recipe": ROCK}));
+    assert!(!r.is_error, "{}", r.text);
+    let id = r.json()["job"].as_u64().expect("job id");
+    let (mut since, mut last, mut seen) = (0, json!(null), String::new());
+    for _ in 0..10 {
+        last = m.call("job", json!({"id": id, "since": since, "wait_s": 5})).json();
+        seen.push_str(&last.to_string());
+        if last["status"] != "running" {
+            break;
+        }
+        since = last["next"].as_u64().unwrap();
+    }
+    assert_eq!(last["status"], "failed", "{last}");
+    assert!(seen.contains("godot"), "{seen}");
+}
+
 #[test]
 fn annotations_tell_what_each_tool_does() {
     let p = temp_project("");

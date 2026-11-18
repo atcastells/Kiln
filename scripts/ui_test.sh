@@ -85,9 +85,60 @@ serve synthetic "$OUT/synthetic"
 serve wizard "$OUT/empty"
 serve longnames "$OUT/longnames"
 
+# a scratch copy of the examples with a generated spec (a recipe, no parts) and a
+# fake Godot that copies a valid GLB to the path the job asks for; it is served
+# apart from the walkthrough targets, which keep their measured baselines
+GEN="$OUT/generated"
+cp -R examples "$GEN"
+cat > "$GEN/specs/rock.toml" <<'TOML'
+[asset]
+id = "rock"
+name = "Roca"
+status = "layout"
+budget_tris = 6000
+
+[generator]
+seed = 7
+
+[[generator.ops]]
+op = "sphere"
+radius_m = [2, 5]
+segments = 32
+
+[[generator.ops]]
+op = "noise"
+amplitude = [0.1, 0.3]
+size = 0.5
+
+[[generator.ops]]
+op = "facet"
+TOML
+cp "$GEN/godot/kits/harbor/crate.glb" "$GEN/fixture.glb"
+cat > "$GEN/fake_godot.sh" <<'SH'
+#!/bin/sh
+for a; do job=$out; out=$a; done
+d=$(dirname "$0")
+glb=$(sed -n 's/.*"glb":"\([^"]*\)".*/\1/p' "$job")
+cp "$d/fixture.glb" "$glb"
+echo '{"size_m":[1,1,1],"min":[0,0,0],"tris":12,"godot":"fake"}' > "$out"
+SH
+chmod +x "$GEN/fake_godot.sh"
+awk -v g="godot = \"$GEN/fake_godot.sh\"" '{print} /^godot_project = /{print g}' "$GEN/kiln.toml" > "$GEN/kiln.toml.new"
+mv "$GEN/kiln.toml.new" "$GEN/kiln.toml"
+GEN_PORT="$(free_port)"
+"$KILN" serve --project "$GEN" --port "$GEN_PORT" >"$OUT/serve-generated.log" 2>&1 &
+PIDS+=("$!")
+for _ in $(seq 1 100); do curl -sf -o /dev/null "http://127.0.0.1:$GEN_PORT/" && break; sleep 0.1; done
+curl -sf -o /dev/null "http://127.0.0.1:$GEN_PORT/" || { echo "kiln serve did not start for generated:" >&2; cat "$OUT/serve-generated.log" >&2; exit 1; }
+
 set +e
 node crates/kiln-cli/ui/tests/walkthrough.mjs --out "$OUT" ${ARGS[@]+"${ARGS[@]}"} $UPDATE
 rc=$?
+echo
+echo "== generated recipe panel"
+node crates/kiln-cli/ui/tests/app_generate.mjs --out "$OUT" --port "$GEN_PORT" --dir "$GEN"
+rc_gen=$?
+[ $rc -ne 0 ] || rc=$rc_gen
 set -e
 echo
 echo "screenshots: $OUT/screenshots"
