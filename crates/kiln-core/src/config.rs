@@ -55,6 +55,9 @@ pub struct GenerateSection {
     /// Fraction of steep faces above which a seed gets a warning (0..=1).
     #[serde(default = "default_steep_max")]
     pub steep_max: f64,
+    /// Canonical geometry verify computes per seed; None leaves verify as before.
+    #[serde(default, deserialize_with = "canonical_class")]
+    pub canonical: Option<CanonicalClass>,
 }
 
 impl Default for GenerateSection {
@@ -62,8 +65,47 @@ impl Default for GenerateSection {
         GenerateSection {
             verify_seeds: default_verify_seeds(),
             steep_max: default_steep_max(),
+            canonical: None,
         }
     }
+}
+
+/// A version of the canonical geometry (`[generate] canonical`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CanonicalClass {
+    RadialV0,
+}
+
+impl CanonicalClass {
+    pub const ALL: [CanonicalClass; 1] = [CanonicalClass::RadialV0];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            CanonicalClass::RadialV0 => "radial_v0",
+        }
+    }
+}
+
+fn canonical_class<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<CanonicalClass>, D::Error> {
+    let known = || {
+        CanonicalClass::ALL
+            .iter()
+            .map(|c| format!("«{}»", c.name()))
+            .collect::<Vec<_>>()
+            .join(", ")
+    };
+    let value = toml::Value::deserialize(d)?;
+    let name = value.as_str().unwrap_or_default();
+    CanonicalClass::ALL
+        .into_iter()
+        .find(|c| c.name() == name)
+        .map(Some)
+        .ok_or_else(|| {
+            serde::de::Error::custom(format!(
+                "[generate] canonical: valor desconocido {value}; se admite {}",
+                known()
+            ))
+        })
 }
 
 fn default_verify_seeds() -> u32 {
@@ -606,6 +648,29 @@ mod tests {
         }
         assert!(parse("verify_seeds = 64\nsteep_max = 1.0").is_ok());
         assert!(parse("verify_seeds = 1\nsteep_max = 0.0").is_ok());
+    }
+
+    #[test]
+    fn canonical_geometry_is_off_without_the_key() {
+        let c = Config::parse("[project]\nname = \"x\"\n[generate]\nverify_seeds = 4\n").unwrap();
+        assert_eq!(c.generate.canonical, None);
+        assert_eq!(Config::parse("[project]\nname = \"x\"\n").unwrap().generate.canonical, None);
+    }
+
+    #[test]
+    fn reads_the_canonical_class() {
+        let c = Config::parse("[project]\nname = \"x\"\n[generate]\ncanonical = \"radial_v0\"\n").unwrap();
+        assert_eq!(c.generate.canonical, Some(CanonicalClass::RadialV0));
+    }
+
+    #[test]
+    fn rejects_an_unknown_canonical_class() {
+        for value in ["\"radial_v1\"", "\"\"", "1"] {
+            let e = Config::parse(&format!("[project]\nname = \"x\"\n[generate]\ncanonical = {value}\n"))
+                .unwrap_err();
+            assert!(e.contains("[generate] canonical"), "{e}");
+            assert!(e.contains("radial_v0"), "{e}");
+        }
     }
 
     #[test]

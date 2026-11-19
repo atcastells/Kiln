@@ -22,6 +22,53 @@ pub fn read_bytes(bytes: &[u8]) -> Result<Vec<Mesh>, String> {
     read_within(bytes, MAX_VERTICES)
 }
 
+pub fn node_transform(path: &Path) -> Result<Option<String>, String> {
+    node_transform_bytes(&std::fs::read(path).map_err(|e| e.to_string())?)
+}
+
+/// `read` takes positions as they are in the mesh and ignores the nodes. This
+/// says whether that differs from what the file places: the first node that
+/// holds a mesh, or is an ancestor of one, with a transform that is not the
+/// identity (`"nodo N: translation"`). A malformed transform counts as one.
+pub fn node_transform_bytes(bytes: &[u8]) -> Result<Option<String>, String> {
+    let doc = json_chunk(bytes)?;
+    let nodes = doc["nodes"].as_array().map(Vec::as_slice).unwrap_or_default();
+    let mut parents = vec![Vec::new(); nodes.len()];
+    for (i, n) in nodes.iter().enumerate() {
+        for c in n["children"].as_array().into_iter().flatten() {
+            if let Some(c) = c.as_u64().and_then(|c| usize::try_from(c).ok()).filter(|&c| c < nodes.len()) {
+                parents[c].push(i);
+            }
+        }
+    }
+    // A node places a mesh when it holds one or a descendant does. One walk up
+    // from the mesh nodes, each node visited once, so a crafted file with
+    // cycles or many nodes stays linear.
+    let mut places_mesh = vec![false; nodes.len()];
+    let mut stack: Vec<usize> = (0..nodes.len()).filter(|&i| nodes[i].get("mesh").is_some()).collect();
+    while let Some(i) = stack.pop() {
+        if !std::mem::replace(&mut places_mesh[i], true) {
+            stack.extend(&parents[i]);
+        }
+    }
+    const IDENTITY: [(&str, &[f64]); 4] = [
+        ("translation", &[0., 0., 0.]),
+        ("rotation", &[0., 0., 0., 1.]),
+        ("scale", &[1., 1., 1.]),
+        ("matrix", &[1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.]),
+    ];
+    for (i, node) in nodes.iter().enumerate() {
+        for (key, identity) in IDENTITY {
+            let Some(v) = node.get(key) else { continue };
+            let values: Option<Vec<f64>> = v.as_array().and_then(|a| a.iter().map(Value::as_f64).collect());
+            if values.as_deref() != Some(identity) && places_mesh[i] {
+                return Ok(Some(format!("nodo {i}: {key}")));
+            }
+        }
+    }
+    Ok(None)
+}
+
 /// Primitives may share accessors, so a small file can name the same big
 /// buffer many times: the vertices of the whole file are bounded, not only
 /// those of each primitive.
@@ -329,6 +376,51 @@ mod tests {
 
     const ACC: &str = r#"{"bufferView":0,"componentType":5126,"count":4,"type":"VEC3"}"#;
     const VIEW: &str = r#"{"buffer":0,"byteLength":48}"#;
+
+    /// The indexed tetrahedron, with `nodes` and a scene over node 0.
+    fn tetra_with_nodes(nodes: &str) -> Vec<u8> {
+        let base = tetra(true, false);
+        let doc = json_chunk(&base).unwrap();
+        let mut doc = doc.as_object().unwrap().clone();
+        doc.insert("nodes".into(), serde_json::from_str(nodes).unwrap());
+        doc.insert("scenes".into(), serde_json::json!([{"nodes": [0]}]));
+        let bin = bin_chunk(&base).unwrap().to_vec();
+        glb(&Value::Object(doc).to_string(), &bin)
+    }
+
+    #[test]
+    fn detects_a_transform_on_the_mesh_node() {
+        for node in [
+            r#"[{"mesh":0,"translation":[0,0.5,0]}]"#,
+            r#"[{"mesh":0,"rotation":[0,0.7071068,0,0.7071068]}]"#,
+            r#"[{"mesh":0,"scale":[2,2,2]}]"#,
+            r#"[{"mesh":0,"matrix":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,3,1]}]"#,
+            r#"[{"mesh":0,"translation":"x"}]"#,
+            r#"[{"children":[1],"translation":[1,0,0]},{"mesh":0}]"#,
+        ] {
+            let found = node_transform_bytes(&tetra_with_nodes(node)).unwrap();
+            assert!(found.is_some(), "{node} must be detected");
+        }
+        let found = node_transform_bytes(&tetra_with_nodes(r#"[{"mesh":0,"translation":[0,0.5,0]}]"#))
+            .unwrap()
+            .unwrap();
+        assert!(found.contains("translation"), "{found}");
+    }
+
+    #[test]
+    fn an_identity_or_absent_transform_is_not_detected() {
+        for node in [
+            r#"[{"mesh":0}]"#,
+            r#"[{"mesh":0,"translation":[0,0,0],"rotation":[0,0,0,1],"scale":[1,1,1]}]"#,
+            r#"[{"mesh":0,"matrix":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]}]"#,
+            r#"[{"mesh":0},{"translation":[5,0,0]}]"#,
+        ] {
+            assert_eq!(node_transform_bytes(&tetra_with_nodes(node)).unwrap(), None, "{node}");
+        }
+        assert_eq!(node_transform_bytes(&tetra(true, false)).unwrap(), None);
+        // read keeps ignoring the transform
+        check_tetra(read_bytes(&tetra_with_nodes(r#"[{"mesh":0,"translation":[0,0.5,0]}]"#)).unwrap());
+    }
 
     #[test]
     fn damaged_files_are_errors() {
