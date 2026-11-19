@@ -3,8 +3,8 @@
 ## Verificado
 
 - `cargo test --workspace --no-fail-fast`: 650 pasan, 0 fallan, 29 ignorados
-  (antes 635; +20 con R9: 4 del registro, 1 de URIs `file://`, 8 de
-  `tests/mcp_projects.rs`, 2 de cobertura de la CLI).
+  antes de R9 (antes 635; +15: 4 del registro, 1 de URIs `file://`, 8 de
+  `tests/mcp_projects.rs`, 2 de cobertura de la CLI). Con R9, 655 (abajo).
 - `cargo clippy --workspace --all-targets -- -D warnings`: limpio.
 - Sesión real por stdio con el binario de release, sin `--project`, arrancada
   desde una copia de `examples/`: `status` abre Puerto Niebla por la carpeta
