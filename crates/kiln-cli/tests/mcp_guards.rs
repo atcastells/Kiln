@@ -10,12 +10,13 @@ use std::io::{BufRead, Write};
 use std::path::Path;
 
 /// (name, readOnly, destructive, idempotent, openWorld); absent hint = false.
-const SURFACE: [(&str, bool, bool, bool, bool); 31] = [
+const SURFACE: [(&str, bool, bool, bool, bool); 35] = [
     ("bind", false, true, true, false),
     ("build", false, true, false, false),
     ("catalog", true, false, false, false),
     ("check", true, false, false, false),
     ("content", true, false, false, false),
+    ("content_manifest", false, false, false, false),
     ("context_edit", false, true, false, false),
     ("context_get", true, false, false, false),
     ("context_propose", false, false, false, false),
@@ -29,6 +30,9 @@ const SURFACE: [(&str, bool, bool, bool, bool); 31] = [
     ("new_game", false, false, false, false),
     ("new_game_options", true, false, false, false),
     ("paint", false, true, false, false),
+    ("project_create", false, false, false, false),
+    ("project_open", false, false, false, false),
+    ("projects", true, false, false, false),
     ("publish", false, true, false, false),
     ("review", false, true, false, false),
     ("review_sheets", true, false, false, false),

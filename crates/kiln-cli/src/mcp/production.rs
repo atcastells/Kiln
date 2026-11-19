@@ -11,8 +11,24 @@ use std::time::Duration;
 const MAX_IMAGE: u64 = 5 * 1024 * 1024;
 const SITES: [&str; 3] = ["polyhaven", "polypizza", "sketchfab"];
 
-fn started(id: u64) -> Reply {
-    ok(json!({ "job": id, "next": "llama a `job` con este id" }))
+impl Kiln {
+    /// Marks the job with the open project, so `jobs` tells projects apart.
+    fn started(&self, id: u64) -> Reply {
+        let dir = self.active.read().unwrap().dir.clone();
+        if let Some(d) = dir
+            && let Some(j) = self.jobs.lock().unwrap().iter_mut().find(|j| j.id == id)
+        {
+            j.project = Some(d.display().to_string());
+        }
+        ok(json!({ "job": id, "next": "llama a `job` con este id" }))
+    }
+}
+
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+struct ContentManifestArgs {
+    /// Nombre del conjunto de contenido; sin él, todos.
+    #[serde(default)]
+    set: Option<String>,
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
@@ -89,7 +105,7 @@ impl Kiln {
         };
         let jobs = self.jobs.clone();
         match blocking(move || ops::production::build(&jobs, ctx, &a.asset)).await? {
-            Ok(id) => started(id),
+            Ok(id) => self.started(id),
             Err(e) => fail(e),
         }
     }
@@ -111,7 +127,7 @@ impl Kiln {
         };
         let jobs = self.jobs.clone();
         match blocking(move || ops::production::paint(&jobs, ctx, &a.asset, a.variant)).await? {
-            Ok(id) => started(id),
+            Ok(id) => self.started(id),
             Err(e) => fail(e),
         }
     }
@@ -128,7 +144,7 @@ impl Kiln {
         };
         let jobs = self.jobs.clone();
         match blocking(move || ops::production::verify(&jobs, ctx, &a.asset)).await? {
-            Ok(id) => started(id),
+            Ok(id) => self.started(id),
             Err(e) => fail(e),
         }
     }
@@ -145,7 +161,7 @@ impl Kiln {
         };
         let jobs = self.jobs.clone();
         match blocking(move || ops::production::publish(&jobs, ctx, &a.asset)).await? {
-            Ok(id) => started(id),
+            Ok(id) => self.started(id),
             Err(e) => fail(e),
         }
     }
@@ -162,7 +178,7 @@ impl Kiln {
         };
         let jobs = self.jobs.clone();
         match blocking(move || ops::production::generate(&jobs, ctx, &a.asset, a.seed, a.recipe.as_deref())).await? {
-            Ok(id) => started(id),
+            Ok(id) => self.started(id),
             Err(e) => fail(e),
         }
     }
@@ -186,7 +202,26 @@ impl Kiln {
         };
         let jobs = self.jobs.clone();
         let id = blocking(move || ops::production::godot_measure(&jobs, ctx)).await?;
-        started(id)
+        self.started(id)
+    }
+
+    /// Godot abre las escenas de los conjuntos de contenido de `kiln.toml` y escribe el manifiesto con sus ids (la orden `kiln content-manifest`). Con `set`, solo ese conjunto. Devuelve un trabajo; sigue su avance llamando a `job` hasta que su estado deje de ser `running`.
+    #[tool(annotations(read_only_hint = false))]
+    async fn content_manifest(&self, Parameters(a): Parameters<ContentManifestArgs>) -> Reply {
+        if let Some(s) = &a.set
+            && let Err(e) = ops::check_len("set", s, 200)
+        {
+            return fail(e);
+        }
+        let ctx = match self.ctx() {
+            Ok(c) => c,
+            Err(e) => return fail(e),
+        };
+        let jobs = self.jobs.clone();
+        match blocking(move || ops::production::content_manifest(&jobs, ctx, a.set)).await? {
+            Ok(id) => self.started(id),
+            Err(e) => fail(e),
+        }
     }
 
     /// Revisa el montaje con el revisor propio de Kiln, aparte: Claude Opus por la sesión de `claude` (gasta uso de la suscripción), de modo que quien colocó las piezas nunca juzga su propio trabajo. Hace hasta `[agents] review_rounds` vueltas. Tarda minutos: devuelve un trabajo; sigue su avance llamando a `job` hasta que su estado deje de ser `running`. Después, mira las hojas con `review_sheets`.
@@ -201,7 +236,7 @@ impl Kiln {
         };
         let jobs = self.jobs.clone();
         match blocking(move || ops::production::review(&jobs, ctx, &a.asset)).await? {
-            Ok(id) => started(id),
+            Ok(id) => self.started(id),
             Err(e) => fail(e),
         }
     }
@@ -228,7 +263,7 @@ impl Kiln {
         };
         let jobs = self.jobs.clone();
         match blocking(move || ops::production::import(&jobs, ctx, &a.asset, &a.part, &a.site, &a.id)).await? {
-            Ok(id) => started(id),
+            Ok(id) => self.started(id),
             Err(e) => fail(e),
         }
     }
@@ -242,7 +277,7 @@ impl Kiln {
         reply(blocking(move || ops::production::job_wait(&jobs, a.id, since, wait)).await?)
     }
 
-    /// Lista los trabajos de esta sesión con su estado.
+    /// Lista los trabajos de esta sesión con su estado y la carpeta del proyecto (`project`) en que se lanzó cada uno.
     #[tool(annotations(read_only_hint = true))]
     async fn jobs(&self) -> Reply {
         let jobs = self.jobs.clone();

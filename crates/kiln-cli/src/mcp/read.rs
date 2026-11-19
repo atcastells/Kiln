@@ -55,14 +55,23 @@ struct ContentArgs {
 
 #[tool_router(router = read_router, vis = "pub(super)")]
 impl Kiln {
-    /// Resumen del proyecto: piezas, fichas, hallazgos por gravedad, contexto y el siguiente paso sugerido. Empieza por aquí.
+    /// Resumen del proyecto abierto (`folder` es su carpeta): piezas, fichas, hallazgos por gravedad, contexto y el siguiente paso sugerido. Empieza por aquí.
     #[tool(annotations(read_only_hint = true))]
     async fn status(&self) -> Reply {
         let ctx = match self.ctx() {
             Ok(c) => c,
             Err(e) => return fail(e),
         };
-        reply(blocking(move || ops::read::status(&ctx)).await?)
+        let folder = ctx.project.display().to_string();
+        reply(
+            blocking(move || {
+                ops::read::status(&ctx).map(|mut s| {
+                    s["folder"] = folder.into();
+                    s
+                })
+            })
+            .await?,
+        )
     }
 
     /// Lista kits, piezas, materiales, fichas o `ui` (variaciones del tema, con su cadena, color, tamaño y si se usan), con total y paginación (por defecto 50 filas, máximo 200). Usa `filter` para acotar antes de paginar.

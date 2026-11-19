@@ -3,7 +3,7 @@
 //!   kiln index  --project DIR [--config FILE] [--out FILE]   catalog as JSON
 //!   kiln check  --project DIR [--config FILE]                findings; exit 1 on errors
 //!   kiln tools  --project DIR [--config FILE]                external tools found, with their versions
-//!   kiln mcp    --project DIR [--config FILE]                MCP over stdio, for Claude Code
+//!   kiln mcp    [--project DIR] [--config FILE]              MCP over stdio, for Claude Code; without --project it serves any project
 //!   kiln serve  --project DIR [--config FILE] [--port 4330] [--ui-dir DIR]  the graph at http://127.0.0.1:PORT (--ui-dir: read the new UI from disk)
 //!   kiln build  --project DIR [--config FILE] --asset ID     assemble an asset in Blender
 //!   kiln generate --project DIR [--config FILE] --asset ID [--seed N]   generate a recipe asset in Godot, no Blender
@@ -20,6 +20,7 @@ mod fetch;
 mod generate;
 mod mcp;
 mod ops;
+mod projects;
 mod production;
 mod review;
 mod run;
@@ -42,6 +43,8 @@ struct Args {
     set: Option<String>,
     ui_dir: Option<PathBuf>,
     seed: Option<u32>,
+    /// Whether `--project` was given (only `mcp` works without it).
+    project_given: bool,
 }
 
 fn parse() -> Result<Args, String> {
@@ -58,11 +61,15 @@ fn parse() -> Result<Args, String> {
         set: None,
         ui_dir: None,
         seed: None,
+        project_given: false,
     };
     while let Some(flag) = it.next() {
         let mut val = || it.next().ok_or(format!("falta el valor de {flag}"));
         match flag.as_str() {
-            "--project" => a.project = PathBuf::from(val()?),
+            "--project" => {
+                a.project = PathBuf::from(val()?);
+                a.project_given = true;
+            }
             "--config" => a.config = Some(PathBuf::from(val()?)),
             "--out" => a.out = Some(PathBuf::from(val()?)),
             "--asset" => a.asset = Some(val()?),
@@ -164,7 +171,10 @@ fn main() -> ExitCode {
                 }
                 Ok(ExitCode::SUCCESS)
             }
-            "mcp" => mcp::run(args.project.clone(), args.config.clone()).map(|_| ExitCode::SUCCESS),
+            "mcp" => {
+                let project = (args.project_given || args.config.is_some()).then(|| args.project.clone());
+                mcp::run(project, args.config.clone()).map(|_| ExitCode::SUCCESS)
+            }
             "serve" => serve::run(args.project.clone(), args.config.clone(), args.port, args.ui_dir.clone())
                 .map(|_| ExitCode::SUCCESS),
             "build" => {

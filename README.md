@@ -389,19 +389,28 @@ El ejemplo está en `examples/specs/cargo_quay.toml`.
 
 ## Entrega 11: Kiln por MCP
 
-`kiln mcp --project DIR [--config FICHERO]` sirve Kiln por MCP sobre stdio,
+`kiln mcp [--project DIR] [--config FICHERO]` sirve Kiln por MCP sobre stdio,
 para Claude Code. El agente que llama hace el trabajo de agente (desglosar
 una petición en ficha, colocar, ordenar el contexto) siguiendo los prompts;
 Kiln comprueba y escribe. No escucha en ninguna red.
 
+Se registra una vez, sin `--project`, y sirve cualquier juego (K014):
+
 ```bash
 cargo build --release
-claude mcp add kiln -- /ruta/a/kiln mcp --project /ruta/al/juego
-# con --scope project queda en el .mcp.json del repo del juego y se comparte
-claude mcp add --scope project kiln -- /ruta/a/kiln mcp --project /ruta/al/juego
+claude mcp add --scope user kiln -- /ruta/a/kiln mcp
 ```
 
-Son 31 herramientas. Empieza por `status`.
+Al arrancar abre el primero que encuentre de: las *roots* del cliente, la
+carpeta desde la que se abrió Claude Code, el último proyecto usado. Cuenta
+como proyecto una carpeta con `kiln.toml` o con `project.godot`. Dentro de la
+conversación se cambia de juego con `project_open` o se empieza uno con
+`project_create`; `projects` lista los recientes. El registro de proyectos
+está en `~/Library/Application Support/Kiln/projects.json` en macOS
+(`$XDG_DATA_HOME/kiln` en Linux; `KILN_HOME` lo cambia). Con `--project` se
+comporta como antes: ese juego desde el principio.
+
+Son 35 herramientas. Empieza por `status`, que dice qué carpeta está abierta.
 
 | Grupo | Herramientas |
 |---|---|
@@ -411,7 +420,9 @@ Son 31 herramientas. Empieza por `status`.
 | Producción y trabajos | `build` monta con Blender; `generate` genera con Godot un asset de receta; `paint` aplica materiales; `godot_measure` mide lo que solo Godot abre y exporta las piezas `.blend`; `review` revisa el montaje; `verify` comprueba el GLB montado; `publish` lo lleva al juego; `tools` dice qué herramientas externas hay y su versión; `job` y `jobs` siguen los trabajos |
 | Materiales y zonas | `material_set` material de una zona; `material_validate` lo pasa al catálogo; `bind` vincula una ranura a la paleta; `zones_split` parte una pieza en zonas |
 | Fuera | `search` busca candidatos (no escribe); `import` trae un modelo con su licencia |
-| Juego nuevo | `new_game_options` el paso de arranque; `new_game` crea el juego; `settle` lo da por asentado si no falta nada |
+| Proyectos | `projects` los recientes y cuál está abierto; `project_open` abre otro por su ruta; `project_create` empieza uno en una carpeta nueva o en una de Godot sin `kiln.toml` |
+| Juego nuevo | `new_game_options` el paso de arranque; `new_game` crea el juego en la carpeta abierta; `settle` lo da por asentado si no falta nada |
+| Contenido | `content_manifest` Godot escribe el manifiesto de escenas (la orden `kiln content-manifest`) |
 
 Tres prompts: `kiln-asset` (de la petición a la ficha), `kiln-context`
 (ordenar o afinar el contexto) y `kiln-review` (explicar los hallazgos de la
@@ -432,7 +443,8 @@ revisión).
 | `GET /api/jobs`, `/api/jobs/<id>` | `jobs`, `job` |
 | `GET` y `POST /api/chat` | no hay (D2) |
 
-`tests/coverage.rs` falla si la página gana una ruta sin su herramienta.
+`tests/coverage.rs` falla si la página gana una ruta o la CLI una orden sin su
+herramienta.
 
 ### Un trabajo largo
 
@@ -440,7 +452,8 @@ revisión).
 un trabajo. `job` espera hasta 30 s a que haya líneas nuevas o termine, y
 cuando llegan sigue juntándolas hasta un segundo de silencio; se vuelve a
 llamar con `since` = el `next` anterior hasta que el estado deje de ser
-`running`. `jobs` los lista.
+`running`. `jobs` los lista, con la carpeta del proyecto en que se lanzó cada
+uno: cambiar de proyecto no para los trabajos en curso.
 
 `kiln-asset` se puede lanzar sin argumentos (`/mcp__kiln__kiln-asset`): el
 agente pregunta qué asset quieres. Claude Code parte el slash command por

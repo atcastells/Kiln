@@ -88,6 +88,24 @@ pub fn godot_measure(jobs: &Jobs, ctx: Arc<Ctx>) -> u64 {
     })
 }
 
+/// `kiln content-manifest` as a job; an unknown set is refused before it starts.
+pub fn content_manifest(jobs: &Jobs, ctx: Arc<Ctx>, set: Option<String>) -> Result<u64, String> {
+    let set = set.filter(|s| !s.trim().is_empty());
+    if let Some(name) = &set {
+        let cfg = crate::production::config(&ctx.project, ctx.config.as_deref())?;
+        if !cfg.content_sets().0.contains_key(name.as_str()) {
+            return Err(format!("no hay conjunto de contenido «{name}» en kiln.toml"));
+        }
+    }
+    let asked = match &set {
+        Some(s) => format!("manifiesto {s}"),
+        None => "manifiesto de contenido".into(),
+    };
+    Ok(agent::job(jobs, asked, move |say| {
+        crate::content::export(&ctx.project, ctx.config.as_deref(), set.as_deref(), say).map(|_| None)
+    }))
+}
+
 pub fn review(jobs: &Jobs, ctx: Arc<Ctx>, asset: &str) -> Result<u64, String> {
     if asset.is_empty() {
         return Err("falta el asset".into());
@@ -171,12 +189,20 @@ pub struct JobSummary {
     pub asked: String,
     pub status: String,
     pub lines: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project: Option<String>,
 }
 
 pub fn jobs_list(jobs: &Jobs) -> Vec<JobSummary> {
     let j = jobs.lock().unwrap();
     j.iter()
-        .map(|j| JobSummary { id: j.id, asked: j.asked.clone(), status: j.status.clone(), lines: j.log.len() })
+        .map(|j| JobSummary {
+            id: j.id,
+            asked: j.asked.clone(),
+            status: j.status.clone(),
+            lines: j.log.len(),
+            project: j.project.clone(),
+        })
         .collect()
 }
 
