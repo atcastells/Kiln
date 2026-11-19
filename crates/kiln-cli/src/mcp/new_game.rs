@@ -44,11 +44,18 @@ impl Kiln {
         };
         let game = kiln_core::new_game::NewGame { name: a.name, basics: a.basics, ..Default::default() };
         let p = project.clone();
-        let (files, ctx) = match blocking(move || crate::ops::new_game::create(&p, game)).await? {
+        let made = blocking(move || {
+            let fresh = crate::projects::fresh(&p);
+            crate::ops::new_game::create(&p, game).map(|r| (fresh, r))
+        })
+        .await?;
+        let (fresh, (files, ctx)) = match made {
             Ok(r) => r,
             Err(e) => return fail(e),
         };
-        self.made(&project, ctx);
+        // `--project` already vouched for this folder; only a fresh one is trusted otherwise.
+        let vouched = self.active.read().unwrap().vouched;
+        self.made(&project, ctx, fresh || vouched);
         ok(serde_json::json!({ "created": files }))
     }
 }

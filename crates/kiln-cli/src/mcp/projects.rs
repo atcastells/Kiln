@@ -112,6 +112,7 @@ impl Kiln {
         let game = kiln_core::new_game::NewGame { name: a.name, basics: a.basics, ..Default::default() };
         let d = dir.clone();
         let made = blocking(move || {
+            let fresh = registry::fresh(&d);
             if !d.is_dir() {
                 if !d.parent().is_some_and(Path::is_dir) {
                     return Err(format!("no existe la carpeta madre de {}", d.display()));
@@ -119,14 +120,14 @@ impl Kiln {
                 std::fs::create_dir(&d).map_err(|e| format!("{}: {e}", d.display()))?;
             }
             let d = std::fs::canonicalize(&d).map_err(|e| format!("{}: {e}", d.display()))?;
-            crate::ops::new_game::create(&d, game).map(|r| (d, r))
+            crate::ops::new_game::create(&d, game).map(|r| (d, fresh, r))
         })
         .await?;
-        let (dir, (files, ctx)) = match made {
+        let (dir, fresh, (files, ctx)) = match made {
             Ok(r) => r,
             Err(e) => return fail(e),
         };
-        self.made(&dir, ctx);
+        self.made(&dir, ctx, fresh);
         ok(json!({ "open": dir, "created": files, "next": "ordena lo que explique la persona con `context_propose` y sigue con `status`" }))
     }
 }

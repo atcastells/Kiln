@@ -109,11 +109,14 @@ impl Kiln {
         Ok(())
     }
 
-    /// Opens a project Kiln has just written, and trusts it.
-    pub fn made(&self, dir: &Path, ctx: Ctx) {
+    /// Opens a project Kiln has just written. It is trusted only when the
+    /// folder was `fresh` (missing or empty before): a folder that already
+    /// held a Godot project keeps its own plugins and needs `kiln trust`.
+    pub fn made(&self, dir: &Path, ctx: Ctx, fresh: bool) {
         *self.active.write().unwrap() =
-            Active { dir: Some(dir.to_path_buf()), ctx: Some(Arc::new(ctx)), chosen: true, vouched: true };
-        if let Some(home) = &self.home
+            Active { dir: Some(dir.to_path_buf()), ctx: Some(Arc::new(ctx)), chosen: true, vouched: fresh };
+        if fresh
+            && let Some(home) = &self.home
             && let Err(e) = registry::trust(home, dir)
         {
             eprintln!("no se pudo apuntar la confianza en {}: {e}", home.display());
@@ -131,8 +134,16 @@ impl Kiln {
 
     /// The project, only if it may run external programs.
     pub fn run_ctx(&self) -> Result<Arc<Ctx>, String> {
-        let ctx = self.ctx()?;
-        if self.trusted() {
+        // One read of the session: the trust checked is that of the folder that will run.
+        let (ctx, vouched) = {
+            let a = self.active.read().unwrap();
+            (a.ctx.clone(), a.vouched)
+        };
+        let ctx = match ctx {
+            Some(c) => c,
+            None => return self.ctx(),
+        };
+        if vouched || self.home.as_deref().is_some_and(|h| registry::is_trusted(h, &ctx.project)) {
             return Ok(ctx);
         }
         Err(format!(

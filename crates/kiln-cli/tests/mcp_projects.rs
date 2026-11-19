@@ -98,6 +98,22 @@ fn a_godot_folder_opens_and_new_game_makes_it_a_kiln_project() {
     let st = m.call("status", json!({}));
     assert!(!st.is_error, "{}", st.text);
     assert_eq!(st.json()["project"], "Isla");
+    assert_eq!(st.json()["trusted"], false, "an existing Godot project keeps needing kiln trust");
+}
+
+#[test]
+fn project_create_in_an_existing_godot_folder_is_not_trusted() {
+    let home = empty_dir();
+    let g = empty_dir();
+    std::fs::write(g.path().join("project.godot"), "").unwrap();
+    let cwd = empty_dir();
+    let mut m = Mcp::start_free(cwd.path(), &home_env(&home));
+    let c = m.call("project_create", json!({"path": s(g.path()), "name": "Isla", "basics": game()}));
+    assert!(!c.is_error, "{}", c.text);
+    assert_eq!(m.call("status", json!({})).json()["trusted"], false);
+    let r = m.call("tools", json!({}));
+    assert!(r.is_error && r.text.contains("kiln trust"), "{}", r.text);
+    assert!(!home.exists("trusted.json"));
 }
 
 #[test]

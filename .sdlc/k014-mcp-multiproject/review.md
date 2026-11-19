@@ -28,6 +28,16 @@ plugins). Aaron aprobó arreglarlo en este PR: lista de confianza en
   sin confianza, `tools` se niega y dice `kiln trust`; tras ejecutar
   `kiln trust --project` en otra terminal, la misma sesión ya lo permite.
 
+Segunda pasada de la revisión de seguridad, arreglada:
+
+- `project_create` o `new_game` sobre una carpeta que ya tenía contenido (un
+  proyecto de Godot con sus plugins) la daban por de confianza. Ahora solo
+  cuenta una carpeta que no existía o estaba vacía; si no, hace falta
+  `kiln trust` (salvo que la abriera `--project`).
+- `run_ctx` leía el proyecto y la confianza en dos lecturas; ahora una sola, y
+  la confianza se comprueba sobre la carpeta que va a correr.
+- `cargo test --workspace --no-fail-fast`: 657 pasan, 0 fallan; clippy limpio.
+
 Límite: la confianza va por carpeta, no por contenido. Si un `git pull` cambia
 el `[tools]` de un proyecto de confianza, sigue siendo de confianza.
 

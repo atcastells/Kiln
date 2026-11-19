@@ -99,6 +99,14 @@ pub fn kind(path: &Path) -> Kind {
     }
 }
 
+/// A folder that does not exist yet or holds nothing: Kiln writes all of it.
+pub fn fresh(path: &Path) -> bool {
+    match std::fs::read_dir(path) {
+        Ok(mut d) => d.next().is_none(),
+        Err(_) => !path.exists(),
+    }
+}
+
 /// The first folder worth opening without asking: one with `kiln.toml` or
 /// `project.godot` among `candidates`, else the newest registered project
 /// that still has `kiln.toml`.
@@ -176,6 +184,15 @@ mod tests {
         assert_eq!(trusted(&home).len(), 1);
         std::fs::write(home.join(TRUSTED), "broken").unwrap();
         assert!(!is_trusted(&home, Path::new("/a")));
+    }
+
+    #[test]
+    fn only_a_missing_or_empty_folder_is_fresh() {
+        let d = dir();
+        assert!(fresh(&d.0));
+        assert!(fresh(&d.0.join("missing")));
+        std::fs::write(d.0.join("project.godot"), "").unwrap();
+        assert!(!fresh(&d.0));
     }
 
     #[test]
