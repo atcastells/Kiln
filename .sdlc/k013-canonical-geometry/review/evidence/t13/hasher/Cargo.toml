@@ -1,0 +1,10 @@
+[package]
+name = "t13-hasher"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[workspace]
+
+[dependencies]
+kiln-core = { path = "/Users/acastells/Kiln/crates/kiln-core" }

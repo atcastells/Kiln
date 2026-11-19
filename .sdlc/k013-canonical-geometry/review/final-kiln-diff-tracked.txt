@@ -1,0 +1,882 @@
+diff --git a/crates/kiln-cli/src/ops/publish_recipe.rs b/crates/kiln-cli/src/ops/publish_recipe.rs
+index ac2d615..a041b9e 100644
+--- a/crates/kiln-cli/src/ops/publish_recipe.rs
++++ b/crates/kiln-cli/src/ops/publish_recipe.rs
+@@ -39,0 +40,10 @@ pub fn publish(
++    let geometry = match cfg.generate.canonical {
++        Some(_) => geometry(project, &cfg, id, r)?,
++        None => Vec::new(),
++    };
++    let godot_version = match cfg.generate.canonical {
++        Some(_) => Some(r["godot_version"].as_str().ok_or_else(|| {
++            format!("la verificación de «{id}» no dice con qué versión de Godot se generó: vuelve a verificar")
++        })?),
++        None => None,
++    };
+@@ -69 +79,2 @@ pub fn publish(
+-    let files = vec!["recipe.json".to_string(), SCRIPT_NAME.to_string()];
++    let mut files = vec!["recipe.json".to_string(), SCRIPT_NAME.to_string()];
++    files.extend(geometry.iter().map(Geometry::file));
+@@ -71 +82 @@ pub fn publish(
+-    let contract = serde_json::to_string_pretty(&json!({
++    let mut contract = json!({
+@@ -76,2 +87,12 @@ pub fn publish(
+-    }))
+-    .map_err(|e| e.to_string())?;
++    });
++    if cfg.generate.canonical.is_some() {
++        contract["geometry"] = geometry
++            .iter()
++            .map(|g| json!({ "seed": g.seed, "file": g.file(), "geometry_sha256": g.sha256 }))
++            .collect();
++        contract["kiln_version"] = env!("CARGO_PKG_VERSION").into();
++    }
++    if let Some(v) = godot_version {
++        contract["godot_version"] = v.into();
++    }
++    let contract = serde_json::to_string_pretty(&contract).map_err(|e| e.to_string())?;
+@@ -80 +101 @@ pub fn publish(
+-    let put = |name: &str, content: &str| {
++    let put = |name: &str, content: &[u8]| {
+@@ -85,2 +106,15 @@ pub fn publish(
+-    put("recipe.json", &recipe)?;
+-    put(SCRIPT_NAME, crate::generate::BUILDER)?;
++    put("recipe.json", recipe.as_bytes())?;
++    put(SCRIPT_NAME, crate::generate::BUILDER.as_bytes())?;
++    if !geometry.is_empty() {
++        let sub = dest.join("geometry");
++        if std::fs::symlink_metadata(&sub).is_ok_and(|m| !m.is_dir()) {
++            let _ = std::fs::remove_file(&sub);
++        }
++        std::fs::create_dir_all(&sub).map_err(|e| format!("no se puede crear geometry: {e}"))?;
++        for g in &geometry {
++            put(&g.file(), &g.bytes)?;
++        }
++        prune_geometry(&sub, &files)?;
++    }
++    // without the key, a `geometry/` left by an earlier canonical publish stays
++    // as it is: removing it is outside what this publish decides
+@@ -95 +129 @@ pub fn publish(
+-    put("asset.json", &contract)?;
++    put("asset.json", contract.as_bytes())?;
+@@ -111,0 +146,57 @@ pub fn publish(
++/// Removes from `sub` the `seed_<n>.bin` of seeds the new batch no longer has.
++/// Nothing else is touched, and a link is removed as a link, never followed.
++fn prune_geometry(sub: &Path, files: &[String]) -> Result<(), String> {
++    for e in std::fs::read_dir(sub).map_err(|e| format!("no se lee geometry: {e}"))?.flatten() {
++        let n = e.file_name().to_string_lossy().into_owned();
++        let seed = n.strip_prefix("seed_").and_then(|r| r.strip_suffix(".bin"));
++        let is_seed = seed.is_some_and(|d| !d.is_empty() && d.bytes().all(|c| c.is_ascii_digit()));
++        if !is_seed || e.file_type().is_ok_and(|t| t.is_dir()) || files.contains(&format!("geometry/{n}")) {
++            continue;
++        }
++        std::fs::remove_file(e.path()).map_err(|err| format!("no se puede borrar geometry/{n}: {err}"))?;
++    }
++    Ok(())
++}
++
++/// One seed's canonical geometry, read back from the verify cache and checked
++/// again (I1–I9 and the verified hash) before anything is written.
++struct Geometry {
++    seed: u64,
++    bytes: Vec<u8>,
++    sha256: String,
++}
++
++impl Geometry {
++    fn file(&self) -> String {
++        format!("geometry/seed_{}.bin", self.seed)
++    }
++}
++
++fn geometry(project: &Path, cfg: &kiln_core::Config, id: &str, recipe: &Value) -> Result<Vec<Geometry>, String> {
++    let cache = crate::generate::cache_dir(project, &cfg.tools.cache, &Path::new("generated").join(id))?.join("verify");
++    let mut all = Vec::new();
++    for s in recipe["seeds"].as_array().into_iter().flatten() {
++        let seed = s["seed"]
++            .as_u64()
++            .ok_or_else(|| format!("la verificación de «{id}» tiene una semilla que no es un número: vuelve a verificar"))?;
++        let bad = |why: String| format!("la geometría canónica de la semilla {seed} de «{id}» {why}: vuelve a verificar");
++        let file = cache.join(format!("{seed}.canonical.bin"));
++        // a link in the cache is never followed into the package
++        let bytes = match std::fs::symlink_metadata(&file) {
++            Ok(m) if m.is_file() => std::fs::read(&file).map_err(|e| bad(format!("no se lee ({e})")))?,
++            _ => return Err(bad("no está en la caché".into())),
++        };
++        let checked = kiln_core::canonical::from_bytes(&bytes).and_then(|g| kiln_core::canonical::validate(&g));
++        if let Err(r) = checked {
++            return Err(bad(format!("no es válida ({})", r.code)));
++        }
++        let sha256 = kiln_core::asset::sha256_hex(&bytes);
++        if s["geometry_sha256"].as_str() != Some(sha256.as_str()) {
++            return Err(bad("no es la verificada".into()));
++        }
++        all.push(Geometry { seed, bytes, sha256 });
++    }
++    all.sort_by_key(|g| g.seed);
++    Ok(all)
++}
++
+@@ -152,0 +244,10 @@ pub fn gate(
++    if cfg.generate.canonical.is_some() {
++        for s in recipe["seeds"].as_array().into_iter().flatten() {
++            if s["geometry_sha256"].as_str().is_none() {
++                return Err(format!(
++                    "la verificación de «{id}» no trae la geometría canónica de la semilla {}: vuelve a verificar",
++                    s["seed"]
++                ));
++            }
++        }
++    }
+@@ -518,0 +620,143 @@ mod tests {
++    const FIXTURE: &[u8] = include_bytes!("../../../kiln-core/tests/fixtures/canonical/asteroid_64_seed42.bin");
++
++    /// A project with `[generate] canonical`, the artefact of seeds 1 and 2
++    /// in the verify cache and a report that carries their hashes.
++    fn canonical_ready(tag: &str) -> (Proj, kiln_core::Config) {
++        let (p, _) = ready(tag, true);
++        let toml = p.0.join("kiln.toml");
++        let mut t = std::fs::read_to_string(&toml).unwrap();
++        t.push_str("\n[generate]\ncanonical = \"radial_v0\"\n");
++        std::fs::write(&toml, t).unwrap();
++        let (cfg, spec) = state(&p);
++        let cache = cache(&p, &cfg);
++        std::fs::create_dir_all(&cache).unwrap();
++        let sha = kiln_core::asset::sha256_hex(FIXTURE);
++        let mut seeds = two_seeds();
++        for s in seeds.as_array_mut().unwrap() {
++            std::fs::write(cache.join(format!("{}.canonical.bin", s["seed"])), FIXTURE).unwrap();
++            s["geometry_sha256"] = sha.clone().into();
++        }
++        let mut v = report(true, &current_sha(&spec), version(), &crate::generate::builder_sha256(), seeds);
++        v["recipe"]["godot_version"] = GODOT.into();
++        write(&p, &cfg, &v);
++        (p, cfg)
++    }
++
++    const GODOT: &str = "4.7.1.stable.test";
++
++    fn cache(p: &Proj, cfg: &kiln_core::Config) -> PathBuf {
++        crate::generate::cache_dir(&p.0, &cfg.tools.cache, Path::new("generated/rock")).unwrap().join("verify")
++    }
++
++    /// Every file of the package as its relative path and the SHA-256 of its bytes.
++    fn package(p: &Proj) -> Vec<(PathBuf, String)> {
++        let d = p.0.join("godot/assets/rock");
++        files(&d)
++            .into_iter()
++            .filter(|f| f.is_file())
++            .map(|f| (f.strip_prefix(&d).unwrap().to_path_buf(), kiln_core::asset::sha256_file(&f).unwrap()))
++            .collect()
++    }
++
++    #[test]
++    fn canonical_publish_writes_the_geometry_and_its_hashes() {
++        let (p, _) = canonical_ready("canon");
++        let r = publish_it(&p).unwrap();
++        let want = ["recipe.json", "kiln_generator.gd", "geometry/seed_1.bin", "geometry/seed_2.bin"];
++        assert_eq!(r.files, want);
++        let a = json_at(&p, "asset.json");
++        assert_eq!(a["files"], json!(want));
++        assert_eq!(a["version"], 1);
++        assert_eq!(a["kiln_version"], env!("CARGO_PKG_VERSION"));
++        let d = p.0.join("godot/assets/rock");
++        let geometry = a["geometry"].as_array().unwrap();
++        assert_eq!(geometry.len(), 2);
++        for (g, n) in geometry.iter().zip([1, 2]) {
++            assert_eq!(g["seed"], n);
++            assert_eq!(g["file"], format!("geometry/seed_{n}.bin"));
++            let on_disk = kiln_core::asset::sha256_file(&d.join(format!("geometry/seed_{n}.bin"))).unwrap();
++            assert_eq!(g["geometry_sha256"].as_str(), Some(on_disk.as_str()));
++        }
++        assert_eq!(std::fs::read(d.join("geometry/seed_2.bin")).unwrap(), FIXTURE);
++    }
++
++    #[test]
++    fn canonical_publish_twice_gives_the_same_bytes() {
++        let (p, _) = canonical_ready("canon-twice");
++        publish_it(&p).unwrap();
++        let first = package(&p);
++        let r = publish_it(&p).unwrap();
++        assert_eq!((r.version, r.changed), (1, false));
++        assert_eq!(package(&p), first);
++        assert_eq!(first.len(), 5);
++    }
++
++    #[test]
++    fn a_tampered_artefact_refuses_and_leaves_the_package_as_it_was() {
++        let (p, cfg) = canonical_ready("canon-tamper");
++        publish_it(&p).unwrap();
++        let before = package(&p);
++        let bin = cache(&p, &cfg).join("2.canonical.bin");
++        let mut bytes = FIXTURE.to_vec();
++        bytes[40] ^= 1;
++        std::fs::write(&bin, &bytes).unwrap();
++        let e = publish_it(&p).unwrap_err();
++        assert!(e.contains("semilla 2") && e.contains("vuelve a verificar"), "{e}");
++        assert_eq!(package(&p), before);
++    }
++
++    #[test]
++    fn an_artefact_that_is_not_the_verified_one_refuses() {
++        let (p, cfg) = canonical_ready("canon-other");
++        let (_, spec) = state(&p);
++        let mut seeds = two_seeds();
++        for s in seeds.as_array_mut().unwrap() {
++            s["geometry_sha256"] = kiln_core::asset::sha256_hex(FIXTURE).into();
++        }
++        seeds[0]["geometry_sha256"] = "0".repeat(64).into();
++        write(&p, &cfg, &report(true, &current_sha(&spec), version(), &crate::generate::builder_sha256(), seeds));
++        let e = publish_it(&p).unwrap_err();
++        assert!(e.contains("semilla 1") && e.contains("no es la verificada"), "{e}");
++        assert!(!p.0.join("godot").exists());
++    }
++
++    #[test]
++    fn an_invalid_artefact_with_the_verified_hash_refuses() {
++        let (p, cfg) = canonical_ready("canon-invalid");
++        let (_, spec) = state(&p);
++        let mut g = kiln_core::canonical::from_bytes(FIXTURE).unwrap();
++        g.triangles[0].swap(0, 1);
++        let bytes = kiln_core::canonical::to_bytes(&g);
++        std::fs::write(cache(&p, &cfg).join("1.canonical.bin"), &bytes).unwrap();
++        let mut seeds = two_seeds();
++        for s in seeds.as_array_mut().unwrap() {
++            s["geometry_sha256"] = kiln_core::asset::sha256_hex(FIXTURE).into();
++        }
++        seeds[0]["geometry_sha256"] = kiln_core::asset::sha256_hex(&bytes).into();
++        write(&p, &cfg, &report(true, &current_sha(&spec), version(), &crate::generate::builder_sha256(), seeds));
++        let e = publish_it(&p).unwrap_err();
++        assert!(e.contains("semilla 1") && e.contains("no es válida"), "{e}");
++        assert!(!p.0.join("godot").exists());
++    }
++
++    #[test]
++    fn a_missing_artefact_refuses() {
++        let (p, cfg) = canonical_ready("canon-missing");
++        std::fs::remove_file(cache(&p, &cfg).join("1.canonical.bin")).unwrap();
++        let e = publish_it(&p).unwrap_err();
++        assert!(e.contains("semilla 1") && e.contains("vuelve a verificar"), "{e}");
++        assert!(!p.0.join("godot").exists());
++    }
++
++    #[test]
++    fn a_report_without_the_hash_of_one_seed_refuses() {
++        let (p, cfg) = canonical_ready("canon-nohash");
++        let (_, spec) = state(&p);
++        let mut seeds = two_seeds();
++        seeds[0]["geometry_sha256"] = kiln_core::asset::sha256_hex(FIXTURE).into();
++        write(&p, &cfg, &report(true, &current_sha(&spec), version(), &crate::generate::builder_sha256(), seeds));
++        let e = publish_it(&p).unwrap_err();
++        assert_eq!(e, "la verificación de «rock» no trae la geometría canónica de la semilla 2: vuelve a verificar");
++        assert!(!p.0.join("godot").exists());
++    }
++
+@@ -528,0 +773,59 @@ mod tests {
++
++    #[test]
++    #[cfg(unix)]
++    fn a_republish_removes_only_the_geometry_of_seeds_no_longer_verified() {
++        let (p, cfg) = canonical_ready("canon-stale");
++        publish_it(&p).unwrap();
++        let d = p.0.join("godot/assets/rock");
++        let keep = ["geometry/seed_2.bin.bak", "geometry/notes.txt", "geometry/seed_.bin", "geometry/seed_x.bin"];
++        for k in keep {
++            std::fs::write(d.join(k), b"x").unwrap();
++        }
++        let outside = p.0.join("outside.bin");
++        std::fs::write(&outside, b"x").unwrap();
++        std::os::unix::fs::symlink(&outside, d.join("geometry/seed_3.bin")).unwrap();
++        let (_, spec) = state(&p);
++        let mut seeds = two_seeds();
++        seeds.as_array_mut().unwrap().truncate(1);
++        seeds[0]["geometry_sha256"] = kiln_core::asset::sha256_hex(FIXTURE).into();
++        let mut v = report(true, &current_sha(&spec), version(), &crate::generate::builder_sha256(), seeds);
++        v["recipe"]["godot_version"] = GODOT.into();
++        write(&p, &cfg, &v);
++        let r = publish_it(&p).unwrap();
++        assert_eq!(r.files, ["recipe.json", "kiln_generator.gd", "geometry/seed_1.bin"]);
++        assert!(d.join("geometry/seed_1.bin").is_file());
++        assert!(!d.join("geometry/seed_2.bin").exists());
++        for k in keep {
++            assert!(d.join(k).is_file(), "{k}");
++        }
++        assert_eq!(std::fs::read(&outside).unwrap(), b"x");
++    }
++
++    #[test]
++    fn canonical_publish_copies_the_godot_version() {
++        let (p, _) = canonical_ready("canon-godot");
++        publish_it(&p).unwrap();
++        assert_eq!(json_at(&p, "asset.json")["godot_version"], GODOT);
++    }
++
++    #[test]
++    fn a_report_without_the_godot_version_refuses() {
++        let (p, cfg) = canonical_ready("canon-nogodot");
++        let dir = kiln_core::build::out_dir(&p.0, &cfg, "rock");
++        let mut v: Value = serde_json::from_slice(&std::fs::read(dir.join("validation.json")).unwrap()).unwrap();
++        v["recipe"].as_object_mut().unwrap().remove("godot_version");
++        write(&p, &cfg, &v);
++        let e = publish_it(&p).unwrap_err();
++        assert_eq!(e, "la verificación de «rock» no dice con qué versión de Godot se generó: vuelve a verificar");
++        assert!(!p.0.join("godot").exists());
++    }
++
++    #[test]
++    fn without_canonical_the_contract_has_no_provenance_keys() {
++        let (p, _) = ready("no-canon-keys", true);
++        publish_it(&p).unwrap();
++        let a = json_at(&p, "asset.json");
++        for k in ["geometry", "kiln_version", "godot_version"] {
++            assert!(a.get(k).is_none(), "{k}: {a}");
++        }
++    }
+diff --git a/crates/kiln-cli/src/verify_recipe.rs b/crates/kiln-cli/src/verify_recipe.rs
+index c6f0e4e..ee7e740 100644
+--- a/crates/kiln-cli/src/verify_recipe.rs
++++ b/crates/kiln-cli/src/verify_recipe.rs
+@@ -16,0 +17,2 @@ pub struct SeedResult {
++    /// Only with `[generate] canonical`: the artifact's `geometry_sha256`, or why there is none.
++    pub canonical: Option<Result<String, kiln_core::canonical::Rejection>>,
+@@ -22,0 +25,2 @@ pub struct Outcome {
++    /// Only with `[generate] canonical`: the Godot that made every seed, when they all agree.
++    pub godot_version: Option<String>,
+@@ -91 +95 @@ pub fn verify(
+-            serde_json::json!({
++            let mut entry = serde_json::json!({
+@@ -100 +104,9 @@ pub fn verify(
+-            })
++            });
++            match &s.canonical {
++                Some(Ok(h)) => entry["geometry_sha256"] = h.clone().into(),
++                Some(Err(r)) => {
++                    entry["canonical"] = serde_json::json!({"code": r.code, "element": r.element, "detail": r.detail});
++                }
++                None => {}
++            }
++            entry
+@@ -117,0 +130,3 @@ pub fn verify(
++    if let (Some(v), Some(r)) = (&outcome.godot_version, report.recipe.as_mut()) {
++        r["godot_version"] = v.clone().into();
++    }
+@@ -162,0 +178,3 @@ pub fn run(
++    if cfg.generate.canonical.is_some() {
++        findings.extend(kiln_core::generate::check::canonical(id, g));
++    }
+@@ -164 +182 @@ pub fn run(
+-        return Ok(Outcome { seeds: vec![], findings });
++        return Ok(Outcome { seeds: vec![], findings, godot_version: None });
+@@ -168,0 +187 @@ pub fn run(
++    let mut engines: Vec<Option<String>> = Vec::new();
+@@ -172,0 +192 @@ pub fn run(
++        engines.push(run.out["godot"].as_str().map(str::to_string));
+@@ -192,0 +213,14 @@ pub fn run(
++        // runs whatever the earlier checks said, so the report has every seed's verdict
++        let canonical = match cfg.generate.canonical {
++            Some(_) => Some(canonical(&run.glb, &meshes, segments_of(&resolved))?),
++            None => None,
++        };
++        if let Some(Err(r)) = &canonical {
++            let at = r.element.map_or(String::new(), |e| format!(" (elemento {e})"));
++            findings.push(Finding {
++                severity: Severity::Error,
++                subject: format!("asset:{id}"),
++                code: r.code.into(),
++                message: format!("semilla {seed}: la geometría canónica no es válida: {}{at}", r.detail),
++            });
++        }
+@@ -194 +228,21 @@ pub fn run(
+-        seeds.push(SeedResult { seed, glb: run.glb, glb_sha256, resolved, measures });
++        seeds.push(SeedResult { seed, glb: run.glb, glb_sha256, resolved, measures, canonical });
++    }
++    let mut godot_version = None;
++    if cfg.generate.canonical.is_some() && !engines.is_empty() {
++        engines.sort();
++        engines.dedup();
++        match engines.as_slice() {
++            [Some(one)] => godot_version = Some(one.clone()),
++            [None] => findings.push(Finding {
++                severity: Severity::Error,
++                subject: format!("asset:{id}"),
++                code: "canonical_engine_missing".into(),
++                message: "ninguna semilla dice con qué versión de Godot se generó".into(),
++            }),
++            _ => findings.push(Finding {
++                severity: Severity::Error,
++                subject: format!("asset:{id}"),
++                code: "canonical_engine_mismatch".into(),
++                message: format!("las semillas no las generó la misma versión de Godot: {engines:?}"),
++            }),
++        }
+@@ -196 +250,28 @@ pub fn run(
+-    Ok(Outcome { seeds, findings })
++    Ok(Outcome { seeds, findings, godot_version })
++}
++
++/// Builds and validates the canonical geometry of one seed and, when it holds,
++/// writes it as `<seed>.canonical.bin` next to the GLB. The outer `Err` is a
++/// file the tool could not write; the inner one, a mesh that is not canonical.
++fn canonical(
++    glb: &Path,
++    meshes: &[kiln_core::mesh::Mesh],
++    segments: u64,
++) -> Result<Result<String, kiln_core::canonical::Rejection>, String> {
++    use kiln_core::canonical::{self, Rejection};
++    let geometry = match kiln_core::mesh::node_transform(glb) {
++        Err(e) => Err(Rejection::new("canonical_node_transform", None, format!("cannot read the nodes: {e}"))),
++        Ok(Some(t)) => Err(Rejection::new("canonical_node_transform", None, format!("{t}: the mesh is not placed as stored"))),
++        Ok(None) if meshes.len() != 1 => {
++            Err(Rejection::new("canonical_mesh_count", None, format!("{} meshes, the canonical geometry needs one", meshes.len())))
++        }
++        Ok(None) => canonical::build(&meshes[0].positions, &meshes[0].indices, u32::try_from(segments).unwrap_or(u32::MAX)),
++    };
++    let geometry = match geometry.and_then(|g| canonical::validate(&g).map(|()| g)) {
++        Ok(g) => g,
++        Err(r) => return Ok(Err(r)),
++    };
++    let bytes = canonical::to_bytes(&geometry);
++    let out = glb.with_extension("canonical.bin");
++    kiln_core::asset::write_replacing(&out, &bytes).map_err(|e| e.to_string())?;
++    Ok(Ok(kiln_core::asset::sha256_hex(&bytes)))
+@@ -523,0 +605,206 @@ mod tests {
++
++    const CANONICAL: &str = "\n[generate]\ncanonical = \"radial_v0\"\n";
++
++    /// The same GLB with `key = value` set on its only node.
++    fn with_node(glb: &[u8], key: &str, value: serde_json::Value) -> Vec<u8> {
++        with_json(glb, |doc| doc["nodes"][0][key] = value)
++    }
++
++    /// The same GLB with its JSON chunk edited by `edit`.
++    fn with_json(glb: &[u8], edit: impl FnOnce(&mut serde_json::Value)) -> Vec<u8> {
++        let len = u32::from_le_bytes([glb[12], glb[13], glb[14], glb[15]]) as usize;
++        let mut doc: serde_json::Value = serde_json::from_slice(&glb[20..20 + len]).unwrap();
++        edit(&mut doc);
++        let mut json = doc.to_string().into_bytes();
++        while !json.len().is_multiple_of(4) {
++            json.push(b' ');
++        }
++        let bin = &glb[20 + len..];
++        let mut out = b"glTF".to_vec();
++        out.extend(2u32.to_le_bytes());
++        out.extend(((12 + 8 + json.len() + bin.len()) as u32).to_le_bytes());
++        out.extend((json.len() as u32).to_le_bytes());
++        out.extend(b"JSON");
++        out.extend(json);
++        out.extend(bin);
++        out
++    }
++
++    fn verify_files(p: &Path) -> Vec<String> {
++        let mut names: Vec<String> = std::fs::read_dir(p.join("kiln/cache/generated/rock/verify"))
++            .unwrap()
++            .flatten()
++            .map(|e| e.file_name().to_string_lossy().into_owned())
++            .collect();
++        names.sort();
++        names
++    }
++
++    #[test]
++    fn canonical_writes_an_artifact_and_its_hash_per_seed() {
++        let p = setup("vr-canon", &spec_text("", 200), &sphere_glb(8, false), CANONICAL);
++        let got = verify(&p, None, "rock", &mut |_| {});
++        let (_, v) = report_of(&p);
++        let dir = p.join("kiln/cache/generated/rock/verify");
++        let seeds = v["recipe"]["seeds"].as_array().unwrap().clone();
++        let files: Vec<(u64, Option<Vec<u8>>)> =
++            seeds.iter().map(|s| (s["seed"].as_u64().unwrap(), std::fs::read(dir.join(format!("{}.canonical.bin", s["seed"]))).ok())).collect();
++        std::fs::remove_dir_all(&p).unwrap();
++        got.unwrap();
++        assert_eq!(seeds.len(), 16);
++        for (s, (seed, bytes)) in seeds.iter().zip(files) {
++            let h = s["geometry_sha256"].as_str().unwrap_or_else(|| panic!("seed {seed}: {s}"));
++            assert!(h.len() == 64 && h.bytes().all(|c| c.is_ascii_hexdigit() && !c.is_ascii_uppercase()), "{h}");
++            let bytes = bytes.unwrap_or_else(|| panic!("seed {seed}: no artifact"));
++            assert_eq!(bytes.len(), 32 + 12 * 34 + 12 * 64);
++            assert_eq!(kiln_core::asset::sha256_hex(&bytes), h);
++            assert!(s.get("canonical").is_none(), "{s}");
++        }
++    }
++
++    #[test]
++    fn canonical_runs_on_every_seed_after_a_flipped_face() {
++        let p = setup("vr-canon-flip", &spec_text("", 200), &sphere_glb(8, true), CANONICAL);
++        let got = verify(&p, None, "rock", &mut |_| {});
++        let (_, v) = report_of(&p);
++        let left = verify_files(&p);
++        std::fs::remove_dir_all(&p).unwrap();
++        assert!(got.is_err());
++        assert_eq!(v["valid"], false);
++        let found = v["findings"].as_array().unwrap();
++        assert!(found.iter().any(|f| f["code"] == "generated_flipped"));
++        let i5: Vec<&serde_json::Value> = found.iter().filter(|f| f["code"] == "I5_inconsistent_orientation").collect();
++        assert_eq!(i5.len(), 16, "{found:?}");
++        assert!(i5.iter().all(|f| f["severity"] == found.iter().find(|g| g["code"] == "generated_flipped").unwrap()["severity"]));
++        for s in v["recipe"]["seeds"].as_array().unwrap() {
++            assert_eq!(s["canonical"]["code"], "I5_inconsistent_orientation", "{s}");
++            assert!(s["canonical"]["element"].is_u64() && s["canonical"]["detail"].is_string(), "{s}");
++            assert!(s.get("geometry_sha256").is_none(), "{s}");
++            assert!(i5.iter().any(|f| f["message"].as_str().unwrap().contains(&format!("semilla {}", s["seed"]))));
++        }
++        assert!(!left.iter().any(|n| n.ends_with(".bin")), "{left:?}");
++    }
++
++    #[test]
++    fn canonical_refuses_a_node_transform() {
++        let glb = with_node(&sphere_glb(8, false), "translation", serde_json::json!([0.0, 1.0, 0.0]));
++        let p = setup("vr-canon-node", &spec_text("", 200), &glb, CANONICAL);
++        let got = verify(&p, None, "rock", &mut |_| {});
++        let (_, v) = report_of(&p);
++        std::fs::remove_dir_all(&p).unwrap();
++        assert!(got.is_err());
++        let found = v["findings"].as_array().unwrap();
++        assert_eq!(found.iter().filter(|f| f["code"] == "canonical_node_transform").count(), 16, "{found:?}");
++        assert!(v["recipe"]["seeds"].as_array().unwrap().iter().all(|s| s["canonical"]["code"] == "canonical_node_transform"));
++    }
++
++    #[test]
++    fn without_canonical_the_report_and_files_are_todays() {
++        let p = setup("vr-canon-off", &spec_text("", 200), &sphere_glb(8, false), "");
++        verify(&p, None, "rock", &mut |_| {}).unwrap();
++        let (_, off) = report_of(&p);
++        let off_files = verify_files(&p);
++        let mut t = std::fs::read_to_string(p.join("kiln.toml")).unwrap();
++        t.push_str(CANONICAL);
++        std::fs::write(p.join("kiln.toml"), t).unwrap();
++        verify(&p, None, "rock", &mut |_| {}).unwrap();
++        let (_, mut on) = report_of(&p);
++        let on_files = verify_files(&p);
++        std::fs::remove_dir_all(&p).unwrap();
++        let today = ["degenerate", "flipped", "glb_sha256", "resolved", "seed", "size_m", "steep", "tris"];
++        for s in off["recipe"]["seeds"].as_array().unwrap() {
++            let keys: Vec<&String> = s.as_object().unwrap().keys().collect();
++            assert_eq!(keys, today, "{s}");
++        }
++        assert!(!off_files.iter().any(|n| n.ends_with(".bin")), "{off_files:?}");
++        for s in on["recipe"]["seeds"].as_array_mut().unwrap() {
++            assert!(s.as_object_mut().unwrap().remove("geometry_sha256").is_some());
++        }
++        assert!(on["recipe"].as_object_mut().unwrap().remove("godot_version").is_some());
++        assert_eq!(on, off);
++        let on_glbs: Vec<&String> = on_files.iter().filter(|n| !n.ends_with(".canonical.bin")).collect();
++        assert_eq!(on_glbs, off_files.iter().collect::<Vec<_>>());
++    }
++
++    #[test]
++    fn canonical_refuses_two_meshes() {
++        let glb = with_json(&sphere_glb(8, false), |doc| {
++            let first = doc["meshes"][0]["primitives"][0].clone();
++            doc["meshes"][0]["primitives"].as_array_mut().unwrap().push(first);
++        });
++        let p = setup("vr-canon-two", &spec_text("", 400), &glb, CANONICAL);
++        let got = verify(&p, None, "rock", &mut |_| {});
++        let (_, v) = report_of(&p);
++        std::fs::remove_dir_all(&p).unwrap();
++        assert!(got.is_err());
++        let found = v["findings"].as_array().unwrap();
++        assert_eq!(found.iter().filter(|f| f["code"] == "canonical_mesh_count").count(), 16, "{found:?}");
++        assert!(v["recipe"]["seeds"].as_array().unwrap().iter().all(|s| s["canonical"]["code"] == "canonical_mesh_count"));
++    }
++
++    #[test]
++    fn canonical_records_the_godot_version_of_the_batch() {
++        let p = setup("vr-canon-godot", &spec_text("", 200), &sphere_glb(8, false), CANONICAL);
++        let got = verify(&p, None, "rock", &mut |_| {});
++        let (_, v) = report_of(&p);
++        std::fs::remove_dir_all(&p).unwrap();
++        got.unwrap();
++        assert_eq!(v["recipe"]["godot_version"], "fake");
++    }
++
++    #[test]
++    fn canonical_refuses_odd_segments_before_godot() {
++        let spec = spec_text("", 200).replace("segments = 8", "segments = [8, 10]");
++        assert_ne!(spec, spec_text("", 200));
++        let p = setup("vr-canon-odd", &spec, &sphere_glb(8, false), CANONICAL);
++        let got = go(&p);
++        let ran = p.join("ran").exists();
++        std::fs::remove_dir_all(&p).unwrap();
++        let out = got.unwrap();
++        assert_eq!(codes(&out, "canonical_odd_segments"), 1, "{:?}", out.findings);
++        assert!(out.seeds.is_empty() && !ran);
++
++        let p = setup("vr-canon-odd-off", &spec, &sphere_glb(8, false), "");
++        let got = go(&p);
++        std::fs::remove_dir_all(&p).unwrap();
++        assert_eq!(codes(&got.unwrap(), "canonical_odd_segments"), 0);
++    }
++
++    #[test]
++    fn canonical_refuses_a_batch_without_a_godot_version() {
++        let p = setup("vr-canon-noengine", &spec_text("", 200), &sphere_glb(8, false), CANONICAL);
++        let fake = std::fs::read_to_string(p.join("fake-godot")).unwrap();
++        let silent = fake.replace(",\"godot\":\"fake\"}'", "}'");
++        assert_ne!(silent, fake);
++        std::fs::write(p.join("fake-godot"), silent).unwrap();
++        let got = verify(&p, None, "rock", &mut |_| {});
++        let (_, v) = report_of(&p);
++        std::fs::remove_dir_all(&p).unwrap();
++        assert!(got.is_err());
++        assert_eq!(v["valid"], false);
++        let found = v["findings"].as_array().unwrap();
++        let missing: Vec<&serde_json::Value> = found.iter().filter(|f| f["code"] == "canonical_engine_missing").collect();
++        assert_eq!(missing.len(), 1, "{found:?}");
++        assert_eq!(missing[0]["severity"], "error");
++        assert!(v["recipe"].get("godot_version").is_none(), "{}", v["recipe"]);
++    }
++
++    #[test]
++    fn canonical_refuses_seeds_made_by_different_godots() {
++        let p = setup("vr-canon-engines", &spec_text("", 200), &sphere_glb(8, false), CANONICAL);
++        let fake = std::fs::read_to_string(p.join("fake-godot")).unwrap();
++        // every run answers with its own process id as the version
++        let varying = fake.replace("\"godot\":\"fake\"}'", "\"godot\":\"fake-'$$'\"}'");
++        assert_ne!(varying, fake);
++        std::fs::write(p.join("fake-godot"), varying).unwrap();
++        let got = verify(&p, None, "rock", &mut |_| {});
++        let (_, v) = report_of(&p);
++        std::fs::remove_dir_all(&p).unwrap();
++        assert!(got.is_err());
++        assert_eq!(v["valid"], false);
++        let found = v["findings"].as_array().unwrap();
++        let mismatch: Vec<&serde_json::Value> = found.iter().filter(|f| f["code"] == "canonical_engine_mismatch").collect();
++        assert_eq!(mismatch.len(), 1, "{found:?}");
++        assert_eq!(mismatch[0]["severity"], "error");
++        assert!(v["recipe"].get("godot_version").is_none(), "{}", v["recipe"]);
++    }
+diff --git a/crates/kiln-core/src/config.rs b/crates/kiln-core/src/config.rs
+index a3f0676..cb3635a 100644
+--- a/crates/kiln-core/src/config.rs
++++ b/crates/kiln-core/src/config.rs
+@@ -57,0 +58,3 @@ pub struct GenerateSection {
++    /// Canonical geometry verify computes per seed; None leaves verify as before.
++    #[serde(default, deserialize_with = "canonical_class")]
++    pub canonical: Option<CanonicalClass>,
+@@ -64,0 +68 @@ impl Default for GenerateSection {
++            canonical: None,
+@@ -68,0 +73,38 @@ impl Default for GenerateSection {
++/// A version of the canonical geometry (`[generate] canonical`).
++#[derive(Debug, Clone, Copy, PartialEq, Eq)]
++pub enum CanonicalClass {
++    RadialV0,
++}
++
++impl CanonicalClass {
++    pub const ALL: [CanonicalClass; 1] = [CanonicalClass::RadialV0];
++
++    pub fn name(self) -> &'static str {
++        match self {
++            CanonicalClass::RadialV0 => "radial_v0",
++        }
++    }
++}
++
++fn canonical_class<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Option<CanonicalClass>, D::Error> {
++    let known = || {
++        CanonicalClass::ALL
++            .iter()
++            .map(|c| format!("«{}»", c.name()))
++            .collect::<Vec<_>>()
++            .join(", ")
++    };
++    let value = toml::Value::deserialize(d)?;
++    let name = value.as_str().unwrap_or_default();
++    CanonicalClass::ALL
++        .into_iter()
++        .find(|c| c.name() == name)
++        .map(Some)
++        .ok_or_else(|| {
++            serde::de::Error::custom(format!(
++                "[generate] canonical: valor desconocido {value}; se admite {}",
++                known()
++            ))
++        })
++}
++
+@@ -610,0 +653,23 @@ mod tests {
++    #[test]
++    fn canonical_geometry_is_off_without_the_key() {
++        let c = Config::parse("[project]\nname = \"x\"\n[generate]\nverify_seeds = 4\n").unwrap();
++        assert_eq!(c.generate.canonical, None);
++        assert_eq!(Config::parse("[project]\nname = \"x\"\n").unwrap().generate.canonical, None);
++    }
++
++    #[test]
++    fn reads_the_canonical_class() {
++        let c = Config::parse("[project]\nname = \"x\"\n[generate]\ncanonical = \"radial_v0\"\n").unwrap();
++        assert_eq!(c.generate.canonical, Some(CanonicalClass::RadialV0));
++    }
++
++    #[test]
++    fn rejects_an_unknown_canonical_class() {
++        for value in ["\"radial_v1\"", "\"\"", "1"] {
++            let e = Config::parse(&format!("[project]\nname = \"x\"\n[generate]\ncanonical = {value}\n"))
++                .unwrap_err();
++            assert!(e.contains("[generate] canonical"), "{e}");
++            assert!(e.contains("radial_v0"), "{e}");
++        }
++    }
++
+diff --git a/crates/kiln-core/src/generate/check.rs b/crates/kiln-core/src/generate/check.rs
+index 543a8e9..995d901 100644
+--- a/crates/kiln-core/src/generate/check.rs
++++ b/crates/kiln-core/src/generate/check.rs
+@@ -112,0 +113,31 @@ pub fn check(
++/// Checks that only apply with `[generate] canonical`. The generator makes
++/// `segments / 2` rings, so the counts of S1 §2.2 hold only for an even value
++/// (decision 003). A range of whole ends that is not a single value always
++/// reaches an odd one, at an end or inside. A value with a range problem is
++/// left to `check`.
++pub fn canonical(asset_id: &str, g: &Generator) -> Vec<Finding> {
++    let Some(sphere) = g.ops.first().filter(|o| o.op == "sphere") else {
++        return Vec::new();
++    };
++    let Some(v) = sphere.params.get("segments") else {
++        return Vec::new();
++    };
++    let odd = |x: f64| x.rem_euclid(2.0) == 1.0;
++    let can_be_odd = match v {
++        Value::Fixed(x) => odd(*x),
++        Value::Range([a, b]) => a != b || odd(*a),
++    };
++    let well_formed = vocab::op("sphere")
++        .and_then(|d| d.param("segments"))
++        .is_some_and(|p| range_problem(p, v).is_none());
++    if !(well_formed && can_be_odd) {
++        return Vec::new();
++    }
++    vec![Finding {
++        severity: Severity::Error,
++        subject: format!("asset:{asset_id}"),
++        code: "canonical_odd_segments".into(),
++        message: "con la geometría canónica, sphere.segments debe ser un número par fijo: un valor impar, o un rango que puede dar uno, rompe el recuento de S1".into(),
++    }]
++}
++
+@@ -291,0 +323,20 @@ mod tests {
++    fn canonical_codes(params: &str) -> Vec<String> {
++        let g = recipe(&sphere(params), "material = \"basalt\"");
++        canonical("a", &g).into_iter().map(|f| f.code).collect()
++    }
++
++    #[test]
++    fn canonical_refuses_segments_that_can_be_odd() {
++        for params in ["segments = 9", "segments = [8, 9]", "segments = [9, 16]", "segments = [8, 10]", "segments = [9, 9]"] {
++            assert_eq!(canonical_codes(params), ["canonical_odd_segments"], "{params}");
++        }
++        for params in ["segments = 8", "segments = [16, 16]", "", "segments = 12.5", "segments = 7"] {
++            assert!(canonical_codes(params).is_empty(), "{params}");
++        }
++        let g = recipe(&sphere("segments = 9"), "material = \"basalt\"");
++        let f = canonical("rock", &g);
++        assert_eq!((f[0].severity, f[0].subject.as_str()), (Severity::Error, "asset:rock"));
++        assert!(f[0].message.contains("par"), "{}", f[0].message);
++        assert!(check("a", &g, None, PALETTE).is_empty());
++    }
++
+diff --git a/crates/kiln-core/src/lib.rs b/crates/kiln-core/src/lib.rs
+index 3669a8c..e6f69de 100644
+--- a/crates/kiln-core/src/lib.rs
++++ b/crates/kiln-core/src/lib.rs
+@@ -8,0 +9 @@ pub mod build;
++pub mod canonical;
+diff --git a/crates/kiln-core/src/mesh.rs b/crates/kiln-core/src/mesh.rs
+index c68e52e..fa14baa 100644
+--- a/crates/kiln-core/src/mesh.rs
++++ b/crates/kiln-core/src/mesh.rs
+@@ -24,0 +25,47 @@ pub fn read_bytes(bytes: &[u8]) -> Result<Vec<Mesh>, String> {
++pub fn node_transform(path: &Path) -> Result<Option<String>, String> {
++    node_transform_bytes(&std::fs::read(path).map_err(|e| e.to_string())?)
++}
++
++/// `read` takes positions as they are in the mesh and ignores the nodes. This
++/// says whether that differs from what the file places: the first node that
++/// holds a mesh, or is an ancestor of one, with a transform that is not the
++/// identity (`"nodo N: translation"`). A malformed transform counts as one.
++pub fn node_transform_bytes(bytes: &[u8]) -> Result<Option<String>, String> {
++    let doc = json_chunk(bytes)?;
++    let nodes = doc["nodes"].as_array().map(Vec::as_slice).unwrap_or_default();
++    let mut parents = vec![Vec::new(); nodes.len()];
++    for (i, n) in nodes.iter().enumerate() {
++        for c in n["children"].as_array().into_iter().flatten() {
++            if let Some(c) = c.as_u64().and_then(|c| usize::try_from(c).ok()).filter(|&c| c < nodes.len()) {
++                parents[c].push(i);
++            }
++        }
++    }
++    // A node places a mesh when it holds one or a descendant does. One walk up
++    // from the mesh nodes, each node visited once, so a crafted file with
++    // cycles or many nodes stays linear.
++    let mut places_mesh = vec![false; nodes.len()];
++    let mut stack: Vec<usize> = (0..nodes.len()).filter(|&i| nodes[i].get("mesh").is_some()).collect();
++    while let Some(i) = stack.pop() {
++        if !std::mem::replace(&mut places_mesh[i], true) {
++            stack.extend(&parents[i]);
++        }
++    }
++    const IDENTITY: [(&str, &[f64]); 4] = [
++        ("translation", &[0., 0., 0.]),
++        ("rotation", &[0., 0., 0., 1.]),
++        ("scale", &[1., 1., 1.]),
++        ("matrix", &[1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1., 0., 0., 0., 0., 1.]),
++    ];
++    for (i, node) in nodes.iter().enumerate() {
++        for (key, identity) in IDENTITY {
++            let Some(v) = node.get(key) else { continue };
++            let values: Option<Vec<f64>> = v.as_array().and_then(|a| a.iter().map(Value::as_f64).collect());
++            if values.as_deref() != Some(identity) && places_mesh[i] {
++                return Ok(Some(format!("nodo {i}: {key}")));
++            }
++        }
++    }
++    Ok(None)
++}
++
+@@ -332,0 +380,45 @@ mod tests {
++    /// The indexed tetrahedron, with `nodes` and a scene over node 0.
++    fn tetra_with_nodes(nodes: &str) -> Vec<u8> {
++        let base = tetra(true, false);
++        let doc = json_chunk(&base).unwrap();
++        let mut doc = doc.as_object().unwrap().clone();
++        doc.insert("nodes".into(), serde_json::from_str(nodes).unwrap());
++        doc.insert("scenes".into(), serde_json::json!([{"nodes": [0]}]));
++        let bin = bin_chunk(&base).unwrap().to_vec();
++        glb(&Value::Object(doc).to_string(), &bin)
++    }
++
++    #[test]
++    fn detects_a_transform_on_the_mesh_node() {
++        for node in [
++            r#"[{"mesh":0,"translation":[0,0.5,0]}]"#,
++            r#"[{"mesh":0,"rotation":[0,0.7071068,0,0.7071068]}]"#,
++            r#"[{"mesh":0,"scale":[2,2,2]}]"#,
++            r#"[{"mesh":0,"matrix":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,3,1]}]"#,
++            r#"[{"mesh":0,"translation":"x"}]"#,
++            r#"[{"children":[1],"translation":[1,0,0]},{"mesh":0}]"#,
++        ] {
++            let found = node_transform_bytes(&tetra_with_nodes(node)).unwrap();
++            assert!(found.is_some(), "{node} must be detected");
++        }
++        let found = node_transform_bytes(&tetra_with_nodes(r#"[{"mesh":0,"translation":[0,0.5,0]}]"#))
++            .unwrap()
++            .unwrap();
++        assert!(found.contains("translation"), "{found}");
++    }
++
++    #[test]
++    fn an_identity_or_absent_transform_is_not_detected() {
++        for node in [
++            r#"[{"mesh":0}]"#,
++            r#"[{"mesh":0,"translation":[0,0,0],"rotation":[0,0,0,1],"scale":[1,1,1]}]"#,
++            r#"[{"mesh":0,"matrix":[1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]}]"#,
++            r#"[{"mesh":0},{"translation":[5,0,0]}]"#,
++        ] {
++            assert_eq!(node_transform_bytes(&tetra_with_nodes(node)).unwrap(), None, "{node}");
++        }
++        assert_eq!(node_transform_bytes(&tetra(true, false)).unwrap(), None);
++        // read keeps ignoring the transform
++        check_tetra(read_bytes(&tetra_with_nodes(r#"[{"mesh":0,"translation":[0,0.5,0]}]"#)).unwrap());
++    }
++

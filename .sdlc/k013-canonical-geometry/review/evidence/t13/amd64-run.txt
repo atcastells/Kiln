@@ -1,0 +1,52 @@
+x86_64
+4.7.1.stable.official.a13da4feb
+pub_32_1595708226 exit=0 glb=yes
+pub_32_1846092899 exit=0 glb=yes
+pub_32_621036976 exit=0 glb=yes
+pub_32_42 exit=0 glb=yes
+pub_32_4096378883 exit=0 glb=yes
+pub_32_1227191235 exit=0 glb=yes
+pub_32_3890178997 exit=0 glb=yes
+pub_32_3943211157 exit=0 glb=yes
+pub_32_1967550902 exit=0 glb=yes
+pub_32_167205829 exit=0 glb=yes
+pub_32_1319969106 exit=0 glb=yes
+pub_32_2394521605 exit=0 glb=yes
+pub_64_42 exit=0 glb=yes
+pub_32_2142325897 exit=0 glb=yes
+pub_32_1859157860 exit=0 glb=yes
+pub_32_3665219471 exit=0 glb=yes
+pub_32_303757059 exit=0 glb=yes
+pub_64_1227191235 exit=0 glb=yes
+pub_64_621036976 exit=0 glb=yes
+pub_64_1595708226 exit=0 glb=yes
+pub_64_1846092899 exit=0 glb=yes
+pub_64_3943211157 exit=0 glb=yes
+pub_64_4096378883 exit=0 glb=yes
+pub_64_1967550902 exit=0 glb=yes
+pub_64_1319969106 exit=0 glb=yes
+pub_64_3665219471 exit=0 glb=yes
+pub_64_1859157860 exit=0 glb=yes
+pub_64_3890178997 exit=0 glb=yes
+pub_64_2394521605 exit=0 glb=yes
+pub_64_167205829 exit=0 glb=yes
+pub_64_2142325897 exit=0 glb=yes
+pub_64_303757059 exit=0 glb=yes
+pub_128_42 exit=0 glb=yes
+pub_128_621036976 exit=0 glb=yes
+pub_128_1227191235 exit=0 glb=yes
+pub_128_4096378883 exit=0 glb=yes
+pub_128_1846092899 exit=0 glb=yes
+pub_128_1595708226 exit=0 glb=yes
+pub_128_3943211157 exit=0 glb=yes
+pub_128_167205829 exit=0 glb=yes
+pub_128_2394521605 exit=0 glb=yes
+pub_128_1967550902 exit=0 glb=yes
+pub_128_1319969106 exit=0 glb=yes
+pub_128_3890178997 exit=0 glb=yes
+pub_128_1859157860 exit=0 glb=yes
+pub_128_303757059 exit=0 glb=yes
+pub_128_3665219471 exit=0 glb=yes
+pub_128_2142325897 exit=0 glb=yes
+wall_s=11
+docker_exit=0 host_wall_s=11

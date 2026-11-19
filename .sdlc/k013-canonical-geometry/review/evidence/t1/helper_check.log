@@ -1,0 +1,2 @@
+sphere_glb(8): f32 winding {'0': 16, '+': 64}  canonical V/T/winding (34, 64, {'+': 64})
+sphere_glb(64): f32 winding {'0': 128, '+': 4096}  canonical V/T/winding (2050, 4096, {'+': 4096})

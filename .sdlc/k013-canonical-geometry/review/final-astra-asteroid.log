@@ -1,0 +1,28 @@
+godot_station: importing project (temp dir /var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T/tmp.8njZSWm8Jm)
+godot_station: --- phase asteroid
+Godot Engine v4.7.1.stable.official.a13da4feb - https://godotengine.org
+
+message [id]: Identificador de paquete no válido: solo letras, cifras, _ y -
+message [missing]: Falta el archivo kiln_generator.gd del paquete miss_kiln_generator: publica de nuevo con Kiln
+message [json]: recipe.json no es JSON válido: publica de nuevo con Kiln
+message [json_object]: recipe.json no es un objeto JSON: publica de nuevo con Kiln
+message [kind]: El contrato no es de un paquete generado (kind distinto de «generated»)
+message [version]: La versión del generador 99 no está soportada; soporta [1]
+message [script hash]: El guion del generador no coincide con su hash del contrato: publica de nuevo con Kiln
+message [recipe hash]: recipe.json no coincide con su hash del contrato: publica de nuevo con Kiln
+message [seeds empty]: La receta no trae semillas verificadas (semillas ausentes o vacías)
+message [typed_script_sha256]: El contrato no trae script_sha256 o no es texto
+message [typed_recipe_json_sha256]: El contrato no trae recipe_json_sha256 o no es texto
+message [typed_kind]: El contrato no trae kind o no es texto
+message [typed_generator_version]: El contrato trae versión del generador ausente o no válida
+message [seeds_entry]: La receta trae una entrada de semillas mal formada
+message [pinned]: El guion del generador no es el que ASTRA conoce para la versión 1: revisa el paquete
+INFO asteroid_32 avg_ms=0.7 vertices=3264
+INFO asteroid_64 avg_ms=2.6 vertices=12672
+INFO asteroid_128 avg_ms=10.0 vertices=49920
+INFO asteroid_32 seed42 hash=9933203f5b70e0f99e7c058232cb9c3df58cb31fa79e50877776dae8be44e3d8
+INFO asteroid_64 seed42 hash=2bace5098284fe2d2b60880b3ba17186979b26be4941dace9d7b999ff2f824f4
+INFO asteroid_128 seed42 hash=a29f1c0de26f47179e5ac4a0b3539fe118bb3ab0bde0d2b267228bc807c7406f
+OK: asteroid recipe test passed
+OK: godot station passed
+exit=0

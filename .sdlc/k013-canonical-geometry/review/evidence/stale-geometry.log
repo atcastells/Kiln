@@ -1,0 +1,9 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running unittests src/main.rs (/private/tmp/claude-501/k13/target/debug/deps/kiln-609f1914adb1c7ac)
+
+running 1 test
+RESULT files=["recipe.json", "kiln_generator.gd", "geometry/seed_1.bin"] contract_files=["recipe.json","kiln_generator.gd","geometry/seed_1.bin"] seed2_on_disk=true
+test ops::publish_recipe::tests::scratch_stale_geometry ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 164 filtered out; finished in 0.10s
+

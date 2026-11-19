@@ -1,0 +1,51 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running unittests src/main.rs (target/debug/deps/kiln-609f1914adb1c7ac)
+
+running 31 tests
+test ops::publish_recipe::tests::a_matching_report_passes_and_an_edited_recipe_does_not ... ok
+test ops::publish_recipe::tests::nothing_is_written_when_the_gate_refuses ... ok
+test ops::publish_recipe::tests::an_old_glb_of_the_same_id_is_removed ... ok
+test ops::publish_recipe::tests::a_missing_artefact_refuses ... ok
+test ops::publish_recipe::tests::publish_asset_reaches_the_recipe ... ok
+test ops::publish_recipe::tests::a_report_without_the_hash_of_one_seed_refuses ... ok
+test ops::publish_recipe::tests::a_new_recipe_raises_the_version ... ok
+test ops::publish_recipe::tests::a_link_in_the_destination_is_replaced_not_followed ... ok
+test ops::publish_recipe::tests::a_contract_that_could_not_be_written_still_raises_the_version_next_time ... ok
+test ops::publish_recipe::tests::refuses_a_spec_without_a_generator ... ok
+test ops::publish_recipe::tests::refuses_a_recipe_that_differs_from_the_verified_one ... ok
+test ops::publish_recipe::tests::refuses_a_validation_that_is_not_json ... ok
+test ops::publish_recipe::tests::publish_is_refused_while_the_asset_is_locked ... ok
+test ops::publish_recipe::tests::refuses_a_validation_that_did_not_pass ... ok
+test ops::publish_recipe::tests::refuses_without_a_validation ... ok
+test ops::publish_recipe::tests::publishes_the_three_files_and_no_glb ... ok
+test ops::publish_recipe::tests::refuses_the_report_of_a_parts_build ... ok
+test ops::publish_recipe::tests::publishing_again_without_changes_keeps_the_version ... ok
+test ops::publish_recipe::tests::refuses_another_generator_version_or_script ... ok
+test ops::publish_recipe::tests::refuses_a_verification_without_seeds ... ok
+test ops::publish_recipe::tests::without_publish_dir_it_says_so ... ok
+test ops::publish_recipe::tests::without_canonical_the_contract_has_no_provenance_keys ... ok
+test ops::publish_recipe::tests::refuses_when_the_rules_of_kiln_toml_changed_since_the_verification ... ok
+test ops::publish_recipe::tests::an_invalid_artefact_with_the_verified_hash_refuses ... ok
+test ops::publish_recipe::tests::an_artefact_that_is_not_the_verified_one_refuses ... ok
+test ops::publish_recipe::tests::canonical_publish_copies_the_godot_version ... ok
+test ops::publish_recipe::tests::a_report_without_the_godot_version_refuses ... ok
+test ops::publish_recipe::tests::canonical_publish_writes_the_geometry_and_its_hashes ... ok
+test ops::publish_recipe::tests::a_republish_removes_only_the_geometry_of_seeds_no_longer_verified ... FAILED
+test ops::publish_recipe::tests::a_tampered_artefact_refuses_and_leaves_the_package_as_it_was ... ok
+test ops::publish_recipe::tests::canonical_publish_twice_gives_the_same_bytes ... ok
+
+failures:
+
+---- ops::publish_recipe::tests::a_republish_removes_only_the_geometry_of_seeds_no_longer_verified stdout ----
+
+thread 'ops::publish_recipe::tests::a_republish_removes_only_the_geometry_of_seeds_no_longer_verified' (42981250) panicked at crates/kiln-cli/src/ops/publish_recipe.rs:778:9:
+assertion failed: !d.join("geometry/seed_2.bin").exists()
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    ops::publish_recipe::tests::a_republish_removes_only_the_geometry_of_seeds_no_longer_verified
+
+test result: FAILED. 30 passed; 1 failed; 0 ignored; 0 measured; 136 filtered out; finished in 0.16s
+
+error: test failed, to rerun pass `-p kiln-cli --bin kiln`

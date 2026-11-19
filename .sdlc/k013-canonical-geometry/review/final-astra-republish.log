@@ -1,0 +1,141 @@
+== verify asteroid_32
+Semilla 1 de 16: 42
+Se resuelve la receta de «asteroid_32» con la semilla 42
+Semilla 2 de 16: 1227191235
+Se resuelve la receta de «asteroid_32» con la semilla 1227191235
+Semilla 3 de 16: 4096378883
+Se resuelve la receta de «asteroid_32» con la semilla 4096378883
+Semilla 4 de 16: 621036976
+Se resuelve la receta de «asteroid_32» con la semilla 621036976
+Semilla 5 de 16: 1846092899
+Se resuelve la receta de «asteroid_32» con la semilla 1846092899
+Semilla 6 de 16: 1595708226
+Se resuelve la receta de «asteroid_32» con la semilla 1595708226
+Semilla 7 de 16: 3943211157
+Se resuelve la receta de «asteroid_32» con la semilla 3943211157
+Semilla 8 de 16: 1967550902
+Se resuelve la receta de «asteroid_32» con la semilla 1967550902
+Semilla 9 de 16: 167205829
+Se resuelve la receta de «asteroid_32» con la semilla 167205829
+Semilla 10 de 16: 2394521605
+Se resuelve la receta de «asteroid_32» con la semilla 2394521605
+Semilla 11 de 16: 3890178997
+Se resuelve la receta de «asteroid_32» con la semilla 3890178997
+Semilla 12 de 16: 1319969106
+Se resuelve la receta de «asteroid_32» con la semilla 1319969106
+Semilla 13 de 16: 1859157860
+Se resuelve la receta de «asteroid_32» con la semilla 1859157860
+Semilla 14 de 16: 3665219471
+Se resuelve la receta de «asteroid_32» con la semilla 3665219471
+Semilla 15 de 16: 2142325897
+Se resuelve la receta de «asteroid_32» con la semilla 2142325897
+Semilla 16 de 16: 303757059
+Se resuelve la receta de «asteroid_32» con la semilla 303757059
+glTF Validator comprueba el GLB (gltf_validator)
+Godot importa e instancia el GLB (godot)
+kiln: pasa
+gltf_validator: pasa (glTF Validator 2.0.0-dev.3.10)
+godot_import: pasa (proyecto de prueba en kiln/cache/verify/asteroid_32)
+16 semillas verificadas; peor caso: 1088 triángulos, 0.5% de caras empinadas
+/Users/acastells/.t3/projects/astra/kiln/build/asteroid_32/validation.json
+exit=0
+== publish asteroid_32
+Receta y guion de «asteroid_32» escritos en godot/assets/kiln/asteroid_32
+Asset generado: no hay nada que Godot deba importar
+«asteroid_32» publicado en godot/assets/kiln/asteroid_32 (versión 1, sin cambios)
+/Users/acastells/.t3/projects/astra/godot/assets/kiln/asteroid_32
+exit=0
+== verify asteroid_64
+Semilla 1 de 16: 42
+Se resuelve la receta de «asteroid_64» con la semilla 42
+Semilla 2 de 16: 1227191235
+Se resuelve la receta de «asteroid_64» con la semilla 1227191235
+Semilla 3 de 16: 4096378883
+Se resuelve la receta de «asteroid_64» con la semilla 4096378883
+Semilla 4 de 16: 621036976
+Se resuelve la receta de «asteroid_64» con la semilla 621036976
+Semilla 5 de 16: 1846092899
+Se resuelve la receta de «asteroid_64» con la semilla 1846092899
+Semilla 6 de 16: 1595708226
+Se resuelve la receta de «asteroid_64» con la semilla 1595708226
+Semilla 7 de 16: 3943211157
+Se resuelve la receta de «asteroid_64» con la semilla 3943211157
+Semilla 8 de 16: 1967550902
+Se resuelve la receta de «asteroid_64» con la semilla 1967550902
+Semilla 9 de 16: 167205829
+Se resuelve la receta de «asteroid_64» con la semilla 167205829
+Semilla 10 de 16: 2394521605
+Se resuelve la receta de «asteroid_64» con la semilla 2394521605
+Semilla 11 de 16: 3890178997
+Se resuelve la receta de «asteroid_64» con la semilla 3890178997
+Semilla 12 de 16: 1319969106
+Se resuelve la receta de «asteroid_64» con la semilla 1319969106
+Semilla 13 de 16: 1859157860
+Se resuelve la receta de «asteroid_64» con la semilla 1859157860
+Semilla 14 de 16: 3665219471
+Se resuelve la receta de «asteroid_64» con la semilla 3665219471
+Semilla 15 de 16: 2142325897
+Se resuelve la receta de «asteroid_64» con la semilla 2142325897
+Semilla 16 de 16: 303757059
+Se resuelve la receta de «asteroid_64» con la semilla 303757059
+glTF Validator comprueba el GLB (gltf_validator)
+Godot importa e instancia el GLB (godot)
+kiln: pasa
+gltf_validator: pasa (glTF Validator 2.0.0-dev.3.10)
+godot_import: pasa (proyecto de prueba en kiln/cache/verify/asteroid_64)
+16 semillas verificadas; peor caso: 4224 triángulos, 0.5% de caras empinadas
+/Users/acastells/.t3/projects/astra/kiln/build/asteroid_64/validation.json
+exit=0
+== publish asteroid_64
+Receta y guion de «asteroid_64» escritos en godot/assets/kiln/asteroid_64
+Asset generado: no hay nada que Godot deba importar
+«asteroid_64» publicado en godot/assets/kiln/asteroid_64 (versión 1, sin cambios)
+/Users/acastells/.t3/projects/astra/godot/assets/kiln/asteroid_64
+exit=0
+== verify asteroid_128
+Semilla 1 de 16: 42
+Se resuelve la receta de «asteroid_128» con la semilla 42
+Semilla 2 de 16: 1227191235
+Se resuelve la receta de «asteroid_128» con la semilla 1227191235
+Semilla 3 de 16: 4096378883
+Se resuelve la receta de «asteroid_128» con la semilla 4096378883
+Semilla 4 de 16: 621036976
+Se resuelve la receta de «asteroid_128» con la semilla 621036976
+Semilla 5 de 16: 1846092899
+Se resuelve la receta de «asteroid_128» con la semilla 1846092899
+Semilla 6 de 16: 1595708226
+Se resuelve la receta de «asteroid_128» con la semilla 1595708226
+Semilla 7 de 16: 3943211157
+Se resuelve la receta de «asteroid_128» con la semilla 3943211157
+Semilla 8 de 16: 1967550902
+Se resuelve la receta de «asteroid_128» con la semilla 1967550902
+Semilla 9 de 16: 167205829
+Se resuelve la receta de «asteroid_128» con la semilla 167205829
+Semilla 10 de 16: 2394521605
+Se resuelve la receta de «asteroid_128» con la semilla 2394521605
+Semilla 11 de 16: 3890178997
+Se resuelve la receta de «asteroid_128» con la semilla 3890178997
+Semilla 12 de 16: 1319969106
+Se resuelve la receta de «asteroid_128» con la semilla 1319969106
+Semilla 13 de 16: 1859157860
+Se resuelve la receta de «asteroid_128» con la semilla 1859157860
+Semilla 14 de 16: 3665219471
+Se resuelve la receta de «asteroid_128» con la semilla 3665219471
+Semilla 15 de 16: 2142325897
+Se resuelve la receta de «asteroid_128» con la semilla 2142325897
+Semilla 16 de 16: 303757059
+Se resuelve la receta de «asteroid_128» con la semilla 303757059
+glTF Validator comprueba el GLB (gltf_validator)
+Godot importa e instancia el GLB (godot)
+kiln: pasa
+gltf_validator: pasa (glTF Validator 2.0.0-dev.3.10)
+godot_import: pasa (proyecto de prueba en kiln/cache/verify/asteroid_128)
+16 semillas verificadas; peor caso: 16640 triángulos, 1.3% de caras empinadas
+/Users/acastells/.t3/projects/astra/kiln/build/asteroid_128/validation.json
+exit=0
+== publish asteroid_128
+Receta y guion de «asteroid_128» escritos en godot/assets/kiln/asteroid_128
+Asset generado: no hay nada que Godot deba importar
+«asteroid_128» publicado en godot/assets/kiln/asteroid_128 (versión 1, sin cambios)
+/Users/acastells/.t3/projects/astra/godot/assets/kiln/asteroid_128
+exit=0

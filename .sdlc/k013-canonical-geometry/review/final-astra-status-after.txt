@@ -1,0 +1,9 @@
+ M godot/assets/kiln/asteroid_128/asset.json
+ M godot/assets/kiln/asteroid_32/asset.json
+ M godot/assets/kiln/asteroid_64/asset.json
+ M kiln.toml
+?? .sdlc/canonical-geometry/measure/__pycache__/
+?? .sdlc/first-character/estado-010c1-2026-11-18.pdf
+?? godot/assets/kiln/asteroid_128/geometry/
+?? godot/assets/kiln/asteroid_32/geometry/
+?? godot/assets/kiln/asteroid_64/geometry/
