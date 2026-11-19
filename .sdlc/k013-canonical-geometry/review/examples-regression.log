@@ -1,0 +1,102 @@
+## 1. cargo build -p kiln-cli --locked
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 0.15s
+rc=0
+ddb4a2b40371bc47114ee47b001b99905734c6e269e06ab3326711ae854dbc16  /Users/acastells/Kiln/target/debug/kiln
+
+## 2. in situ: kiln publish --project examples --asset hoist
+falta [publish] dir en kiln.toml
+rc=2
+## 2b. in situ: kiln publish --project examples --asset cargo_quay
+falta [publish] dir en kiln.toml
+rc=2
+copia temporal: /var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T/tmp.SMZFrQ9kFU/p (examples/ entera, como temp_project de los tests)
+## $ kiln publish --asset hoist --project <copia>
+verifica antes el asset: kiln verify --asset hoist
+rc=2
+## $ kiln build --asset hoist --project <copia>
+Plan de montaje: 9 copias de 7 piezas
+windlass: caja en lugar de un modelo por buscar: wooden windlass crank
+pulley: caja en lugar de un modelo por buscar: wooden pulley block
+rope: retocar: la soga del kit está enrollada; se estira en un tramo recto
+Montando en Blender (blender)
+built /private/var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T/tmp.SMZFrQ9kFU/p/kiln/build/hoist/hoist.glb 108 tris
+Aplicando materiales en Blender (blender)
+painted /private/var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T/tmp.SMZFrQ9kFU/p/kiln/build/hoist/hoist--weathered.glb 8 materials
+/private/var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T/tmp.SMZFrQ9kFU/p/kiln/build/hoist/hoist.glb
+rc=0
+## $ kiln verify --asset hoist --project <copia>
+Kiln comprueba el GLB
+glTF Validator comprueba el GLB (gltf_validator)
+Godot importa e instancia el GLB (godot)
+kiln: pasa
+gltf_validator: pasa (glTF Validator 2.0.0-dev.3.10)
+godot_import: pasa (proyecto de prueba en kiln/cache/verify/hoist)
+/private/var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T/tmp.SMZFrQ9kFU/p/kiln/build/hoist/validation.json
+rc=0
+## $ kiln publish --asset hoist --project <copia>
+«hoist» copiado a godot/assets/hoist
+Godot importa lo publicado (godot)
+«hoist» publicado en godot/assets/hoist (versión 1)
+/private/var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T/tmp.SMZFrQ9kFU/p/godot/assets/hoist
+rc=0
+## $ kiln publish --asset hoist --project <copia>
+«hoist» copiado a godot/assets/hoist
+Godot importa lo publicado (godot)
+«hoist» publicado en godot/assets/hoist (versión 1, sin cambios)
+/private/var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T/tmp.SMZFrQ9kFU/p/godot/assets/hoist
+rc=0
+
+## sha256 publicados (copia, binario HEAD)
+df773c453845866de8f7c7afa812aaf44fc9453b83b73a93c66e8f966d38f09e  godot/assets/hoist/asset.json
+c4e110a5e82a70d26d8be546a3db4f99d75c5068f42874fed00e868d7a5aa7d4  godot/assets/hoist/hoist--weathered.glb
+8860bb79d768e4db62a46f9afb63c739599acdf7f5eda45fae66fc21ce65f720  godot/assets/hoist/hoist--weathered.glb.import
+60561b7a414cc216bb57143f57a79440572a63dc0f5d708b2040c43c55c0ad86  godot/assets/hoist/hoist.glb
+d06a953273074a339416c8c0c6f9bb870982e5d77ad1aa8f853c29a84e16cc7a  godot/assets/hoist/hoist.glb.import
+3adfa7fca3574beb5778cca5f8b3eca9016e3e3ed2fbda46f615fedb5e15a474  kiln/build/hoist/validation.json
+e0241505efdbb6507f72b98eb685904f14e03392ba7ff779c0689bd6bdb58a0d  kiln/build/hoist/asset.json
+
+## 4. LÍNEA BASE: binario compilado de 2651608 (padre de K013, git archive en temporal), mismo flujo, copia /var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T/tmp.tn6Dh4PAc3/p
+5c99a05bbb6dba57cb11e97c79569867c7f7a119ab55d91e5923c4c2f57c1053  /var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T/tmp.yOvUN4cisA/target/debug/kiln
+## $ (base) kiln publish --asset hoist --project <copia2>
+verifica antes el asset: kiln verify --asset hoist
+rc=2
+## $ (base) kiln build --asset hoist --project <copia2>
+Plan de montaje: 9 copias de 7 piezas
+windlass: caja en lugar de un modelo por buscar: wooden windlass crank
+pulley: caja en lugar de un modelo por buscar: wooden pulley block
+rope: retocar: la soga del kit está enrollada; se estira en un tramo recto
+Montando en Blender (blender)
+built /private/var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T/tmp.tn6Dh4PAc3/p/kiln/build/hoist/hoist.glb 108 tris
+Aplicando materiales en Blender (blender)
+painted /private/var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T/tmp.tn6Dh4PAc3/p/kiln/build/hoist/hoist--weathered.glb 8 materials
+/private/var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T/tmp.tn6Dh4PAc3/p/kiln/build/hoist/hoist.glb
+rc=0
+## $ (base) kiln verify --asset hoist --project <copia2>
+Kiln comprueba el GLB
+glTF Validator comprueba el GLB (gltf_validator)
+Godot importa e instancia el GLB (godot)
+kiln: pasa
+gltf_validator: pasa (glTF Validator 2.0.0-dev.3.10)
+godot_import: pasa (proyecto de prueba en kiln/cache/verify/hoist)
+/private/var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T/tmp.tn6Dh4PAc3/p/kiln/build/hoist/validation.json
+rc=0
+## $ (base) kiln publish --asset hoist --project <copia2>
+«hoist» copiado a godot/assets/hoist
+Godot importa lo publicado (godot)
+«hoist» publicado en godot/assets/hoist (versión 1)
+/private/var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T/tmp.tn6Dh4PAc3/p/godot/assets/hoist
+rc=0
+## $ (base) kiln publish --asset hoist --project <copia2>
+«hoist» copiado a godot/assets/hoist
+Godot importa lo publicado (godot)
+«hoist» publicado en godot/assets/hoist (versión 1, sin cambios)
+/private/var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T/tmp.tn6Dh4PAc3/p/godot/assets/hoist
+rc=0
+## sha256 publicados (copia2, binario base)
+df773c453845866de8f7c7afa812aaf44fc9453b83b73a93c66e8f966d38f09e  godot/assets/hoist/asset.json
+c4e110a5e82a70d26d8be546a3db4f99d75c5068f42874fed00e868d7a5aa7d4  godot/assets/hoist/hoist--weathered.glb
+8860bb79d768e4db62a46f9afb63c739599acdf7f5eda45fae66fc21ce65f720  godot/assets/hoist/hoist--weathered.glb.import
+60561b7a414cc216bb57143f57a79440572a63dc0f5d708b2040c43c55c0ad86  godot/assets/hoist/hoist.glb
+d06a953273074a339416c8c0c6f9bb870982e5d77ad1aa8f853c29a84e16cc7a  godot/assets/hoist/hoist.glb.import
+3adfa7fca3574beb5778cca5f8b3eca9016e3e3ed2fbda46f615fedb5e15a474  kiln/build/hoist/validation.json
+e0241505efdbb6507f72b98eb685904f14e03392ba7ff779c0689bd6bdb58a0d  kiln/build/hoist/asset.json

@@ -46,10 +46,10 @@ Arrays crudos: `gen.build(job)` → `surface_get_arrays(0)` con las mismas entra
 
 ## Cómo se reproduce
 
-Guiones y salidas en `work/T1-scratch/` (desechables): `proj/` (proyecto Godot con `generate.gd`, `kiln_generator.gd` y `dumpraw.gd`), `make_jobs.py` → `jobs/`, `out/`, `compare.py` → `compare.log`, `extra.py` → `extra.log`, `helper_check.py` → `helper_check.log`.
+Guiones y salidas en `review/evidence/t1/`: `proj/` (proyecto Godot con `generate.gd`, `kiln_generator.gd` y `dumpraw.gd`), `make_jobs.py` → `jobs/`, `out/` (no conservado: lo regeneran los dos bucles de abajo), `compare.py` → `compare.log`, `extra.py` → `extra.log`, `helper_check.py` → `helper_check.log`.
 
 ```bash
-W=~/Kiln/.sdlc/k013-canonical-geometry/work/T1-scratch
+W=~/Kiln/.sdlc/k013-canonical-geometry/review/evidence/t1
 python3 $W/make_jobs.py $W ~/.t3/projects/astra
 cd $W/proj
 for k in sph8 sph64 ast42 ast42s; do

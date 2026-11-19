@@ -28,7 +28,7 @@ Estimaciones con la mediana real de este repo (`calibrate.sh`): `implementer` 0,
 | # | Tarea | Requisito | Archivos | Prueba que la demuestra | Runs | Depende | Est. | Status |
 |---|-------|-----------|----------|-------------------------|------|---------|------|--------|
 | T0 | Trasladar la cadena de ASTRA a `.sdlc/k013-canonical-geometry/` y escribir este plan | D1 | `.sdlc/` de los dos repos | Los tres archivos aquí; la carpeta de ASTRA, borrada | integrator | — | 3m/300k | done |
-| T1 | Medir el GLB real frente a los arrays: `generate.gd` sobre la esfera base de 8 y 64 segmentos y `asteroid_64` semilla 42; comparar posiciones `f32`, orden de índices, sentido de giro respecto al centro y transformación de nodo. Decide si la construcción invierte el giro | Riesgo 1, R1, R10 | solo `work/` | Medición; decisión en `decisions/001-glb-orientation.md` | integrator | T0 | 20m/1.5M | done |
+| T1 | Medir el GLB real frente a los arrays: `generate.gd` sobre la esfera base de 8 y 64 segmentos y `asteroid_64` semilla 42; comparar posiciones `f32`, orden de índices, sentido de giro respecto al centro y transformación de nodo. Decide si la construcción invierte el giro | Riesgo 1, R1, R10 | solo `work/` (hoy `review/evidence/t1/`; `work/` borrado) | Medición; decisión en `decisions/001-glb-orientation.md` | integrator | T0 | 20m/1.5M | done |
 | T2 | `kiln-core::canonical`: tipos, cuantizar (S1 §5.5), unir enteros iguales, descartar triángulos que repiten vértice, recuento `2 + S·S/2` / `S·S`, inversión de giro si T1 la pide, serializar (D3, `class` radial = 0) y `geometry_sha256` | R1, R4 | `crates/kiln-core/src/canonical/{mod,build}.rs`, `lib.rs` | Esfera de 8 segmentos de `verify_recipe::sphere_glb` → 34 / 64; tamaño = 32 + 12V + 12T; hash = SHA-256 del archivo; mitades lejos de cero | implementer | T1 | 2m/250k | done |
 | T3 | Validador I1–I5 con los códigos de M§8 y el elemento | R2 | `canonical/topology.rs` | Una prueba por código: `I1_too_small`, `I1_out_of_range`, `I2_index_out_of_range`, `I3_duplicate_position`, `I3_unused_vertex`, `I4_open_edge`, `I4_edge_shared_by_more_than_two`, `I5_inconsistent_orientation` | implementer | T2 | 2m/250k | done |
 | T4 | Validador I6–I7: ciclo único por vértice, conexión y Euler | R2 | `canonical/topology.rs` | `I6_pinched_vertex`, `I7_not_connected`, `I7_not_a_sphere` | implementer | T3 | 2m/250k | done |
@@ -44,7 +44,7 @@ Estimaciones con la mediana real de este repo (`calibrate.sh`): `implementer` 0,
 | T14 | Verificación: batería entera de Kiln una vez (normal e `--ignored`), clippy, fase `asteroid` de ASTRA y dos flujos vecinos (publicar `examples/`; verify de una receta sin la opción) | Done means | — | Salidas en archivo y su ruta en el artefacto | verifier | T11, T12, T13 | 8m/1.3M | done (631/0/29, clippy limpio; base sin K013 562/27) |
 | T15 | Revisión: tres `reviewer` (bugs, seguridad, conformidad con spec y plan) y consolidación | Done means | `review/` | Hallazgos con archivo:línea, o renuncia | integrator | T14 | 15m/2M | done |
 | T16 | Correcciones de la revisión T15 (decisiones del desarrollador, 2026-11-19): I-1 `canonical_odd_segments` en la comprobación estática de verify con la clave (decisión 003); I-2 publish borra los `geometry/seed_<n>.bin` que ya no están en el lote; nit 1 `canonical_engine_missing` si ninguna semilla trae versión de Godot | Review | `generate/check.rs`, `verify_recipe.rs`, `ops/publish_recipe.rs`, `decisions/003-odd-segments.md` | `canonical_refuses_segments_that_can_be_odd`, `canonical_refuses_odd_segments_before_godot`, `canonical_refuses_a_batch_without_a_godot_version`, `a_republish_removes_only_the_geometry_of_seeds_no_longer_verified` | integrator | T15 | 10m/800k | done |
-| T17 | Cierre: verificación final una vez (Kiln normal, `--ignored` y clippy; ASTRA republicar sin cambio de bytes, fase `asteroid`, `kiln_check.sh`), recuentos en `CLAUDE.md`, `handoff.md` (I-3, I-4), limpieza de `work/` (I-5) | Done means, Review | `CLAUDE.md`, `handoff.md`, `review/`, `plan.md` | `review/final-*.log` en verde: 635/0/29, 29/0 ignoradas, clippy limpio, sha y `git status` de ASTRA idénticos | integrator | T16 | 25m/2M | done |
+| T17 | Cierre: verificación final una vez (Kiln normal, `--ignored` y clippy; ASTRA republicar sin cambio de bytes, fase `asteroid`, `kiln_check.sh`), recuentos en `CLAUDE.md`, `handoff.md` (I-3, I-4), limpieza de `work/` (I-5; borrado tras el cierre, ver `review/findings.md`) | Done means, Review | `CLAUDE.md`, `handoff.md`, `review/`, `plan.md` | `review/final-*.log` en verde: 635/0/29, 29/0 ignoradas, clippy limpio, sha y `git status` de ASTRA idénticos | integrator | T16 | 25m/2M | done |
 
 ## Waves
 
@@ -79,13 +79,13 @@ Sin medir: al cierre (T17, 2026-11-19) no hay `actuals.jsonl` en esta cadena, as
 
 ## Review
 
-T15 (2026-11-19). Tres `reviewer` en paralelo; consolidación del integrador. Evidencia en `review/evidence/` (`findings.md` lo escribe la sesión principal con el texto del artefacto de T15).
+T15 (2026-11-19). Tres `reviewer` en paralelo; consolidación del integrador. Evidencia en `review/evidence/` (`review/findings.md`: reconstrucción, porque el artefacto de T15 no se escribió en disco).
 
 | Pasada | Veredicto |
 |---|---|
 | bugs | 2 Important: I-1, recuento con S impar (`canonical/build.rs:53-54`, hueco de S1 §2.2, pide decisión); I-2, `geometry/seed_<n>.bin` obsoletos tras republicar (`ops/publish_recipe.rs:108-123`). Los dos reproducidos (`review/evidence/*.log`) |
 | security | Sin Important; fuzzing sin pánicos en `from_bytes`, `validate`, `build` y `node_transform_bytes` |
-| conformance | R1–R10 cumplen. *Done means* abierto: I-3, evidencia de T14 no está en disco (631/0/29 comunicado, no verificado); I-4, falta la tabla consolidada de 89 casos; I-5, `work/T13-scratch/` de 322 MB sin ignorar |
+| conformance | R1–R10 cumplen. *Done means* abierto: I-3, evidencia de T14 no está en disco (631/0/29 comunicado, no verificado); I-4, falta la tabla consolidada de 89 casos; I-5, `work/T13-scratch/` de 322 MB sin ignorar (cerrado: lo citado está en `review/evidence/t13/` y `work/` ya no existe; ver `review/findings.md`) |
 
 ---
 Next stage: tras la aprobación del ingeniero, Build implementa ola a ola.

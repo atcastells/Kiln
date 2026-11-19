@@ -6,7 +6,7 @@ Tarea T13 de K013, medida el 2026-11-19. **Todo lo que esta página llama «x86-
 
 - `geometry_sha256`: **48 de 48 iguales** entre arm64 nativo y x86-64 emulado. Las 48 semillas publicadas son 16 de `asteroid_32`, 16 de `asteroid_64` y 16 de `asteroid_128`.
 - GLB: **48 de 48 idénticos byte a byte**, con el mismo SHA-256 del archivo en los dos lados. Por tanto también coinciden bit a bit los `f32` de las posiciones, los índices y el chunk JSON, y no solo la geometría cuantizada a 1 mm.
-- El lado arm64 reproduce línea a línea la tabla de `work/T10-result.md`: 48 de 48. `pub_64_42` = `2713c0a9…d78a`, igual que el fixture.
+- El lado arm64 reproduce línea a línea la tabla de `review/evidence/results/T10-result.md`: 48 de 48. `pub_64_42` = `2713c0a9…d78a`, igual que el fixture.
 - Todas las ejecuciones terminaron con código de salida 0 y produjeron su GLB. Las 48 pasan `canonical::validate` en los dos lados.
 
 ## Entornos
@@ -29,10 +29,10 @@ En `amd64-env.txt` hay dos salidas que confunden:
 
 ## Cómo se midió
 
-1. `work/T13-scratch/scripts/make_jobs.py` crea una carpeta por semilla con la misma forma que `tests/common/canonical.rs`: `project.godot` igual que `SCRATCH_PROJECT`, `generate.gd` y `kiln_generator.gd` de `crates/kiln-cli/godot/`, y `job.json` con `{id, glb, material, ops}` tomado de cada semilla de `recipe.json`. Hay dos árboles: `jobs-arm64` (rutas del host) y `jobs-amd64` (rutas `/jobs`).
+1. `review/evidence/t13/scripts/make_jobs.py` crea una carpeta por semilla con la misma forma que `tests/common/canonical.rs`: `project.godot` igual que `SCRATCH_PROJECT`, `generate.gd` y `kiln_generator.gd` de `crates/kiln-cli/godot/`, y `job.json` con `{id, glb, material, ops}` tomado de cada semilla de `recipe.json`. Hay dos árboles: `jobs-arm64` (rutas del host) y `jobs-amd64` (rutas `/jobs`).
 2. arm64: `godot --headless --path <caso> --script generate.gd -- job.json out.json` para los 48 casos, 6 en paralelo.
 3. x86-64 emulado: un único `docker run --platform linux/amd64` monta el binario oficial (solo lectura) y `jobs-amd64`, y ejecuta `scripts/run_amd64.sh`: los mismos 48, 6 en paralelo, con `timeout 3500`.
-4. En el host, `work/T13-scratch/hasher` (proyecto cargo desechable, fuera del workspace de Kiln, que depende de `kiln-core` por ruta) comprueba `node_transform == None` y que hay una sola malla, y aplica `build(positions, indices, segments)`, `validate`, `to_bytes` y `geometry_sha256`. `shasum -a 256` da el hash de cada GLB.
+4. En el host, `review/evidence/t13/hasher` (proyecto cargo desechable, fuera del workspace de Kiln, que depende de `kiln-core` por ruta) comprueba `node_transform == None` y que hay una sola malla, y aplica `build(positions, indices, segments)`, `validate`, `to_bytes` y `geometry_sha256`. `shasum -a 256` da el hash de cada GLB.
 
 ## Tiempos de reloj
 
@@ -61,8 +61,10 @@ Muy por debajo del tope de 60 minutos.
 
 ## Reproducir
 
+Los guiones y el hasher se conservan en `review/evidence/t13/`. No se conservan los árboles `jobs-arm64` y `jobs-amd64` (los regenera `make_jobs.py`) ni `godot-x86`, el binario oficial de Godot 4.7.1 `linux.x86_64` (no conservado: hay que descargarlo de nuevo). Las salidas (`arm64-geom.txt`, `amd64-geom.txt`) de esa carpeta son la evidencia: para repetir, mejor sobre una copia.
+
 ```
-S=~/Kiln/.sdlc/k013-canonical-geometry/work/T13-scratch
+S=~/Kiln/.sdlc/k013-canonical-geometry/review/evidence/t13
 python3 -I $S/scripts/make_jobs.py ~/Kiln ~/.t3/projects/astra/godot/assets/kiln $S/jobs-arm64 $S/jobs-arm64
 python3 -I $S/scripts/make_jobs.py ~/Kiln ~/.t3/projects/astra/godot/assets/kiln $S/jobs-amd64 /jobs
 # arm64 nativo (host)
