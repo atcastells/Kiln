@@ -137,11 +137,7 @@ impl Kiln {
         // One read of the session: the trust checked is that of the folder that will run.
         let (ctx, vouched) = {
             let a = self.active.read().unwrap();
-            (a.ctx.clone(), a.vouched)
-        };
-        let ctx = match ctx {
-            Some(c) => c,
-            None => return self.ctx(),
+            (Self::ctx_of(&a)?, a.vouched)
         };
         if vouched || self.home.as_deref().is_some_and(|h| registry::is_trusted(h, &ctx.project)) {
             return Ok(ctx);
@@ -180,7 +176,11 @@ impl Kiln {
 
     /// The project, or what to do when there is none yet.
     pub fn ctx(&self) -> Result<Arc<Ctx>, String> {
-        let a = self.active.read().unwrap();
+        Self::ctx_of(&self.active.read().unwrap())
+    }
+
+    /// The project of one read of the session, or what to do without one.
+    fn ctx_of(a: &Active) -> Result<Arc<Ctx>, String> {
         if let Some(c) = &a.ctx {
             return Ok(c.clone());
         }

@@ -38,9 +38,13 @@ impl Kiln {
         if let Err(e) = crate::ops::check_len("el nombre", &a.name, 200) {
             return fail(e);
         }
-        let project = match self.dir() {
-            Ok(d) => d,
-            Err(e) => return fail(e),
+        // The folder and whether `--project` vouched for it, from one read.
+        let (project, vouched) = {
+            let a = self.active.read().unwrap();
+            match &a.dir {
+                Some(d) => (d.clone(), a.vouched),
+                None => return fail(super::NO_PROJECT),
+            }
         };
         let game = kiln_core::new_game::NewGame { name: a.name, basics: a.basics, ..Default::default() };
         let p = project.clone();
@@ -53,8 +57,7 @@ impl Kiln {
             Ok(r) => r,
             Err(e) => return fail(e),
         };
-        // `--project` already vouched for this folder; only a fresh one is trusted otherwise.
-        let vouched = self.active.read().unwrap().vouched;
+        // Only a fresh folder, or the one `--project` vouched for, is trusted.
         self.made(&project, ctx, fresh || vouched);
         ok(serde_json::json!({ "created": files }))
     }
