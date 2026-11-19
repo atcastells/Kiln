@@ -33,6 +33,9 @@ pub struct Job {
     pub kind: String,
     /// Unix seconds when the job was created.
     pub started: u64,
+    /// The project folder the job works on, when the session can switch projects.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub project: Option<String>,
 }
 
 fn now_secs() -> u64 {
@@ -91,6 +94,7 @@ pub fn start(jobs: &Jobs, ctx: Arc<Ctx>, task: Task) -> u64 {
             offer: None,
             kind: kind.into(),
             started: now_secs(),
+            project: None,
         });
         id
     };
@@ -137,6 +141,7 @@ where
             offer: None,
             kind,
             started: now_secs(),
+            project: None,
         });
         id
     };
@@ -271,6 +276,7 @@ pub fn chat(jobs: &Jobs, project: PathBuf, ctx: Option<Arc<Ctx>>, turn: Turn) ->
             offer: None,
             kind: "chat".into(),
             started: now_secs(),
+            project: None,
         });
         id
     };

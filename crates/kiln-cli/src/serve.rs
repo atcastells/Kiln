@@ -1072,7 +1072,7 @@ mod tests {
     // ---- jobs list (T10)
 
     fn job(id: u64, status: &str) -> agent::Job {
-        agent::Job { id, asked: format!("tarea {id}"), status: status.into(), log: vec!["linea".into()], spec: None, reply: None, offer: None, kind: "montar".into(), started: 1_700_000_000 + id }
+        agent::Job { id, asked: format!("tarea {id}"), status: status.into(), log: vec!["linea".into()], spec: None, reply: None, offer: None, kind: "montar".into(), started: 1_700_000_000 + id, project: None }
     }
 
     #[test]

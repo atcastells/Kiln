@@ -42,6 +42,71 @@ const TABLE: &[(&str, Cover)] = &[
     ("GET /api/chat", Excluded("D2: the chat is the page's own agent")),
 ];
 
+const MAIN: &str = include_str!("../src/main.rs");
+
+/// Every command of the CLI has a tool or an explicit exclusion.
+const COMMANDS: &[(&str, Cover)] = &[
+    ("index", Tool(&["catalog", "status"])),
+    ("check", Tool(&["check"])),
+    ("tools", Tool(&["tools"])),
+    ("mcp", Excluded("the MCP server itself")),
+    ("trust", Excluded("the person's own decision: the agent must not be able to grant it")),
+    ("serve", Excluded("the page; its routes are covered by TABLE")),
+    ("build", Tool(&["build"])),
+    ("generate", Tool(&["generate"])),
+    ("verify", Tool(&["verify"])),
+    ("publish", Tool(&["publish"])),
+    ("paint", Tool(&["paint"])),
+    ("review", Tool(&["review"])),
+    ("godot", Tool(&["godot_measure"])),
+    ("content-manifest", Tool(&["content_manifest"])),
+];
+
+/// The commands of `main`: the `"name" =>` arms after `match args.cmd`.
+fn commands(src: &str) -> BTreeSet<String> {
+    let body = src.split("match args.cmd.as_str()").nth(1).unwrap_or_default();
+    body.lines()
+        .filter_map(|l| {
+            let l = l.trim_start().strip_prefix('"')?;
+            let (name, rest) = l.split_once('"')?;
+            let ok = rest.trim_start().starts_with("=>")
+                && name.starts_with(|c: char| c.is_ascii_lowercase())
+                && name.chars().all(|c| c.is_ascii_lowercase() || c == '-');
+            ok.then(|| name.to_string())
+        })
+        .collect()
+}
+
+#[test]
+fn every_cli_command_is_covered() {
+    let found = commands(MAIN);
+    assert!(found.len() >= 12, "extractor found too few commands: {found:?}");
+    let known: BTreeSet<&str> = COMMANDS.iter().map(|(k, _)| *k).collect();
+    let missing: Vec<_> = found.iter().filter(|c| !known.contains(c.as_str())).collect();
+    assert!(missing.is_empty(), "CLI commands without tool or exclusion: {missing:?}");
+    let stale: Vec<_> = known.iter().filter(|k| !found.contains(**k)).collect();
+    assert!(stale.is_empty(), "rows whose command is gone from main.rs: {stale:?}");
+}
+
+#[test]
+fn command_tools_exist() {
+    let p = temp_project("");
+    let mut m = Mcp::start(p.path());
+    let tools: BTreeSet<String> =
+        m.tools().iter().map(|t| t["name"].as_str().unwrap().to_string()).collect();
+    for (cmd, cover) in COMMANDS {
+        match cover {
+            Tool(names) => {
+                for n in *names {
+                    assert!(tools.contains(*n), "{cmd}: tool {n} not in tools/list");
+                }
+            }
+            Excluded(reason) => assert!(!reason.is_empty(), "{cmd}: exclusion needs a reason"),
+            Prompt(..) => unreachable!("commands are covered by tools"),
+        }
+    }
+}
+
 /// Routes of the `/api/` match arms: literal `("GET"|"POST", "/api/..")` and
 /// prefix `("GET"|"POST", p) if p.starts_with("/api/..")`. Test code is skipped.
 fn routes(src: &str) -> BTreeSet<String> {

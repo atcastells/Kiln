@@ -159,6 +159,8 @@ pub struct Mcp {
     stdin: Option<std::process::ChildStdin>,
     out: std::sync::mpsc::Receiver<serde_json::Value>,
     next: u64,
+    /// The default `KILN_HOME`, so tests never touch the user's registry.
+    _home: TempDir,
 }
 
 /// What a tool call returned: whether it is an error and its first text.
@@ -180,9 +182,23 @@ impl Mcp {
     }
 
     pub fn start_with(dir: &Path, env: &[(&str, &str)]) -> Mcp {
-        let mut child = Command::new(env!("CARGO_BIN_EXE_kiln"))
-            .args(["mcp", "--project"])
-            .arg(dir)
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_kiln"));
+        cmd.args(["mcp", "--project"]).arg(dir);
+        Self::spawn(cmd, env, None)
+    }
+
+    /// `kiln mcp` without `--project`, run from `cwd`. `env` should set
+    /// `KILN_HOME` when the test reads the registry.
+    pub fn start_free(cwd: &Path, env: &[(&str, &str)]) -> Mcp {
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_kiln"));
+        cmd.arg("mcp").current_dir(cwd);
+        Self::spawn(cmd, env, None)
+    }
+
+    fn spawn(mut cmd: Command, env: &[(&str, &str)], roots: Option<&[&str]>) -> Mcp {
+        let home = TempDir::new();
+        let mut child = cmd
+            .env("KILN_HOME", home.path())
             .envs(env.iter().copied())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -202,13 +218,31 @@ impl Mcp {
                 }
             }
         });
-        let mut m = Mcp { child, stdin: Some(stdin), out, next: 1 };
+        let mut m = Mcp { child, stdin: Some(stdin), out, next: 1, _home: home };
+        let caps = if roots.is_some() { serde_json::json!({"roots": {}}) } else { serde_json::json!({}) };
         m.request(
             "initialize",
-            serde_json::json!({"protocolVersion": "2025-06-18", "capabilities": {}, "clientInfo": {"name": "test", "version": "0"}}),
+            serde_json::json!({"protocolVersion": "2025-06-18", "capabilities": caps, "clientInfo": {"name": "test", "version": "0"}}),
         );
         m.send(serde_json::json!({"jsonrpc": "2.0", "method": "notifications/initialized"}));
+        if let Some(uris) = roots {
+            let asked = loop {
+                let v = m.out.recv_timeout(Duration::from_secs(10)).expect("kiln mcp no pidió las roots");
+                if v["method"] == "roots/list" {
+                    break v;
+                }
+            };
+            let list: Vec<_> = uris.iter().map(|u| serde_json::json!({"uri": u})).collect();
+            m.send(serde_json::json!({"jsonrpc": "2.0", "id": asked["id"], "result": {"roots": list}}));
+        }
         m
+    }
+
+    /// Like `start_free`, from a client that answers `roots/list` with `uris`.
+    pub fn start_free_with_roots(cwd: &Path, env: &[(&str, &str)], uris: &[&str]) -> Mcp {
+        let mut cmd = Command::new(env!("CARGO_BIN_EXE_kiln"));
+        cmd.arg("mcp").current_dir(cwd);
+        Self::spawn(cmd, env, Some(uris))
     }
 
     fn send(&mut self, v: serde_json::Value) {
@@ -224,7 +258,7 @@ impl Mcp {
         self.send(serde_json::json!({"jsonrpc": "2.0", "id": id, "method": method, "params": params}));
         loop {
             let v = self.out.recv_timeout(Duration::from_secs(40)).expect("sin respuesta de kiln mcp");
-            if v["id"] == id {
+            if v["id"] == id && v.get("method").is_none() {
                 assert!(v.get("error").is_none(), "error de protocolo: {v}");
                 return v["result"].clone();
             }
