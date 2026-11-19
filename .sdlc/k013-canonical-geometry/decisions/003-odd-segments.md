@@ -14,4 +14,4 @@ Generalizar la fórmula del recuento a S impar. Se descarta porque cambia S1, qu
 
 ## Pendiente
 
-Anotarlo en S1 §2.2 cuando se revise S1.
+Hecho: S1 §2.2 se anotó en ASTRA (`docs/design/ast-esp-001-s1-geometria-canonica-v0.md`, «Nota de implementación (K013, decisión 003)») el 2026-11-19.

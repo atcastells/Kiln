@@ -1,0 +1,54 @@
+# git status --short (después, sin contar los archivos de esta corrida: examples-regression-*.txt/.log ni .gs-before.tmp)
+ M .sdlc/k013-canonical-geometry/context.md
+ M .sdlc/k013-canonical-geometry/decisions/001-glb-orientation.md
+ M .sdlc/k013-canonical-geometry/decisions/002-static-radius-rule.md
+ M .sdlc/k013-canonical-geometry/decisions/003-odd-segments.md
+ M .sdlc/k013-canonical-geometry/handoff.md
+ M .sdlc/k013-canonical-geometry/measurements-x86.md
+ M .sdlc/k013-canonical-geometry/plan.md
+?? .sdlc/k013-canonical-geometry/review/findings.md
+# sha256 de examples/ (tracked + ignorados), ordenado
+9cb2411a2d94af29a9f8446d01405b563f527369c35c659972f311b7434c33c3  examples/content/.gitignore
+72e0f50b0160d8eb1fa6d1a9ecb426ec50325608d8efa598fa041c5504f0ab80  examples/content/data/content/world.ron
+ff7797167b545add60e2d81a3ad2a887388f4075a8d11e61abd7bb0025f77b0b  examples/content/godot/astra/warehouse.tscn
+2f5188170ce06da6f0960a18da1e2af249fb362c20ccefb23447f334532ab264  examples/content/godot/astra/yard.tscn
+7419d82420acce1805503ea1a1ac86e817a542959b58f11e2ff7da9fc413066c  examples/content/godot/project.godot
+a6aeb4d9966220a8f0e7d9a4676c8a4d5a8716902a8a2f5b09fcaecc71b7718e  examples/content/kiln.toml
+7231a320d9ba385940ec5b0d9ac845653f6939eaec5b9199770c8783f7dbbd5f  examples/content/kiln/content_manifest.json
+2745e05edab2f98972b70f47b0256ea2ad0c5f694523a2ae8b90c740af49b34e  examples/content/kits/harbor/LICENSE.md
+d34396198ef474e317eb70073de0ec812c3fa7af25eeaded1624b1c08e27e771  examples/content/kits/harbor/crate.glb
+3c069587f096a9f53c29b9d733700b648c2c683a3c70e48523f22ee43e28b32f  examples/content/kits/harbor/door.glb
+2e648a32c8f1cec66c642d4e062b7fafc508bef1809a0b61c62fed023c6843d9  examples/context.toml
+5b6796e3c593e1672fdf29b03b70c51f537811f665fd65e46c260e6365c822cd  examples/data/materials.toml
+2745e05edab2f98972b70f47b0256ea2ad0c5f694523a2ae8b90c740af49b34e  examples/godot/kits/harbor/LICENSE.md
+dd87432c63744ab9fdf64df8329876b1334b22272bf1e0608dd92b238c4c89e6  examples/godot/kits/harbor/beam.glb
+d34396198ef474e317eb70073de0ec812c3fa7af25eeaded1624b1c08e27e771  examples/godot/kits/harbor/crate.glb
+3c069587f096a9f53c29b9d733700b648c2c683a3c70e48523f22ee43e28b32f  examples/godot/kits/harbor/door.glb
+2745e05edab2f98972b70f47b0256ea2ad0c5f694523a2ae8b90c740af49b34e  examples/godot/kits/props/LICENSE.md
+8c36c648aa4b34999e8b26556597c5f1634c9d4876b1678fba244a00499aa75e  examples/godot/kits/props/rope_coil.glb
+6a3412f058c7d8dfd9170c41e85ade48e5156ecb89356110ca57a0a27734af46  examples/godot/ui/fonts/IBMPlexMono-Regular.ttf
+7e6b2818edbd8f6a01ae80641cc8f16a51080d08fb4e532be3a0b6f74adb07da  examples/godot/ui/fonts/OFL.txt
+630f9daa68463a6053a7e932ff3363a9c4385ec30a3e56d9afe692c4cc2d4f8c  examples/godot/ui/hud.gd
+e99d1246063a509c9e9260080131059716bb5ff4473e5a567862e1c88f3ae34f  examples/godot/ui/theme.tres
+fd15c6b2134b26fcd3f2ecd9fd04e2e303f7bd4924f4baa13d414ab6a147a19e  examples/kiln.toml
+427d33821f093800dd5dd90da15527fd5629430e44771069e4a577821a273884  examples/kiln/build/hoist/.kiln/hoist.blend
+5cdb267769de968917bb4170ac03b8b42f46868f3f743ef705f6eead364a2d4a  examples/kiln/build/hoist/.kiln/hoist.blend1
+2d4d397273a901f777a5b9fcf243833e88c7506d7f80b6780847c5c1617444d7  examples/kiln/build/hoist/assemble.py
+c4e110a5e82a70d26d8be546a3db4f99d75c5068f42874fed00e868d7a5aa7d4  examples/kiln/build/hoist/hoist--weathered.glb
+60561b7a414cc216bb57143f57a79440572a63dc0f5d708b2040c43c55c0ad86  examples/kiln/build/hoist/hoist.glb
+b4fcf3cbcefc25b18286eebf7e2ede90c45d0485829071a0ca2dbcb54f080329  examples/kiln/build/hoist/materials--weathered.json
+a5009c3fd048c863c90b14eb0d2c6554342b8c94994cc9358ea48205ede9a33f  examples/kiln/build/hoist/materials.json
+6b5a3221a1d8f4562145bd184d62d31491c7bd9734f9dc3d57e5ae47a9b3d7a1  examples/kiln/build/hoist/plan.json
+0864f2e71df9ddac125452e40a958475be5756a0cd08b6dece4b27a9307482e2  examples/kiln/build/hoist/repaint.json
+78bbb242f5b635e84f3434cf73c57652ff6b0c04eebc69430f765832e4866c73  examples/kiln/build/hoist/repaint.py
+5ae09b8b0791fba34abf8416f7a43c437ce3252fe5fb5693823ca3927e24b67d  examples/kiln/build/hoist/report.json
+a33a374aa62f2e374c0225132ee7d21ec7f556405d85b8173c23bdceeea0eabc  examples/specs/cargo_quay.toml
+047bf1cdaaf9ffa69e9e3bc297d8a3f54500595ae5318e0765851b522bffe818  examples/specs/hoist.toml
+c0f075080db90d16dd5b9f8507c2cc1251abd88da468a28172e72549998a9ed9  examples/ui_target.toml
+# copia temporal (binario HEAD): publicados
+df773c453845866de8f7c7afa812aaf44fc9453b83b73a93c66e8f966d38f09e  godot/assets/hoist/asset.json
+c4e110a5e82a70d26d8be546a3db4f99d75c5068f42874fed00e868d7a5aa7d4  godot/assets/hoist/hoist--weathered.glb
+8860bb79d768e4db62a46f9afb63c739599acdf7f5eda45fae66fc21ce65f720  godot/assets/hoist/hoist--weathered.glb.import
+60561b7a414cc216bb57143f57a79440572a63dc0f5d708b2040c43c55c0ad86  godot/assets/hoist/hoist.glb
+d06a953273074a339416c8c0c6f9bb870982e5d77ad1aa8f853c29a84e16cc7a  godot/assets/hoist/hoist.glb.import
+# copia temporal (binario base 2651608): publicados, identicos linea a linea (ver .log)

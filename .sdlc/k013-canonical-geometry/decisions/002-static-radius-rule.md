@@ -6,7 +6,7 @@
 
 ## Por qué
 
-S1 §4.2 («Esas recetas no se rechazan en bloque») describe mal a Kiln: la regla es anterior a K013. Una receta que pasa la comprobación estática tiene cota > 0, y por tanto ya es radial (S1 §4.2). Así que ninguna receta negativa puede llegar a I8/I9 a través de verify (leído en T8, no ejecutado con esas dos recetas: `work/T8-result.md`; el test `a_static_error_never_launches_godot` confirma el mecanismo con otra receta).
+S1 §4.2 («Esas recetas no se rechazan en bloque») describe mal a Kiln: la regla es anterior a K013. Una receta que pasa la comprobación estática tiene cota > 0, y por tanto ya es radial (S1 §4.2). Así que ninguna receta negativa puede llegar a I8/I9 a través de verify (leído en T8, no ejecutado con esas dos recetas: `review/evidence/results/T8-result.md`; el test `a_static_error_never_launches_godot` confirma el mecanismo con otra receta).
 
 ## Alternativa rechazada
 
@@ -14,4 +14,4 @@ Dejar que I8/I9 decidan semilla a semilla cuando `[generate] canonical` está ac
 
 ## Pendiente
 
-Corregir S1 §4.2 cuando se revise S1.
+Hecho: S1 §4.2 se anotó en ASTRA (`docs/design/ast-esp-001-s1-geometria-canonica-v0.md`, «Corrección (K013, decisión 002)») el 2026-11-19.

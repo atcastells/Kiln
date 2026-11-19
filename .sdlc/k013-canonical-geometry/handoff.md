@@ -7,8 +7,8 @@
   la escribe en el paquete con su `geometry_sha256` y su procedencia. Los
   89 casos de S1 §8 dan el veredicto de M§8. Los tres paquetes de K012 están
   republicados en ASTRA con su geometría, sin cambiar un byte de lo que K012
-  publicó. Queda por borrar `work/` (323 MB): el borrado fue denegado al
-  agente (I-5, *Estado Git*).
+  publicó. K013 está confirmado y unido a `main` (Kiln PR #33, ASTRA
+  PR #22) y `work/` ya está borrado (I-5, *Estado Git*).
 - **Entorno**: un solo equipo. Apple Silicon arm64, macOS 27.0, Godot
   4.7.1-stable (official) sin ventana. La comparación con x86-64 es
   **emulada** (Rosetta en Docker, en el mismo Mac); no hay medida en un
@@ -53,7 +53,7 @@ Los 60 archivos de ASTRA son, por paquete, `asset.json`, las 18 entradas de
 | R6 | 67 positivos y 22 negativos con el veredicto de M§8 | hecho, 89/89 | tabla de abajo; `review/final-ignored.log` (vías A y B), `review/final-test.log` (vía C, 17 pruebas de `canonical_cases.rs`) |
 | R7 | Mismo `geometry_sha256` en x86-64, o por qué no | medido **solo emulado**: 48/48 iguales | `measurements-x86.md`; `review/evidence/t13/` |
 | R8 | K012 sin cambios: `recipe.json`, `kiln_generator.gd`, `script_sha256`, consumidor y pruebas | hecho | `review/final-astra-asteroid.log`; diff de ASTRA limitado a `kiln.toml`, los tres `asset.json` y `geometry/` (`review/final-astra-status-*.txt`); sha de `recipe.json` y guion en `review/evidence/results/T12-result.md` |
-| R9 | Sin la clave, verify y publish hacen lo de hoy | hecho; «`examples/` publica igual que antes» sin evidencia en disco (ver *Sin confirmar*) | `config::tests::canonical_geometry_is_off_without_the_key`, `verify_recipe::tests::without_canonical_the_report_and_files_are_todays`, `ops::publish_recipe::tests::without_canonical_the_contract_has_no_provenance_keys`; ningún test existente cambiado (`review/final-kiln-diff-tracked.txt`) |
+| R9 | Sin la clave, verify y publish hacen lo de hoy | hecho; «`examples/` publica igual que antes» repetido el 2026-11-19 con bytes idénticos (`review/examples-regression.log`) | `config::tests::canonical_geometry_is_off_without_the_key`, `verify_recipe::tests::without_canonical_the_report_and_files_are_todays`, `ops::publish_recipe::tests::without_canonical_the_contract_has_no_provenance_keys`; ningún test existente cambiado (`review/final-kiln-diff-tracked.txt`) |
 | R10 | GLB con transformación de nodo → rechazo con código propio | hecho | `mesh::tests::detects_a_transform_on_the_mesh_node`, `verify_recipe::tests::canonical_refuses_a_node_transform` (`canonical_node_transform`) |
 
 ## Los 89 casos (cierra I-4)
@@ -178,7 +178,7 @@ pruebas de `godot_canonical` (vías A y B) y las 17 de `canonical_cases`
 
 ## Qué cambia en Kiln
 
-Rama `k012-asteroid-pilot`, todo sin confirmar.
+Rama `k012-asteroid-pilot`, unida a `main` (PR #33).
 
 - **Nuevo, `kiln-core::canonical`** (`crates/kiln-core/src/canonical/`):
   `mod.rs` (tipos, bytes S1 §6.2, `geometry_sha256`, `validate` = I1–I7 y
@@ -217,7 +217,7 @@ Rama `k012-asteroid-pilot`, todo sin confirmar.
 
 ## Qué cambia en ASTRA
 
-Rama `k012-asteroid-pilot`, sin confirmar.
+Rama `k012-asteroid-pilot`, unida a `main` (PR #22).
 
 - `kiln.toml`: sección nueva al final, `[generate] canonical = "radial_v0"`
   (+4 líneas). `verify_seeds` sigue por defecto: 16 semillas desde la 42.
@@ -266,7 +266,8 @@ Además, de la spec: D3 (archivo = bytes del hash, `class` radial = 0), D4
 
 T15, tres pasadas (fallos, seguridad, conformidad). Fuente: *Review* de
 `plan.md` y `review/evidence/results/T16-result.md`; el artefacto completo
-de T15 no está en disco (`review/findings.md` no se llegó a escribir).
+de T15 no se escribió en disco. `review/findings.md` lo reconstruye desde
+esas fuentes y esta tabla.
 
 | Hallazgo | Qué era | Cómo se cerró |
 |---|---|---|
@@ -274,7 +275,7 @@ de T15 no está en disco (`review/findings.md` no se llegó a escribir).
 | I-2 | Republicar dejaba `geometry/seed_<n>.bin` de semillas que ya no estaban en el lote (`review/evidence/stale-geometry.log`) | T16: `prune_geometry`, solo `seed_<dígitos>.bin` fuera de `files`, sin seguir enlaces. Prueba `a_republish_removes_only_the_geometry_of_seeds_no_longer_verified` |
 | I-3 | La evidencia de T14 (631/0/29) no estaba en disco | Esta tarea: `review/final-*.log` |
 | I-4 | Faltaba la tabla consolidada de los 89 casos | Esta tarea: tabla de arriba |
-| I-5 | `work/T13-scratch/` de 322 MB sin ignorar | **Abierto a medias.** Lo citado está copiado a `review/evidence/`; el borrado de `work/` fue denegado por los permisos del agente y queda para el desarrollador (ver *Estado Git*) |
+| I-5 | `work/T13-scratch/` de 322 MB sin ignorar | **Cerrado.** Lo citado está copiado a `review/evidence/` y `work/` ya no está en disco (ver *Estado Git*) |
 | nit 1 | Lote en el que ninguna semilla trae versión de Godot (la cadena solo registra el arreglo, no el comportamiento previo) | T16: `canonical_engine_missing`. Prueba `canonical_refuses_a_batch_without_a_godot_version` |
 | seguridad | Sin hallazgos importantes; fuzzing sin pánicos en `from_bytes`, `validate`, `build` y `node_transform_bytes` | — |
 
@@ -282,9 +283,16 @@ Logs de T16 (rojo y verde): `review/evidence/t16/`. Otros nits de T15, si los
 hubo, no constan en la cadena.
 
 **Sin confirmar**:
-- El flujo vecino de T14 «publicar `examples/` igual que antes» no se ha
-  vuelto a correr aquí. R9 se apoya en las pruebas citadas y en que ningún test
-  existente cambió.
+- ~~El flujo vecino de T14 «publicar `examples/` igual que antes»~~
+  Repetido el 2026-11-19, tras unir K013. Se usó el flujo de
+  `crates/kiln-cli/tests/godot_verify.rs`: una copia de `examples/` con
+  `[publish] dir`, sobre la que se corrieron build, verify, publish y un
+  segundo publish. Los archivos publicados de `hoist` tienen el mismo sha256
+  con el binario de `2651608` (antes de K013) y con el de `bd608df`. Los 37
+  archivos de `examples/` y `git status` no cambian. `examples/kiln.toml` no
+  declara `[publish]`, así que no se puede publicar en su sitio, ni con K013
+  ni sin él. Evidencia: `review/examples-regression.log` y
+  `review/examples-regression-{before,after}.txt`.
 - Los 23 avisos de `kiln_check.sh` no se compararon con los de antes de
   activar la clave. Ninguno menciona `generate`, `canonical` ni `asteroid`.
 - `kiln generate` y `spec::check` no aplican la regla de impares (fuera del
@@ -292,13 +300,12 @@ hubo, no constan en la cadena.
 
 ## Lo que queda abierto
 
-- **Borrar `work/`** (323 MB; I-5): denegado al agente. Nada de lo que
-  cita la cadena depende ya de esa carpeta.
 - **x86-64 nativo**: repetir T13 en un equipo x86-64 real. Sirve el mismo
   `docker run --platform linux/amd64` de `measurements-x86.md`, con
   `review/evidence/t13/scripts/` y `hasher/`.
-- **Correcciones de S1** cuando se revise: §4.2 (decisión 002) y §2.2
-  (decisión 003).
+- **Correcciones de S1**: hecho. §4.2 (decisión 002) y §2.2 (decisión 003)
+  se anotaron en ASTRA (`docs/design/ast-esp-001-s1-geometria-canonica-v0.md`)
+  el 2026-11-19.
 - **Límites de R7**: los de *No prueba*; la medida cubre las 48 semillas
   publicadas, no las 18 derivadas de escala.
 - **El hash depende de Godot**: `geometry_sha256` depende de cómo el
@@ -313,25 +320,21 @@ hubo, no constan en la cadena.
 
 ## Estado Git
 
-- **Kiln**, rama `k012-asteroid-pilot`: todo K013 sin confirmar, el código
-  (seis archivos cambiados, `canonical/`, pruebas, fixture, example),
-  `CLAUDE.md` y la cadena `.sdlc/k013-canonical-geometry/`.
-- **ASTRA**, rama `k012-asteroid-pilot`: sin confirmar `kiln.toml`, los tres
-  `asset.json` y las tres carpetas `geometry/`. Siguen sin seguimiento y sin
-  tocar `.sdlc/canonical-geometry/measure/__pycache__/` y un PDF ajeno de
+- **K013 confirmado y unido a `main`** en los dos repos: Kiln PR #33 y ASTRA
+  PR #22 (unidos el 2026-11-19).
+- **ASTRA**: siguen sin seguimiento y sin tocar
+  `.sdlc/canonical-geometry/measure/__pycache__/` y un PDF ajeno de
   `.sdlc/first-character/`.
-- **`work/` sigue en disco** (323 MB, 322 de ellos en `work/T13-scratch/`):
-  el `rm -rf` del cierre fue denegado por los permisos del agente. Se puede
-  borrar entero: lo que la cadena citaba allí ya está en
+- **`work/` borrado.** Lo que la cadena citaba allí está en
   `review/evidence/`: `work/T13-scratch/*` → `review/evidence/t13/` (sin
   Godot, el zip ni los árboles de trabajos, que se regeneran);
   `work/T1-scratch/` → `review/evidence/t1/` (sin `out/`, que se regenera);
   `work/T16-*.log` → `review/evidence/t16/`; `work/T*-result.md` y
   `T*-measurement.md` → `review/evidence/results/`. `measurements-x86.md`,
-  `decisions/001` y `002` y `context.md` siguen citando las rutas de `work/`;
-  tras borrarlo, valen las de `review/evidence/` de arriba.
+  `decisions/001` y `002`, `context.md` y `plan.md` ya citan las rutas de
+  `review/evidence/`.
 
 ## Siguiente paso, cuando se decida
 
-Ninguno se inicia solo: borrar `work/`, confirmar K013 en las dos ramas, medir en x86-64
-nativo y, después, la tarea 2 (Rust de ASTRA).
+Ninguno se inicia solo: medir en x86-64 nativo y, después, la tarea 2
+(Rust de ASTRA).
