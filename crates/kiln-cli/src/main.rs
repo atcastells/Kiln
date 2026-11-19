@@ -4,6 +4,7 @@
 //!   kiln check  --project DIR [--config FILE]                findings; exit 1 on errors
 //!   kiln tools  --project DIR [--config FILE]                external tools found, with their versions
 //!   kiln mcp    [--project DIR] [--config FILE]              MCP over stdio, for Claude Code; without --project it serves any project
+//!   kiln trust  --project DIR                                let `kiln mcp` run Blender, Godot and Claude in that project
 //!   kiln serve  --project DIR [--config FILE] [--port 4330] [--ui-dir DIR]  the graph at http://127.0.0.1:PORT (--ui-dir: read the new UI from disk)
 //!   kiln build  --project DIR [--config FILE] --asset ID     assemble an asset in Blender
 //!   kiln generate --project DIR [--config FILE] --asset ID [--seed N]   generate a recipe asset in Godot, no Blender
@@ -86,7 +87,7 @@ fn parse() -> Result<Args, String> {
     Ok(a)
 }
 
-const USAGE: &str = "uso: kiln <index|check|tools|mcp|serve|build|generate|paint|verify|publish|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--ui-dir DIR] [--asset ID] [--variant ID] [--set NAME] [--seed N]";
+const USAGE: &str = "uso: kiln <index|check|tools|mcp|trust|serve|build|generate|paint|verify|publish|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--ui-dir DIR] [--asset ID] [--variant ID] [--set NAME] [--seed N]";
 
 pub fn load(
     project: &std::path::Path,
@@ -169,6 +170,19 @@ fn main() -> ExitCode {
                     let line = format!("{:<w$}  {:<10}  {:<13}  {}", t.name, version, state, t.note.as_deref().unwrap_or(""));
                     println!("{}", line.trim_end());
                 }
+                Ok(ExitCode::SUCCESS)
+            }
+            "trust" => {
+                if !args.project_given {
+                    return Err("falta --project DIR: la carpeta del juego en la que confías".into());
+                }
+                let k = projects::kind(&args.project);
+                if !(k.kiln || k.godot) {
+                    return Err(format!("{} no tiene kiln.toml ni project.godot", args.project.display()));
+                }
+                let home = projects::home().ok_or("no se sabe dónde guardar la confianza: define KILN_HOME")?;
+                projects::trust(&home, &args.project)?;
+                eprintln!("Kiln ya puede lanzar Blender, Godot y Claude en {}", args.project.display());
                 Ok(ExitCode::SUCCESS)
             }
             "mcp" => {

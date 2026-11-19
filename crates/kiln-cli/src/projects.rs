@@ -54,6 +54,35 @@ pub fn touch(dir: &Path, path: &Path, name: &str, now: u64) -> Result<(), String
     std::fs::rename(&tmp, dir.join(FILE)).map_err(|e| format!("{}: {e}", dir.display()))
 }
 
+const TRUSTED: &str = "trusted.json";
+
+/// The folders the person trusts to run Blender, Godot and Claude in: a
+/// project's `kiln.toml` names those programs and its Godot project runs its
+/// own editor plugins. Only `kiln trust` and the projects Kiln creates add to it.
+pub fn trusted(dir: &Path) -> Vec<PathBuf> {
+    std::fs::read(dir.join(TRUSTED))
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .unwrap_or_default()
+}
+
+pub fn is_trusted(dir: &Path, path: &Path) -> bool {
+    trusted(dir).iter().any(|p| p == path)
+}
+
+pub fn trust(dir: &Path, path: &Path) -> Result<(), String> {
+    let mut v = trusted(dir);
+    if v.iter().any(|p| p == path) {
+        return Ok(());
+    }
+    v.push(path.to_path_buf());
+    std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let json = serde_json::to_vec_pretty(&v).map_err(|e| e.to_string())?;
+    let tmp = dir.join(format!("{TRUSTED}.{}", std::process::id()));
+    std::fs::write(&tmp, json).map_err(|e| format!("{}: {e}", tmp.display()))?;
+    std::fs::rename(&tmp, dir.join(TRUSTED)).map_err(|e| format!("{}: {e}", dir.display()))
+}
+
 /// What a folder holds, for choosing and listing projects.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct Kind {
@@ -133,6 +162,20 @@ mod tests {
         let v = list(&home);
         assert_eq!(v.iter().map(|e| e.name.as_str()).collect::<Vec<_>>(), ["A2", "B"]);
         assert_eq!(v[0].last_opened, 3);
+    }
+
+    #[test]
+    fn trust_adds_a_folder_once_and_nothing_else_is_trusted() {
+        let d = dir();
+        let home = d.0.join("home");
+        assert!(!is_trusted(&home, Path::new("/a")));
+        trust(&home, Path::new("/a")).unwrap();
+        trust(&home, Path::new("/a")).unwrap();
+        assert!(is_trusted(&home, Path::new("/a")));
+        assert!(!is_trusted(&home, Path::new("/a/b")));
+        assert_eq!(trusted(&home).len(), 1);
+        std::fs::write(home.join(TRUSTED), "broken").unwrap();
+        assert!(!is_trusted(&home, Path::new("/a")));
     }
 
     #[test]

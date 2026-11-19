@@ -37,6 +37,9 @@ pub struct Active {
     /// Opened on purpose (`--project` or a tool), so the client's roots do
     /// not replace it.
     pub chosen: bool,
+    /// The person vouched for it in this session (`--project`) or Kiln made
+    /// it; otherwise the registry's trust list decides.
+    pub vouched: bool,
 }
 
 #[derive(Clone)]
@@ -79,7 +82,10 @@ impl Kiln {
             prompt_router: Self::prompts_router(),
         };
         match project {
-            Some(p) => kiln.open(&p, config, true)?,
+            Some(p) => {
+                kiln.open(&p, config, true)?;
+                kiln.active.write().unwrap().vouched = true;
+            }
             None => {
                 let here: Vec<PathBuf> = std::env::current_dir().into_iter().collect();
                 let recent = kiln.home.as_deref().map(registry::list).unwrap_or_default();
@@ -98,9 +104,44 @@ impl Kiln {
     pub fn open(&self, dir: &Path, config: Option<PathBuf>, chosen: bool) -> Result<(), String> {
         let has_toml = config.is_some() || registry::kind(dir).kiln;
         let ctx = if has_toml { Some(Arc::new(crate::ops::ctx(dir, config)?)) } else { None };
-        *self.active.write().unwrap() = Active { dir: Some(dir.to_path_buf()), ctx, chosen };
+        *self.active.write().unwrap() = Active { dir: Some(dir.to_path_buf()), ctx, chosen, vouched: false };
         self.remember(dir);
         Ok(())
+    }
+
+    /// Opens a project Kiln has just written, and trusts it.
+    pub fn made(&self, dir: &Path, ctx: Ctx) {
+        *self.active.write().unwrap() =
+            Active { dir: Some(dir.to_path_buf()), ctx: Some(Arc::new(ctx)), chosen: true, vouched: true };
+        if let Some(home) = &self.home
+            && let Err(e) = registry::trust(home, dir)
+        {
+            eprintln!("no se pudo apuntar la confianza en {}: {e}", home.display());
+        }
+        self.remember(dir);
+    }
+
+    /// Whether the open project may run Blender, Godot and Claude. Read
+    /// from the registry each time, so `kiln trust` counts at once.
+    pub fn trusted(&self) -> bool {
+        let a = self.active.read().unwrap();
+        a.vouched
+            || a.dir.as_deref().zip(self.home.as_deref()).is_some_and(|(d, h)| registry::is_trusted(h, d))
+    }
+
+    /// The project, only if it may run external programs.
+    pub fn run_ctx(&self) -> Result<Arc<Ctx>, String> {
+        let ctx = self.ctx()?;
+        if self.trusted() {
+            return Ok(ctx);
+        }
+        Err(format!(
+            "Kiln no lanza Blender, Godot ni Claude en {} hasta que la persona confíe en él: su kiln.toml \
+             decide qué programas se ejecutan y su proyecto de Godot corre sus propios plugins. Pídele que \
+             revise la carpeta y, si se fía, ejecute en su terminal `kiln trust --project {}`. No lo ejecutes tú.",
+            ctx.project.display(),
+            ctx.project.display()
+        ))
     }
 
     /// Notes `dir` as the newest project; a failure only goes to stderr.

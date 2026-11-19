@@ -99,7 +99,7 @@ impl Kiln {
         if let Err(e) = ops::check_id("el asset", &a.asset) {
             return fail(e);
         }
-        let ctx = match self.ctx() {
+        let ctx = match self.run_ctx() {
             Ok(c) => c,
             Err(e) => return fail(e),
         };
@@ -121,7 +121,7 @@ impl Kiln {
         {
             return fail(e);
         }
-        let ctx = match self.ctx() {
+        let ctx = match self.run_ctx() {
             Ok(c) => c,
             Err(e) => return fail(e),
         };
@@ -138,7 +138,7 @@ impl Kiln {
         if let Err(e) = ops::check_id("el asset", &a.asset) {
             return fail(e);
         }
-        let ctx = match self.ctx() {
+        let ctx = match self.run_ctx() {
             Ok(c) => c,
             Err(e) => return fail(e),
         };
@@ -155,7 +155,7 @@ impl Kiln {
         if let Err(e) = ops::check_id("el asset", &a.asset) {
             return fail(e);
         }
-        let ctx = match self.ctx() {
+        let ctx = match self.run_ctx() {
             Ok(c) => c,
             Err(e) => return fail(e),
         };
@@ -172,7 +172,7 @@ impl Kiln {
         if let Err(e) = ops::check_id("el asset", &a.asset) {
             return fail(e);
         }
-        let ctx = match self.ctx() {
+        let ctx = match self.run_ctx() {
             Ok(c) => c,
             Err(e) => return fail(e),
         };
@@ -186,7 +186,7 @@ impl Kiln {
     /// Qué herramientas externas hay (Blender, Godot, validador de glTF, glTF-Transform, claude, curl) y en qué versión. Las ejecuta con `--version`; `status` dice solo si están, sin ejecutarlas.
     #[tool(annotations(read_only_hint = false))]
     async fn tools(&self) -> Reply {
-        let ctx = match self.ctx() {
+        let ctx = match self.run_ctx() {
             Ok(c) => c,
             Err(e) => return fail(e),
         };
@@ -196,7 +196,7 @@ impl Kiln {
     /// Godot mide las piezas que solo él abre (`.res`, `.tres`, `.tscn`) y las exporta a GLB en la caché, para que Blender y el montaje las usen. Tarda minutos: devuelve un trabajo; sigue su avance llamando a `job` hasta que su estado deje de ser `running`.
     #[tool(annotations(read_only_hint = false))]
     async fn godot_measure(&self) -> Reply {
-        let ctx = match self.ctx() {
+        let ctx = match self.run_ctx() {
             Ok(c) => c,
             Err(e) => return fail(e),
         };
@@ -213,7 +213,7 @@ impl Kiln {
         {
             return fail(e);
         }
-        let ctx = match self.ctx() {
+        let ctx = match self.run_ctx() {
             Ok(c) => c,
             Err(e) => return fail(e),
         };
@@ -230,7 +230,7 @@ impl Kiln {
         if let Err(e) = ops::check_id("el asset", &a.asset) {
             return fail(e);
         }
-        let ctx = match self.ctx() {
+        let ctx = match self.run_ctx() {
             Ok(c) => c,
             Err(e) => return fail(e),
         };
@@ -257,7 +257,7 @@ impl Kiln {
         if let Err(e) = checks {
             return fail(e);
         }
-        let ctx = match self.ctx() {
+        let ctx = match self.run_ctx() {
             Ok(c) => c,
             Err(e) => return fail(e),
         };

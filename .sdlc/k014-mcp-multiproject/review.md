@@ -3,7 +3,7 @@
 ## Verificado
 
 - `cargo test --workspace --no-fail-fast`: 650 pasan, 0 fallan, 29 ignorados
-  (antes 635; +15: 4 del registro, 1 de URIs `file://`, 8 de
+  (antes 635; +20 con R9: 4 del registro, 1 de URIs `file://`, 8 de
   `tests/mcp_projects.rs`, 2 de cobertura de la CLI).
 - `cargo clippy --workspace --all-targets -- -D warnings`: limpio.
 - Sesión real por stdio con el binario de release, sin `--project`, arrancada
@@ -13,6 +13,23 @@
 - Las roots del cliente se prueban con un cliente de test que declara `roots`
   y contesta `roots/list` desde una carpeta vacía y un registro vacío, de modo
   que solo las roots pueden abrir el proyecto.
+
+## Hallazgo de seguridad y arreglo (R9)
+
+La revisión automática de seguridad señaló que `project_open`, la carpeta de
+trabajo y las roots podían abrir cualquier carpeta con `kiln.toml`, cuyo
+`[tools]` decide qué binarios corre Kiln (y cuyo proyecto de Godot corre sus
+plugins). Aaron aprobó arreglarlo en este PR: lista de confianza en
+`KILN_HOME`, que solo amplía `kiln trust` desde la terminal.
+
+- `cargo test --workspace --no-fail-fast`: 655 pasan, 0 fallan, 29 ignorados.
+- `clippy -D warnings`: limpio.
+- Sesión real con el binario de release: tras `project_open` de una carpeta
+  sin confianza, `tools` se niega y dice `kiln trust`; tras ejecutar
+  `kiln trust --project` en otra terminal, la misma sesión ya lo permite.
+
+Límite: la confianza va por carpeta, no por contenido. Si un `git pull` cambia
+el `[tools]` de un proyecto de confianza, sigue siendo de confianza.
 
 ## Cambios en tests existentes
 

@@ -159,6 +159,79 @@ fn the_clients_root_with_a_project_is_opened() {
     assert_eq!(folder, canon(a.path()));
 }
 
+fn kiln_trust(home: &TempDir, args: &[&str]) -> std::process::Output {
+    std::process::Command::new(env!("CARGO_BIN_EXE_kiln"))
+        .arg("trust")
+        .args(args)
+        .env("KILN_HOME", home.path())
+        .output()
+        .unwrap()
+}
+
+#[test]
+fn an_opened_project_runs_no_programs_until_the_person_trusts_it() {
+    let home = empty_dir();
+    let a = temp_project("");
+    let cwd = empty_dir();
+    let mut m = Mcp::start_free(cwd.path(), &home_env(&home));
+
+    let o = m.call("project_open", json!({"path": s(a.path())}));
+    assert_eq!(o.json()["trusted"], false, "{}", o.text);
+    assert!(o.json()["next"].as_str().unwrap().contains("kiln trust"));
+    assert_eq!(m.call("status", json!({})).json()["trusted"], false);
+    for (tool, args) in [
+        ("tools", json!({})),
+        ("build", json!({"asset": "x"})),
+        ("godot_measure", json!({})),
+        ("publish", json!({"asset": "x"})),
+        ("content_manifest", json!({})),
+    ] {
+        let r = m.call(tool, args);
+        assert!(r.is_error && r.text.contains("kiln trust"), "{tool}: {}", r.text);
+    }
+    assert!(m.call("jobs", json!({})).text.contains("[]"), "no job may start");
+    assert!(!m.call("catalog", json!({"what": "kits"})).is_error, "reading still works");
+
+    let out = kiln_trust(&home, &["--project", s(a.path())]);
+    assert!(out.status.success(), "{}", String::from_utf8_lossy(&out.stderr));
+    assert_eq!(m.call("status", json!({})).json()["trusted"], true);
+    let r = m.call("tools", json!({}));
+    assert!(!r.is_error, "{}", r.text);
+    let list = m.call("projects", json!({})).json();
+    assert_eq!(list["projects"][0]["trusted"], true, "{list}");
+}
+
+#[test]
+fn the_working_folder_is_opened_but_not_trusted() {
+    let home = empty_dir();
+    let a = temp_project("");
+    let mut m = Mcp::start_free(a.path(), &home_env(&home));
+    let st = m.call("status", json!({}));
+    assert_eq!(st.json()["trusted"], false, "{}", st.text);
+    assert!(m.call("tools", json!({})).is_error);
+}
+
+#[test]
+fn a_project_kiln_creates_is_trusted() {
+    let home = empty_dir();
+    let cwd = empty_dir();
+    let b = cwd.path().join("Faro");
+    let mut m = Mcp::start_free(cwd.path(), &home_env(&home));
+    let c = m.call("project_create", json!({"path": s(&b), "name": "Faro", "basics": game()}));
+    assert!(!c.is_error, "{}", c.text);
+    assert_eq!(m.call("status", json!({})).json()["trusted"], true);
+    assert!(home.read("trusted.json").contains("Faro"), "{}", home.read("trusted.json"));
+}
+
+#[test]
+fn kiln_trust_needs_a_project_folder() {
+    let home = empty_dir();
+    let plain = empty_dir();
+    assert!(!kiln_trust(&home, &[]).status.success());
+    assert!(!kiln_trust(&home, &["--project", s(plain.path())]).status.success());
+    assert!(!home.exists("trusted.json"));
+}
+
 #[test]
 fn jobs_say_which_project_they_belong_to() {
     let home = empty_dir();

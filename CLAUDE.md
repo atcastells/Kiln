@@ -8,7 +8,7 @@ con Blender y Godot. Rust, sin dependencias fuera de Rust en el servidor.
 
 ```bash
 cargo build --release      # binario target/release/kiln
-cargo test --workspace     # 650 pasan, 0 fallan, 29 ignorados; ~14 s en caliente
+cargo test --workspace     # 655 pasan, 0 fallan, 29 ignorados; ~14 s en caliente
 KILN_CANONICAL_RECIPES=<ASTRA>/godot/assets/kiln cargo test --workspace -- --ignored   # los 29: piden blender y godot en el PATH; los de geometría canónica leen las recetas de ASTRA
 cargo clippy --workspace --all-targets -- -D warnings   # limpio, sin avisos
 scripts/ui_test.sh         # UI en Chrome sin ventana; pide node >= 22 y Chrome

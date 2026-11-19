@@ -410,6 +410,19 @@ está en `~/Library/Application Support/Kiln/projects.json` en macOS
 (`$XDG_DATA_HOME/kiln` en Linux; `KILN_HOME` lo cambia). Con `--project` se
 comporta como antes: ese juego desde el principio.
 
+Un proyecto abierto así se puede leer y editar, pero Kiln no lanza Blender,
+Godot ni Claude en él hasta que confíes en él: su `kiln.toml` decide qué
+programas se ejecutan y su proyecto de Godot corre sus propios plugins. Para
+confiar, en tu terminal (el agente no puede hacerlo por MCP):
+
+```bash
+kiln trust --project /ruta/al/juego
+```
+
+Los proyectos que crea Kiln (`project_create`, `new_game`) y el de `--project`
+ya cuentan como de confianza. La lista está en `trusted.json`, junto al
+registro; `status` y `projects` dicen `trusted`.
+
 Son 35 herramientas. Empieza por `status`, que dice qué carpeta está abierta.
 
 | Grupo | Herramientas |

@@ -19,6 +19,8 @@
 | R7 | `content_manifest {set?}`: la orden `kiln content-manifest` como trabajo. | `mcp_production.rs` |
 | R8 | `tests/coverage.rs` también comprueba que cada orden de la CLI tiene herramienta o exclusión con motivo. | `coverage.rs` |
 
+| R9 | Confianza: `build`, `paint`, `generate`, `verify`, `publish`, `godot_measure`, `review`, `import`, `content_manifest` y `tools` se niegan en un proyecto que no está en `$KILN_HOME/trusted.json`, salvo el de `--project` y los que crea Kiln. Solo `kiln trust --project DIR` (la persona, en su terminal) añade uno; no hay herramienta MCP para ello. Leer y editar no cambian. Añadido por la revisión de seguridad, aprobado por Aaron el 2026-11-19. | `mcp_projects.rs` |
+
 ## Security
 
 Rutas de entrada: absolutas, longitud acotada, canonicalizadas, deben ser

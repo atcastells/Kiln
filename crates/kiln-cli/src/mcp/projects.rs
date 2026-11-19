@@ -7,7 +7,6 @@ use rmcp::{schemars, tool, tool_router};
 use serde_json::json;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 struct OpenArgs {
@@ -56,6 +55,7 @@ impl Kiln {
                         "exists": k.exists,
                         "kiln": k.kiln,
                         "godot": k.godot,
+                        "trusted": home.as_deref().is_some_and(|h| registry::is_trusted(h, &e.path)),
                         "open": open.as_deref() == Some(e.path.as_path()),
                     })
                 })
@@ -66,7 +66,7 @@ impl Kiln {
         ok(json!({ "open": open, "projects": list }))
     }
 
-    /// Abre otro juego en esta sesión; a partir de aquí todas las herramientas trabajan sobre él. La carpeta debe tener `kiln.toml` o `project.godot`. Si solo tiene `project.godot`, queda abierta y falta crear el proyecto de Kiln con `new_game_options` y `new_game`. Los trabajos lanzados antes siguen corriendo.
+    /// Abre otro juego en esta sesión; a partir de aquí todas las herramientas trabajan sobre él. La carpeta debe tener `kiln.toml` o `project.godot`. Si solo tiene `project.godot`, queda abierta y falta crear el proyecto de Kiln con `new_game_options` y `new_game`. Los trabajos lanzados antes siguen corriendo. Kiln no lanza Blender, Godot ni Claude en un proyecto abierto así hasta que la persona confíe en él con `kiln trust` (lo dice `trusted`).
     #[tool(annotations(read_only_hint = false, destructive_hint = false))]
     async fn project_open(&self, Parameters(a): Parameters<OpenArgs>) -> Reply {
         let dir = match absolute(&a.path) {
@@ -88,12 +88,15 @@ impl Kiln {
         if let Err(e) = blocking(move || kiln.open(&d, None, true)).await? {
             return fail(e);
         }
-        let next = if k.kiln {
-            "llama a `status`"
-        } else {
+        let trusted = self.trusted();
+        let next = if !k.kiln {
             "es un proyecto de Godot sin kiln.toml: usa `new_game_options` y `new_game` para crear aquí el de Kiln"
+        } else if !trusted {
+            "se puede leer y editar, pero Kiln no lanzará Blender, Godot ni Claude hasta que la persona ejecute `kiln trust --project` con esta ruta en su terminal; díselo y sigue con `status`"
+        } else {
+            "llama a `status`"
         };
-        ok(json!({ "open": dir, "kiln": k.kiln, "godot": k.godot, "next": next }))
+        ok(json!({ "open": dir, "kiln": k.kiln, "godot": k.godot, "trusted": trusted, "next": next }))
     }
 
     /// Empieza un juego nuevo en la carpeta dada y lo deja abierto: la crea si falta y escribe kiln.toml, una paleta vacía y el contexto con cada respuesta fijada, como `new_game`. Sirve también para una carpeta de Godot que aún no tiene kiln.toml. Pide antes a la persona la carpeta, el nombre y cada pregunta básica (las respuestas sugeridas salen de `new_game_options`). Falla si la carpeta ya tiene kiln.toml: entonces usa `project_open`.
@@ -123,8 +126,7 @@ impl Kiln {
             Ok(r) => r,
             Err(e) => return fail(e),
         };
-        *self.active.write().unwrap() = super::Active { dir: Some(dir.clone()), ctx: Some(Arc::new(ctx)), chosen: true };
-        self.remember(&dir);
+        self.made(&dir, ctx);
         ok(json!({ "open": dir, "created": files, "next": "ordena lo que explique la persona con `context_propose` y sigue con `status`" }))
     }
 }

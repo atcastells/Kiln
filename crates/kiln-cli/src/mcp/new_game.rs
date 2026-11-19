@@ -4,7 +4,6 @@ use super::{Kiln, Reply, blocking, fail, ok, reply};
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::{schemars, tool, tool_router};
 use std::collections::BTreeMap;
-use std::sync::Arc;
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 struct NewGameArgs {
@@ -49,13 +48,7 @@ impl Kiln {
             Ok(r) => r,
             Err(e) => return fail(e),
         };
-        {
-            let mut active = self.active.write().unwrap();
-            if active.dir.as_deref() == Some(project.as_path()) {
-                active.ctx = Some(Arc::new(ctx));
-            }
-        }
-        self.remember(&project);
+        self.made(&project, ctx);
         ok(serde_json::json!({ "created": files }))
     }
 }

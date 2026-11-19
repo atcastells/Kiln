@@ -55,7 +55,7 @@ struct ContentArgs {
 
 #[tool_router(router = read_router, vis = "pub(super)")]
 impl Kiln {
-    /// Resumen del proyecto abierto (`folder` es su carpeta): piezas, fichas, hallazgos por gravedad, contexto y el siguiente paso sugerido. Empieza por aquí.
+    /// Resumen del proyecto abierto (`folder` es su carpeta; `trusted`, si Kiln puede lanzar Blender, Godot y Claude en él): piezas, fichas, hallazgos por gravedad, contexto y el siguiente paso sugerido. Empieza por aquí.
     #[tool(annotations(read_only_hint = true))]
     async fn status(&self) -> Reply {
         let ctx = match self.ctx() {
@@ -63,10 +63,12 @@ impl Kiln {
             Err(e) => return fail(e),
         };
         let folder = ctx.project.display().to_string();
+        let trusted = self.trusted();
         reply(
             blocking(move || {
                 ops::read::status(&ctx).map(|mut s| {
                     s["folder"] = folder.into();
+                    s["trusted"] = trusted.into();
                     s
                 })
             })
