@@ -1,0 +1,192 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.03s
+     Running unittests src/main.rs (target/debug/deps/kiln-609f1914adb1c7ac)
+
+running 1 test
+test content::tests::godot_export_matches_fixture_and_catches_a_moved_door ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 166 filtered out; finished in 0.57s
+
+     Running tests/blender_anchor.rs (target/debug/deps/blender_anchor-b994a54310720f3a)
+
+running 1 test
+test anchors_reach_the_glb_as_empty_nodes_in_place ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.51s
+
+     Running tests/blender_contract.rs (target/debug/deps/blender_contract-c3e61a75f578c12a)
+
+running 1 test
+test two_builds_of_the_same_spec_are_equivalent ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.20s
+
+     Running tests/blender_piece.rs (target/debug/deps/blender_piece-1c79829720386ded)
+
+running 1 test
+test a_blend_piece_is_exported_measured_and_tracked ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 3.86s
+
+     Running tests/blender_rig.rs (target/debug/deps/blender_rig-2d9f9f7dff35d34d)
+
+running 4 tests
+test piece_keeps_rig ... ok
+test a_rigged_piece_is_not_copied ... ok
+test build_measures_a_rig_at_rest ... ok
+test build_keeps_rig ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.81s
+
+     Running tests/blender_turn.rs (target/debug/deps/blender_turn-32f6a1ad9cf80377)
+
+running 1 test
+test turn_reaches_copies_of_models_like_boxes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.99s
+
+     Running tests/cli_generate.rs (target/debug/deps/cli_generate-f579135ce92b9930)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/coverage.rs (target/debug/deps/coverage-f67e1072addf6bbf)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/generate_vocab.rs (target/debug/deps/generate_vocab-875b9658ace16e13)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/godot_canonical.rs (target/debug/deps/godot_canonical-5785ef4b72cf1df8)
+
+running 2 tests
+test glbs_straight_to_the_validator_give_the_verdicts_of_m8 ... ok
+test recipes_through_godot_give_the_verdicts_of_m8 ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.01s
+
+     Running tests/godot_generate.rs (target/debug/deps/godot_generate-ea895a6572c1ca9a)
+
+running 4 tests
+test a_smooth_recipe_also_generates ... ok
+test triangles_match_the_static_count ... ok
+test another_seed_gives_another_mesh ... ok
+test same_seed_gives_the_same_structure ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.55s
+
+     Running tests/godot_recipe.rs (target/debug/deps/godot_recipe-4aaee4b209583d9a)
+
+running 8 tests
+test publish_without_verifying_is_refused ... ok
+test a_recipe_that_can_reach_zero_radius_is_refused_everywhere ... ok
+test verify_seeds_is_read_from_the_config ... ok
+test publish_writes_the_recipe_the_script_and_the_contract ... ok
+test verify_generates_the_batch_and_writes_the_report ... ok
+test verify_does_not_touch_the_preview ... ok
+test verifying_twice_gives_the_same_seeds_and_meshes ... ok
+test a_changed_recipe_must_be_verified_again ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 12.16s
+
+     Running tests/godot_verify.rs (target/debug/deps/godot_verify-255b62862f543372)
+
+running 6 tests
+test verify_uses_the_khronos_validator_when_it_is_installed ... ok
+test rig_passes_with_its_declared_animations ... ok
+test rig_fails_without_a_declared_animation ... ok
+test a_declared_animation_that_moves_nothing_is_a_warning ... ok
+test a_moved_and_turned_rig_still_verifies ... ok
+test verify_passes_a_good_build_and_publish_takes_only_what_was_verified ... ok
+
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 8.78s
+
+     Running tests/mcp.rs (target/debug/deps/mcp-66e918a3407d2b56)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/mcp_context.rs (target/debug/deps/mcp_context-22c2dcd4b991c33e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/mcp_guards.rs (target/debug/deps/mcp_guards-90c65661d63bd511)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/mcp_materials.rs (target/debug/deps/mcp_materials-48af2decd8c74e57)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/mcp_new_game.rs (target/debug/deps/mcp_new_game-96e56fb05cc43418)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/mcp_production.rs (target/debug/deps/mcp_production-449597272d5e3e27)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 11 filtered out; finished in 0.00s
+
+     Running tests/mcp_prompts.rs (target/debug/deps/mcp_prompts-f07cf5091eec731e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/mcp_read.rs (target/debug/deps/mcp_read-592d3159b8580f76)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+     Running tests/mcp_specs.rs (target/debug/deps/mcp_specs-4de017b87d81c74e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/routes.rs (target/debug/deps/routes-c7839bab4c11c663)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+     Running tests/run_timeout.rs (target/debug/deps/run_timeout-ad288638489338c6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running unittests src/lib.rs (target/debug/deps/kiln_core-7560b75a47ee09af)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 369 filtered out; finished in 0.00s
+
+     Running tests/canonical_cases.rs (target/debug/deps/canonical_cases-da701c32e75f2af8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.00s
+
+   Doc-tests kiln_core
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

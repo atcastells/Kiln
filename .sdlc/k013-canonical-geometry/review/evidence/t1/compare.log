@@ -1,0 +1,52 @@
+== sph8
+ nodes: [{'children': [1], 'name': 'sph8'}, {'mesh': 0, 'name': 'sph82'}]
+ scenes: [{'nodes': [0]}] meshes: 1 prim keys: ['attributes', 'indices', 'material', 'mode'] attrs: ['NORMAL', 'POSITION', 'TANGENT', 'TEXCOORD_0'] index ct: 5121 mode: 4
+ counts glb V/I: 54 240  raw V/I: 54 240  vbytes==12V: True  out.tris: 80  glb tris: 80
+ positions same order bitwise: True
+ positions same multiset bitwise: True
+ distinct position sets equal: True
+ index arrays equal: False
+ triangles by position: same order count: 0 / 80
+ per-triangle permutation glb vs raw: {'swap02': 80}
+ winding f32 exact glb: {'0': 16, '+': 64}  raw: {'0': 16, '-': 64}
+ canonical from glb: V 34 T 64 expected (34, 64) match True int winding {'+': 64}
+ canonical from raw:  (34, 64, {'-': 64})
+== sph64
+ nodes: [{'children': [1], 'name': 'sph64'}, {'mesh': 0, 'name': 'sph642'}]
+ scenes: [{'nodes': [0]}] meshes: 1 prim keys: ['attributes', 'indices', 'material', 'mode'] attrs: ['NORMAL', 'POSITION', 'TANGENT', 'TEXCOORD_0'] index ct: 5123 mode: 4
+ counts glb V/I: 2210 12672  raw V/I: 2210 12672  vbytes==12V: True  out.tris: 4224  glb tris: 4224
+ positions same order bitwise: True
+ positions same multiset bitwise: True
+ distinct position sets equal: True
+ index arrays equal: False
+ triangles by position: same order count: 0 / 4224
+ per-triangle permutation glb vs raw: {'swap02': 4224}
+ winding f32 exact glb: {'0': 128, '+': 4096}  raw: {'0': 128, '-': 4096}
+ canonical from glb: V 2050 T 4096 expected (2050, 4096) match True int winding {'+': 4096}
+ canonical from raw:  (2050, 4096, {'-': 4096})
+== ast42s
+ nodes: [{'children': [1], 'name': 'ast42s'}, {'mesh': 0, 'name': 'ast42s2'}]
+ scenes: [{'nodes': [0]}] meshes: 1 prim keys: ['attributes', 'indices', 'material', 'mode'] attrs: ['NORMAL', 'POSITION', 'TANGENT', 'TEXCOORD_0'] index ct: 5123 mode: 4
+ counts glb V/I: 2210 12672  raw V/I: 2210 12672  vbytes==12V: True  out.tris: 4224  glb tris: 4224
+ positions same order bitwise: True
+ positions same multiset bitwise: True
+ distinct position sets equal: True
+ index arrays equal: False
+ triangles by position: same order count: 0 / 4224
+ per-triangle permutation glb vs raw: {'swap02': 4224}
+ winding f32 exact glb: {'0': 128, '+': 4096}  raw: {'0': 128, '-': 4096}
+ canonical from glb: V 2050 T 4096 expected (2050, 4096) match True int winding {'+': 4096}
+ canonical from raw:  (2050, 4096, {'-': 4096})
+== ast42
+ nodes: [{'children': [1], 'name': 'ast42'}, {'mesh': 0, 'name': 'ast422'}]
+ scenes: [{'nodes': [0]}] meshes: 1 prim keys: ['attributes', 'indices', 'material', 'mode'] attrs: ['NORMAL', 'POSITION', 'TANGENT', 'TEXCOORD_0'] index ct: 5123 mode: 4
+ counts glb V/I: 12672 12672  raw V/I: 12672 12672  vbytes==12V: True  out.tris: 4224  glb tris: 4224
+ positions same order bitwise: True
+ positions same multiset bitwise: True
+ distinct position sets equal: True
+ index arrays equal: False
+ triangles by position: same order count: 64 / 4224
+ per-triangle permutation glb vs raw: {'swap12': 4160, 'same': 64}
+ winding f32 exact glb: {'0': 128, '+': 4096}  raw: {'0': 128, '-': 4096}
+ canonical from glb: V 2050 T 4096 expected (2050, 4096) match True int winding {'+': 4096}
+ canonical from raw:  (2050, 4096, {'-': 4096})

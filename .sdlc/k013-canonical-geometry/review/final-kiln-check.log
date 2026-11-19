@@ -1,0 +1,53 @@
+kiln_check: content-manifest
+station: Godot lee 4 escenas (godot)
+station: manifiesto en /Users/acastells/.t3/projects/astra/kiln/content_manifest.json
+kiln_check: check
+aviso  industrial/access_arch             blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/bulletin_board          blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/ceiling_tile            blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/door_frame              blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/door_leaf               blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/duct_run                blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/floor_marking           blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/floor_plate             blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/floor_threshold         blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/floor_tile              blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/luminaire               blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/machine_press           blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/pipe_run                blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/register_panel          blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/rib                     blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/sign_plate              blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/storage_rack            blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/task_lamp               blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/tray_cart               blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/wall_doorway            blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/wall_hatch              blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/wall_panel              blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  industrial/workbench               blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+info   industrial/access_arch             not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/bulletin_board          not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/ceiling_tile            not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/door_frame              not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/door_leaf               not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/duct_run                not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/floor_marking           not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/floor_plate             not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/floor_threshold         not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/floor_tile              not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/luminaire               not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/machine_press           not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/pipe_run                not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/register_panel          not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/rib                     not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/sign_plate              not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/storage_rack            not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/task_lamp               not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/tray_cart               not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/wall_doorway            not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/wall_hatch              not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/wall_panel              not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+info   industrial/workbench               not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+26 piezas, 0 errores, 23 avisos
+OK: kiln validated the astra modules
+exit=0

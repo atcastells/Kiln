@@ -110,6 +110,37 @@ pub fn check(
     out
 }
 
+/// Checks that only apply with `[generate] canonical`. The generator makes
+/// `segments / 2` rings, so the counts of S1 §2.2 hold only for an even value
+/// (decision 003). A range of whole ends that is not a single value always
+/// reaches an odd one, at an end or inside. A value with a range problem is
+/// left to `check`.
+pub fn canonical(asset_id: &str, g: &Generator) -> Vec<Finding> {
+    let Some(sphere) = g.ops.first().filter(|o| o.op == "sphere") else {
+        return Vec::new();
+    };
+    let Some(v) = sphere.params.get("segments") else {
+        return Vec::new();
+    };
+    let odd = |x: f64| x.rem_euclid(2.0) == 1.0;
+    let can_be_odd = match v {
+        Value::Fixed(x) => odd(*x),
+        Value::Range([a, b]) => a != b || odd(*a),
+    };
+    let well_formed = vocab::op("sphere")
+        .and_then(|d| d.param("segments"))
+        .is_some_and(|p| range_problem(p, v).is_none());
+    if !(well_formed && can_be_odd) {
+        return Vec::new();
+    }
+    vec![Finding {
+        severity: Severity::Error,
+        subject: format!("asset:{asset_id}"),
+        code: "canonical_odd_segments".into(),
+        message: "con la geometría canónica, sphere.segments debe ser un número par fijo: un valor impar, o un rango que puede dar uno, rompe el recuento de S1".into(),
+    }]
+}
+
 /// Sum of noise amplitudes above which the surface usually comes out spiky.
 const AMPLITUDE_WARN: f64 = 0.5;
 
@@ -287,6 +318,26 @@ mod tests {
     fn findings_name_the_asset() {
         let f = check("rock", &recipe("", ""), None, PALETTE);
         assert_eq!(f[0].subject, "asset:rock");
+    }
+
+    fn canonical_codes(params: &str) -> Vec<String> {
+        let g = recipe(&sphere(params), "material = \"basalt\"");
+        canonical("a", &g).into_iter().map(|f| f.code).collect()
+    }
+
+    #[test]
+    fn canonical_refuses_segments_that_can_be_odd() {
+        for params in ["segments = 9", "segments = [8, 9]", "segments = [9, 16]", "segments = [8, 10]", "segments = [9, 9]"] {
+            assert_eq!(canonical_codes(params), ["canonical_odd_segments"], "{params}");
+        }
+        for params in ["segments = 8", "segments = [16, 16]", "", "segments = 12.5", "segments = 7"] {
+            assert!(canonical_codes(params).is_empty(), "{params}");
+        }
+        let g = recipe(&sphere("segments = 9"), "material = \"basalt\"");
+        let f = canonical("rock", &g);
+        assert_eq!((f[0].severity, f[0].subject.as_str()), (Severity::Error, "asset:rock"));
+        assert!(f[0].message.contains("par"), "{}", f[0].message);
+        assert!(check("a", &g, None, PALETTE).is_empty());
     }
 
     #[test]

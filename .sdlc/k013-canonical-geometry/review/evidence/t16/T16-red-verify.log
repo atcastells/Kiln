@@ -1,0 +1,55 @@
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+   Compiling kiln-cli v0.1.0 (/Users/acastells/Kiln/crates/kiln-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.96s
+     Running unittests src/main.rs (target/debug/deps/kiln-609f1914adb1c7ac)
+
+running 25 tests
+test verify_recipe::tests::a_budget_below_the_sphere_fails ... ok
+test verify_recipe::tests::the_sphere_helper_measures_like_godots_sphere ... ok
+test verify_recipe::tests::a_static_error_never_launches_godot ... ok
+test verify_recipe::tests::a_flipped_face_fails_every_seed ... ok
+test verify_recipe::tests::verify_is_refused_while_the_asset_is_locked ... ok
+test verify_recipe::tests::verify_of_a_static_error_writes_an_invalid_report_without_godot ... ok
+test verify_recipe::tests::a_broken_glb_is_reported_once ... ok
+test verify_recipe::tests::an_unreadable_glb_is_a_finding_not_a_crash ... ok
+test verify_recipe::tests::the_checks_of_the_glb_are_not_repeated_per_seed ... ok
+test verify_recipe::tests::canonical_runs_on_every_seed_after_a_flipped_face ... ok
+test verify_recipe::tests::a_verification_that_cannot_run_leaves_no_report_behind ... ok
+test verify_recipe::tests::canonical_refuses_a_node_transform ... ok
+test verify_recipe::tests::verify_seeds_comes_from_the_config ... ok
+test verify_recipe::tests::verify_fails_and_still_writes_the_report ... ok
+test verify_recipe::tests::canonical_refuses_odd_segments_before_godot ... FAILED
+test verify_recipe::tests::canonical_refuses_a_batch_without_a_godot_version ... FAILED
+test verify_recipe::tests::canonical_refuses_two_meshes ... ok
+test verify_recipe::tests::a_good_recipe_generates_the_whole_batch ... ok
+test verify_recipe::tests::canonical_records_the_godot_version_of_the_batch ... ok
+test verify_recipe::tests::verify_asset_reaches_the_recipe_verification ... ok
+test verify_recipe::tests::canonical_refuses_seeds_made_by_different_godots ... ok
+test verify_recipe::tests::canonical_writes_an_artifact_and_its_hash_per_seed ... ok
+test verify_recipe::tests::verify_runs_the_three_checks ... ok
+test verify_recipe::tests::verify_writes_the_report_of_a_good_recipe ... ok
+test verify_recipe::tests::without_canonical_the_report_and_files_are_todays ... ok
+
+failures:
+
+---- verify_recipe::tests::canonical_refuses_odd_segments_before_godot stdout ----
+
+thread 'verify_recipe::tests::canonical_refuses_odd_segments_before_godot' (42976387) panicked at crates/kiln-cli/src/verify_recipe.rs:755:9:
+assertion `left == right` failed: [Finding { severity: Error, subject: "asset:rock", code: "generated_tris", message: "semilla 7: 80 triángulos y la esfera de la receta tiene 90" }, Finding { severity: Error, subject: "asset:rock", code: "canonical_count", message: "semilla 7: la geometría canónica no es válida: 9 segments expect 42 vertices and 81 triangles, got 34 and 64" }, Finding { severity: Error, subject: "asset:rock", code: "generated_tris", message: "semilla 961578924: 80 triángulos y la esfera de la receta tiene 90" }, Finding { severity: Error, subject: "asset:rock", code: "canonical_count", message: "semilla 961578924: la geometría canónica no es válida: 9 segments expect 42 vertices and 81 triangles, got 34 and 64" }, Finding { severity: Error, subject: "asset:rock", code: "generated_tris", message: "semilla 2330964792: 80 triángulos y la esfera de la receta tiene 90" }, Finding { severity: Error, subject: "asset:rock", code: "canonical_count", message: "semilla 2330964792: la geometría canónica no es válida: 9 segments expect 42 vertices and 81 triangles, got 34 and 64" }, Finding { severity: Error, subject: "asset:rock", code: "generated_tris", message: "semilla 3298821547: 80 triángulos y la esfera de la receta tiene 90" }, Finding { severity: Error, subject: "asset:rock", code: "canonical_count", message: "semilla 3298821547: la geometría canónica no es válida: 9 segments expect 42 vertices and 81 triangles, got 34 and 64" }, Finding { severity: Error, subject: "asset:rock", code: "generated_tris", message: "semilla 2669350074: 80 triángulos y la esfera de la receta tiene 90" }, Finding { severity: Error, subject: "asset:rock", code: "canonical_count", message: "semilla 2669350074: la geometría canónica no es válida: 9 segments expect 42 vertices and 81 triangles, got 34 and 64" }, Finding { severity: Error, subject: "asset:rock", code: "generated_tris", message: "semilla 2067759717: 80 triángulos y la esfera de la receta tiene 90" }, Finding { severity: Error, subject: "asset:rock", code: "canonical_count", message: "semilla 2067759717: la geometría canónica no es válida: 9 segments expect 42 vertices and 81 triangles, got 34 and 64" }]
+  left: 0
+ right: 1
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- verify_recipe::tests::canonical_refuses_a_batch_without_a_godot_version stdout ----
+
+thread 'verify_recipe::tests::canonical_refuses_a_batch_without_a_godot_version' (42976385) panicked at crates/kiln-cli/src/verify_recipe.rs:774:9:
+assertion failed: got.is_err()
+
+
+failures:
+    verify_recipe::tests::canonical_refuses_a_batch_without_a_godot_version
+    verify_recipe::tests::canonical_refuses_odd_segments_before_godot
+
+test result: FAILED. 23 passed; 2 failed; 0 ignored; 0 measured; 142 filtered out; finished in 1.75s
+
+error: test failed, to rerun pass `-p kiln-cli --bin kiln`

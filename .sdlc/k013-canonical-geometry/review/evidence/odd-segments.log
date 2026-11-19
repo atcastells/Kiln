@@ -1,0 +1,13 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/scratch_odd.rs (/private/tmp/claude-501/k13/target/debug/deps/scratch_odd-af5d44fb7919ab50)
+
+running 1 test
+RESULT S=8: ok V=34 T=64 validate=Ok(())
+RESULT S=9: canonical_count 9 segments expect 42 vertices and 81 triangles, got 38 and 72
+RESULT S=10: ok V=52 T=100 validate=Ok(())
+RESULT S=11: canonical_count 11 segments expect 62 vertices and 121 triangles, got 57 and 110
+RESULT S=15: canonical_count 15 segments expect 114 vertices and 225 triangles, got 107 and 210
+test odd ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s
+

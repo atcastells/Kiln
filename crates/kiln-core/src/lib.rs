@@ -6,6 +6,7 @@ pub mod asset;
 pub mod bindings;
 pub mod blend;
 pub mod build;
+pub mod canonical;
 pub mod catalog;
 pub mod chat;
 pub mod check;

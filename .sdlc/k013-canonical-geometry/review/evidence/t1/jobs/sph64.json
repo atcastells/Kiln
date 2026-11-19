@@ -1,0 +1,1 @@
+{"id": "sph64", "glb": "/Users/acastells/Kiln/.sdlc/k013-canonical-geometry/work/T1-scratch/out/sph64.glb", "material": null, "ops": [{"op": "sphere", "params": {"radius_m": 1000.0, "segments": 64.0}}]}

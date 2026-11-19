@@ -1,0 +1,18 @@
+    }
+
+    #[test]
+    fn scratch_stale_geometry() {
+        let (p, cfg) = canonical_ready("scratch-stale");
+        publish_it(&p).unwrap();
+        let (_, spec) = state(&p);
+        let mut seeds = two_seeds();
+        seeds.as_array_mut().unwrap().truncate(1);
+        let sha = kiln_core::asset::sha256_hex(FIXTURE);
+        seeds[0]["geometry_sha256"] = sha.into();
+        let mut v = report(true, &current_sha(&spec), version(), &crate::generate::builder_sha256(), seeds);
+        v["recipe"]["godot_version"] = GODOT.into();
+        write(&p, &cfg, &v);
+        let r = publish_it(&p).unwrap();
+        let d = p.0.join("godot/assets/rock");
+        let a = json_at(&p, "asset.json");
+        eprintln!("RESULT files={:?} contract_files={} seed2_on_disk={}", r.files, a["files"], d.join("geometry/seed_2.bin").exists());

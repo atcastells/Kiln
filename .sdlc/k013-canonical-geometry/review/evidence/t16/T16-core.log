@@ -1,0 +1,71 @@
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.55s
+     Running unittests src/lib.rs (target/debug/deps/kiln_core-1b0997d9069dbce5)
+
+running 57 tests
+test config::tests::generate_defaults_when_the_section_is_absent ... ok
+test config::tests::reads_the_generate_section ... ok
+test config::tests::rejects_generate_values_out_of_range ... ok
+test generate::check::tests::findings_name_the_asset ... ok
+test generate::check::tests::unknown_or_repeated_op ... ok
+test generate::check::tests::order_needs_a_first_sphere_and_no_other ... ok
+test generate::check::tests::spec_check_runs_the_recipe_checks ... ok
+test generate::check::tests::the_example_recipe_only_warns_about_amplitude ... ok
+test generate::check::tests::radius_bound_reaching_zero_is_an_error ... ok
+test generate::check::tests::the_readme_recipe_has_neither_finding ... ok
+test generate::check::tests::material_must_be_in_the_palette ... ok
+test generate::check::tests::a_broken_recipe_skips_the_numeric_rules ... ok
+test generate::check::tests::unknown_param ... ok
+test generate::check::tests::amplitude_sum_warns_above_the_limit_only ... ok
+test generate::check::tests::radius_bound_follows_the_order_of_stretch_and_noise ... ok
+test generate::check::tests::budget_uses_the_worst_case ... ok
+test generate::check::tests::radius_bound_uses_the_worst_end_of_a_range ... ok
+test generate::check::tests::range_problems ... ok
+test generate::measure::tests::a_clean_seed_has_no_findings ... ok
+test generate::measure::tests::a_spike_is_steep_not_flipped ... ok
+test generate::measure::tests::a_triangle_count_that_is_not_the_sphere_is_an_error ... ok
+test generate::measure::tests::degenerate_triangles_beyond_the_poles_are_an_error ... ok
+test generate::measure::tests::a_collapsed_triangle_is_degenerate_only ... ok
+test generate::measure::tests::a_clean_tetrahedron_has_nothing_wrong ... ok
+test generate::measure::tests::every_message_names_the_seed ... ok
+test generate::check::tests::canonical_refuses_segments_that_can_be_odd ... ok
+test generate::measure::tests::a_reversed_face_is_flipped ... ok
+test generate::measure::tests::flipped_faces_are_an_error ... ok
+test generate::measure::tests::nothing_to_measure ... ok
+test generate::measure::tests::steep_faces_are_only_a_warning ... ok
+test generate::measure::tests::segments_come_from_the_sphere_op ... ok
+test generate::measure::tests::the_budget_and_the_rule_limit_the_triangles ... ok
+test generate::resolve::tests::batch_is_pinned ... ok
+test generate::measure::tests::unstretching_makes_a_stretched_octahedron_regular ... ok
+test generate::resolve::tests::batch_is_distinct_extends_and_handles_the_edges ... ok
+test generate::measure::tests::stretches_multiply_per_axis ... ok
+test generate::hash::tests::it_is_64_lowercase_hex ... ok
+test generate::resolve::tests::mix_is_pinned ... ok
+test generate::hash::tests::the_canonical_form_is_pinned ... ok
+test generate::resolve::tests::fnv_matches_the_known_vector ... ok
+test generate::hash::tests::integer_and_float_spelling_match ... ok
+test generate::resolve::tests::fixed_stays_and_absent_takes_the_default ... ok
+test generate::hash::tests::writing_order_does_not_matter ... ok
+test generate::resolve::tests::resolved_values_are_pinned ... ok
+test generate::vocab::tests::only_noise_is_repeatable ... ok
+test generate::tests::a_recipe_alone_is_not_without_parts ... ok
+test generate::vocab::tests::sphere_triangles ... ok
+test generate::resolve::tests::resolving_is_repeatable_and_the_seed_matters ... ok
+test generate::vocab::tests::table_serializes_as_an_array ... ok
+test generate::tests::a_spec_without_recipe_does_not_write_one ... ok
+test generate::vocab::tests::the_four_ops_exist_in_order ... ok
+test generate::vocab::tests::unknown_op_is_none ... ok
+test generate::resolve::tests::noise_ops_get_their_own_seed_and_facet_none ... ok
+test generate::tests::a_recipe_with_parts_is_refused ... ok
+test generate::tests::reads_and_round_trips_the_recipe ... ok
+test generate::hash::tests::it_changes_with_the_recipe ... ok
+test generate::resolve::tests::ranges_stay_inside_and_integers_are_whole ... ok
+
+test result: ok. 57 passed; 0 failed; 0 ignored; 0 measured; 312 filtered out; finished in 0.01s
+
+     Running tests/canonical_cases.rs (target/debug/deps/canonical_cases-907311b816a91866)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.00s
+
