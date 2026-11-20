@@ -1,0 +1,12 @@
+== perdidas (en base, no en final) ==
+== nuevas ==
+test canonical::topology::tests::pieces_and_euler_counts_a_torus ... ok
+test integrity::intersect::tests::intersect_pairs_with_known_answers ... ok
+test integrity::tests::mesh_rules_find_one_code_per_mutation ... ok
+test integrity::tests::self_intersection_sweep_misses_no_pair ... ok
+test integrity::tests::self_intersection_sweep_prunes_a_fine_torus ... ok
+test integrity::tests::welding_reports_what_it_cannot_weld_honestly ... ok
+test spec::mesh_tests::an_existing_spec_has_no_mesh_rules ... ok
+test spec::mesh_tests::mesh_rules_are_checked ... ok
+test validate::tests::mesh_integrity_runs_only_when_the_spec_asks_for_it ... ok
+== FAILED en final ==

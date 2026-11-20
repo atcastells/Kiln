@@ -1,0 +1,11 @@
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.62s
+     Running unittests src/lib.rs (target/debug/deps/kiln_core-1b0997d9069dbce5)
+
+running 2 tests
+test integrity::tests::self_intersection_sweep_misses_no_pair ... ok
+fine torus: 16000 triangles, 127992000 pairs, 1541656 overlap in x, 111272 boxes overlap, 264.194959ms
+test integrity::tests::self_intersection_sweep_prunes_a_fine_torus ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 375 filtered out; finished in 0.27s
+

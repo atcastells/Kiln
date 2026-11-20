@@ -1,0 +1,193 @@
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+   Compiling kiln-cli v0.1.0 (/Users/acastells/Kiln/crates/kiln-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 21.86s
+     Running unittests src/main.rs (target/debug/deps/kiln-609f1914adb1c7ac)
+
+running 31 tests
+test ops::publish::tests::refuses_a_glb_changed_after_verifying ... ok
+test verify_recipe::tests::a_budget_below_the_sphere_fails ... ok
+test verify::tests::the_scratch_project_stays_inside_the_project ... ok
+test ops::publish::tests::refuses_a_variant_painted_again_after_verifying ... ok
+test verify_recipe::tests::a_static_error_never_launches_godot ... ok
+test generate::tests::verify_dir_starts_empty ... ok
+test generate::tests::verify_dir_removes_a_link_and_never_what_it_points_to ... ok
+test verify_recipe::tests::the_sphere_helper_measures_like_godots_sphere ... ok
+test generate::tests::run_seed_into_the_verify_folder_leaves_the_preview_alone ... ok
+test verify_recipe::tests::a_good_recipe_generates_the_whole_batch ... ok
+test verify_recipe::tests::verify_is_refused_while_the_asset_is_locked ... ok
+test verify_recipe::tests::an_unreadable_glb_is_a_finding_not_a_crash ... ok
+test verify_recipe::tests::verify_of_a_static_error_writes_an_invalid_report_without_godot ... ok
+test verify_recipe::tests::a_flipped_face_fails_every_seed ... ok
+test verify_recipe::tests::a_broken_glb_is_reported_once ... ok
+test verify_recipe::tests::canonical_refuses_a_node_transform ... ok
+test verify_recipe::tests::a_verification_that_cannot_run_leaves_no_report_behind ... ok
+test verify_recipe::tests::canonical_refuses_seeds_made_by_different_godots ... ok
+test verify_recipe::tests::canonical_refuses_two_meshes ... ok
+test verify_recipe::tests::verify_seeds_comes_from_the_config ... ok
+test verify_recipe::tests::canonical_refuses_a_batch_without_a_godot_version ... ok
+test verify_recipe::tests::canonical_records_the_godot_version_of_the_batch ... ok
+test verify_recipe::tests::verify_fails_and_still_writes_the_report ... ok
+test verify_recipe::tests::canonical_refuses_odd_segments_before_godot ... ok
+test verify_recipe::tests::canonical_writes_an_artifact_and_its_hash_per_seed ... ok
+test verify_recipe::tests::canonical_runs_on_every_seed_after_a_flipped_face ... ok
+test verify_recipe::tests::verify_asset_reaches_the_recipe_verification ... ok
+test verify_recipe::tests::the_checks_of_the_glb_are_not_repeated_per_seed ... ok
+test verify_recipe::tests::verify_runs_the_three_checks ... ok
+test verify_recipe::tests::verify_writes_the_report_of_a_good_recipe ... ok
+test verify_recipe::tests::without_canonical_the_report_and_files_are_todays ... ok
+
+test result: ok. 31 passed; 0 failed; 0 ignored; 0 measured; 143 filtered out; finished in 1.92s
+
+     Running tests/blender_anchor.rs (target/debug/deps/blender_anchor-b994a54310720f3a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/blender_contract.rs (target/debug/deps/blender_contract-c3e61a75f578c12a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/blender_piece.rs (target/debug/deps/blender_piece-1c79829720386ded)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/blender_rig.rs (target/debug/deps/blender_rig-2d9f9f7dff35d34d)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/blender_turn.rs (target/debug/deps/blender_turn-32f6a1ad9cf80377)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+
+     Running tests/cli_generate.rs (target/debug/deps/cli_generate-f579135ce92b9930)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/coverage.rs (target/debug/deps/coverage-f67e1072addf6bbf)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 8 filtered out; finished in 0.00s
+
+     Running tests/generate_vocab.rs (target/debug/deps/generate_vocab-875b9658ace16e13)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/godot_canonical.rs (target/debug/deps/godot_canonical-5785ef4b72cf1df8)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 2 filtered out; finished in 0.00s
+
+     Running tests/godot_generate.rs (target/debug/deps/godot_generate-ea895a6572c1ca9a)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/godot_recipe.rs (target/debug/deps/godot_recipe-4aaee4b209583d9a)
+
+running 5 tests
+test publish_without_verifying_is_refused ... ignored
+test verify_does_not_touch_the_preview ... ignored
+test verify_generates_the_batch_and_writes_the_report ... ignored
+test verify_seeds_is_read_from_the_config ... ignored
+test verifying_twice_gives_the_same_seeds_and_meshes ... ignored
+
+test result: ok. 0 passed; 0 failed; 5 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/godot_verify.rs (target/debug/deps/godot_verify-255b62862f543372)
+
+running 2 tests
+test verify_passes_a_good_build_and_publish_takes_only_what_was_verified ... ignored
+test verify_uses_the_khronos_validator_when_it_is_installed ... ignored
+
+test result: ok. 0 passed; 0 failed; 2 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/mcp.rs (target/debug/deps/mcp-66e918a3407d2b56)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/mcp_context.rs (target/debug/deps/mcp_context-22c2dcd4b991c33e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/mcp_guards.rs (target/debug/deps/mcp_guards-90c65661d63bd511)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 4 filtered out; finished in 0.00s
+
+     Running tests/mcp_materials.rs (target/debug/deps/mcp_materials-48af2decd8c74e57)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/mcp_new_game.rs (target/debug/deps/mcp_new_game-96e56fb05cc43418)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.00s
+
+     Running tests/mcp_production.rs (target/debug/deps/mcp_production-449597272d5e3e27)
+
+running 2 tests
+test mcp_recipe_verify_starts_a_job_that_needs_godot ... ok
+test mcp_recipe_verify_reports_a_static_error_without_godot ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.56s
+
+     Running tests/mcp_projects.rs (target/debug/deps/mcp_projects-a076fee0b2023f48)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 13 filtered out; finished in 0.00s
+
+     Running tests/mcp_prompts.rs (target/debug/deps/mcp_prompts-f07cf5091eec731e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 6 filtered out; finished in 0.00s
+
+     Running tests/mcp_read.rs (target/debug/deps/mcp_read-592d3159b8580f76)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 9 filtered out; finished in 0.00s
+
+     Running tests/mcp_specs.rs (target/debug/deps/mcp_specs-4de017b87d81c74e)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 7 filtered out; finished in 0.00s
+
+     Running tests/routes.rs (target/debug/deps/routes-c7839bab4c11c663)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 14 filtered out; finished in 0.00s
+
+     Running tests/run_timeout.rs (target/debug/deps/run_timeout-ad288638489338c6)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+

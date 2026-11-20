@@ -1,0 +1,8 @@
+Kiln comprueba el GLB
+glTF Validator comprueba el GLB (gltf_validator)
+Godot importa e instancia el GLB (godot)
+kiln: pasa
+mesh_integrity: falla (mesh_topology)
+gltf_validator: pasa (glTF Validator 2.0.0-dev.3.10)
+godot_import: pasa (proyecto de prueba en kiln/cache/verify/historic_cavity)
+la verificación de «historic_cavity» no pasa: mesh_topology: 1 piezas, V − E + F = 0; la ficha declara 1 componentes y género 0, que dan 2 (informe: /private/var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T/claudio-t10-6gCyqU/kiln/build/historic_cavity/validation.json)

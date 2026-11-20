@@ -1,0 +1,132 @@
+# Findings: derived-mesh-verify (T11)
+
+(Mismo contenido que findings.md: el entorno bloqueó escribir el .md dos veces.)
+
+Revisión de `git diff origin/main` (8 archivos seguidos; copia en `review/evidence/T11-tracked.diff`) más tres archivos nuevos: `crates/kiln-core/src/integrity.rs`, `integrity/intersect.rs` y `tests/integrity_fixture.rs`. Tres pasadas de `REVIEW.md`, en paralelo: T11a bugs, T11b seguridad y T11c conformidad. La evidencia de los reviewers está copiada de `$TMPDIR` a `review/evidence/`.
+
+## Pass 1: bugs (T11a)
+
+### Important
+
+**I1. El barrido de cruces degenera a O(n²) en mallas cuyos triángulos se solapan en x. Resuelto.**
+
+- **Dónde**: `crates/kiln-core/src/integrity.rs` (`crossings`, antes en `:191-194`). La poda solo cortaba por x, así que se recorrían todos los pares cuyos intervalos en x se solapan.
+- **Por qué está mal**: `spec.md` prometía «O(n log n + k)». Las mallas de excavación de ASTRA son tubos con triángulos tan largos como el tubo. Esa forma es legítima, y por eso el caso cuadrático no es hipotético.
+- **Demostración**:
+  - Cilindro de un solo anillo a lo largo de x, en release (`evidence/claudio-review-bugs-timing2.log`, arnés en `evidence/bugs-sweep-demo.rs`):
+
+    | Triángulos | Tiempo |
+    |---|---|
+    | 20 000 | 4,4 s |
+    | 40 000 | 18,0 s |
+    | 80 000 | 71,0 s |
+
+  - T11b, prisma en debug (`evidence/claudio-review-sec-sweep.log`): 32 000 triángulos en 33,5 s.
+- **Resolución**:
+  - `sweep_axis` elige el eje de barrido con menos solape esperado. El criterio es la menor suma de longitudes de caja respecto a la extensión de la malla en ese eje: n cajas de longitud media L repartidas en S solapan en unos n²·L/S pares. Se compara como fracción en `u128`, sin coma flotante. Un eje de extensión nula es el peor, y en un empate gana el eje más bajo.
+  - La poda sigue siendo completa con cualquier eje: dos triángulos que se cruzan tienen cajas que se solapan en los tres ejes.
+  - Prueba nueva: `self_intersection_sweep_avoids_the_axis_of_long_triangles`. Usa prismas de 48 000 triángulos sobre un polígono exactamente convexo en enteros, a lo largo de x, y y z, con los triángulos laterales tan largos como el prisma.
+  - Pruebas ampliadas: `self_intersection_sweep_misses_no_pair` compara ahora con todos los pares prismas pequeños en x, y, z y diagonal, con tapas en tira y en abanico, y un prisma con un vértice empujado a través de la tapa opuesta.
+  - Rojo (`review/T11-sweep-red.log`, debug):
+
+    | Prisma a lo largo de | Pares recorridos | Tiempo |
+    |---|---|---|
+    | x | 1 007 999 999 | 40,2 s |
+    | y | 551 924 | 0,9 s |
+    | z | 576 215 972 | 16,2 s |
+
+  - Verde (`review/T11-sweep-green.log`): 551 924 pares en los tres ejes, unos 11,5 por triángulo, en 0,92–0,93 s. El umbral de la prueba es menos de 20·n pares y menos de 3 s. Lo puse primero en 10·n y lo subí a 20·n antes del primer verde, igual que la prueba del toro, porque los 551 924 pares son lineales.
+  - Banco en release, antes y después (`review/T11-bench-before.log`, `review/T11-bench-after.log`; prisma de tapas en tira, 16 000 triángulos):
+
+    | Prisma a lo largo de | Antes | Después |
+    |---|---|---|
+    | x | 115 ms | 22 ms |
+    | y | 21 ms | 21 ms |
+    | z | 53 ms | 21 ms |
+
+    Con 48 000 triángulos, después: 64 ms en los tres. Cavidad real (322 triángulos): 0,94 ms por `check`, tanto antes como después.
+- **Peor caso que queda, O(n²)**: triángulos cuyas cajas se solapan en los tres ejes. Ningún barrido por cajas alineadas a los ejes lo evita. Medido en release (`review/T11-bench-after.log`):
+
+  | Caso | Triángulos | Tiempo |
+  |---|---|---|
+  | Tapa en abanico (todas las cajas contienen el vértice común) | 16 000 | 5,0 s |
+  | Tapa en abanico | 48 000 | 45,5 s |
+  | Tubo largo en diagonal (1, 1, 1) | 16 000 | 2,7 s |
+  | Tubo largo en diagonal (1, 1, 1) | 48 000 | 23,9 s |
+
+  El cilindro de T11a tenía tapas en abanico desde el centro, así que sus tapas siguen siendo cuadráticas en el número de lados. Queda documentado en `spec.md` §Autointersección.
+
+### Unconfirmed
+
+- **`mesh_normals` con varias componentes** (`integrity.rs`, `check`). Se decide por el signo del volumen total, así que un sólido pequeño con las caras invertidas junto a uno grande pasa (`evidence/claudio-review-bugs-norm.log`). Es lo que dice la spec: es un límite del diseño. No se toca.
+
+### Nits
+
+- Se siguen contando los pares después del primer cruce (`crossings`, `hits`). La spec pide el número de pares, así que no sale gratis: no se toca.
+- `triangles_cross` crea dos `Vec` por cada par (`intersect.rs:103-105`). No sale gratis con este cambio: no se toca.
+
+## Pass 2: seguridad (T11b)
+
+### Important
+
+- **I1**: el mismo hallazgo, como consumo de tiempo sin cota con un GLB pequeño. Resuelto arriba para los tubos; el peor caso que queda está medido y documentado.
+
+### Unconfirmed
+
+- **No hay tope de bytes para el archivo ni para el chunk JSON** (`verify.rs:35`, `json_chunk`). Ya pasaba antes de este diff y no se demostró. No se toca.
+
+### Respuestas
+
+- **GLB malformados**: ningún pánico en 21 casos (`evidence/claudio-review-sec-malformed.log`): NaN o inf, `count` igual a u32::MAX, `stride` absurdo, `mode` 5, índices fuera de rango, archivo truncado o vacío, JSON muy anidado y coordenadas de 1e30.
+- **Credenciales y rutas personales**: ninguna en el código. `integrity_fixture.rs` lee la ruta de `KILN_MESH_FIXTURE`.
+
+### Nits
+
+- `check_i6` es `pub` y entra en pánico si no se cumplen I1–I5 (`canonical/topology.rs`). Resuelto: una línea de documentación con la precondición.
+
+## Pass 3: conformidad (T11c)
+
+### Important
+
+**I2. Se aceptaba una malla sin ningún nodo que la sostenga. Resuelto.**
+
+- **Dónde**: `crates/kiln-core/src/integrity.rs:46`, que antes decía `holders > 1`.
+- **Por qué está mal**: `spec.md:73` dice «Se exige un solo nodo con malla».
+- **Demostración**: `evidence/claudio-review-conf-q4-demo.log` («no nodes at all: welded 8 tris»).
+- **Resolución**: caso `no_node` en `welding_reports_what_it_cannot_weld_honestly`.
+  - Rojo: `review/T11-red.log` (`no_node: welded, want mesh_layout`).
+  - Arreglo: `holders != 1` y el doc corregido.
+
+### Unconfirmed
+
+- **`mesh_unreadable` en el `kiln verify` real**. `glb_findings` (`validate.rs:25-41`) solo mira el JSON, así que un GLB con accessor `sparse` o sin BIN podría llegar a `mesh_check`. Solo leído en el código, no ejecutado. No se toca.
+
+### Nits
+
+- **`mesh_unreadable` no estaba en la tabla de códigos.** Resuelto: fila añadida en `spec.md`.
+- **El `CLAUDE.md` de Kiln tenía los recuentos 657/0/29.** Resuelto: ahora 667/0/30, más la variable de entorno de la prueba ignorada nueva.
+
+### Respuestas
+
+- **Ficha sin `[mesh]`**: idéntica a `origin/main` en verify, en `validation.json` y en check.
+- **`[meshes]`**: se ignora sin aviso, como cualquier clave desconocida de la ficha (`spec.md` §Risks). Las erratas dentro de `[mesh]` sí se rechazan (`deny_unknown_fields`).
+- **R1–R6**: tienen implementación y prueba. R7 es de T12.
+
+## Respuestas del pase de bugs a las preguntas del brief
+
+- **Poda**: completa, con el argumento comprobado.
+- **`intersect.rs`**: sin desbordamiento en `i128`, probado con 3 M pares en los extremos de `i32` (`evidence/claudio-review-bugs-ovf.log`). Contra un port literal de check.py, 1,72 M pares y 0 discrepancias (`evidence/claudio-review-bugs-diff.log`).
+- **`check_i6_i7`**: mismos códigos, textos y orden; las 15 pruebas `topology` pasan.
+- **`mesh::read`**: sus 4 llamadores reciben lo mismo que antes.
+
+## Verificación final
+
+| | Línea base (T1) | T10 | Final (T11) |
+|---|---|---|---|
+| `cargo test --workspace` | 657 / 0 / 29 | 666 / 0 / 30 | 667 / 0 / 30 (`review/T11-workspace-summary.txt`) |
+| `cargo test -p kiln-core` | — | — | 379 + 17 + 1 pasan, 0 fallan (`review/T11-module.log`) |
+| Cavidad real (`integrity_fixture`, ignorada) | — | pasa | pasa (`review/T11-fixture.log`) |
+| `godot_canonical` ignoradas | 2 pasan | 2 pasan | 2 pasan (`review/T11-ignored-canonical.log`) |
+| Clippy `-D warnings` | limpio | limpio | limpio (`review/T11-clippy.log`) |
+
+Después de la batería, Clippy pidió un alias de tipo en el módulo de pruebas (`PrismAxis`). Se volvieron a pasar las pruebas del barrido (`review/T11-sweep-after-clippy.log`) y Clippy. `target/debug/kiln` se recompiló a las 20:29:01 CET del 2026-11-20 (`review/T11-build.log`).

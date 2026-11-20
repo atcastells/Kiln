@@ -1,0 +1,22 @@
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.01s
+     Running unittests src/lib.rs (target/debug/deps/kiln_core-1b0997d9069dbce5)
+
+running 1 test
+test integrity::tests::welding_reports_what_it_cannot_weld_honestly ... FAILED
+
+failures:
+
+---- integrity::tests::welding_reports_what_it_cannot_weld_honestly stdout ----
+
+thread 'integrity::tests::welding_reports_what_it_cannot_weld_honestly' (60114717) panicked at crates/kiln-core/src/integrity.rs:342:45:
+no_node: welded, want mesh_layout
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    integrity::tests::welding_reports_what_it_cannot_weld_honestly
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 377 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p kiln-core --lib`

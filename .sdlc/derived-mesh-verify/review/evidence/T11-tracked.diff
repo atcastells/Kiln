@@ -1,0 +1,466 @@
+diff --git a/README.md b/README.md
+index e765aca..cfbe1a9 100644
+--- a/README.md
++++ b/README.md
+@@ -565,7 +565,7 @@ estructural sale de los nodos, su jerarquía, sus transformaciones (a 0,1 mm),
+ los triángulos y los materiales: dos montajes con el mismo hash estructural
+ son equivalentes aunque los ficheros no fueran idénticos byte a byte.
+ 
+-**Verificar.** `kiln verify` hace tres comprobaciones y escribe
++**Verificar.** `kiln verify` hace tres comprobaciones (cuatro con `[mesh]`) y escribe
+ `validation.json`:
+ 
+ | Comprobación | Qué mira |
+@@ -573,6 +573,33 @@ son equivalentes aunque los ficheros no fueran idénticos byte a byte.
+ | `kiln` | Que sea un GLB válido y sin referencias rotas; nombres de nodo vacíos o repetidos; escala negativa o desigual en la raíz; triángulos sobre el presupuesto; medidas distintas de las que dio Blender; materiales sin clave de la paleta; piezas pendientes; anclajes que faltan o están fuera de sitio |
+ | `gltf_validator` | El informe del validador de Khronos. Si no está instalado consta como ausente y no cuenta como fallo |
+ | `godot_import` | Godot importa el GLB en un proyecto de prueba de la caché, lo instancia y devuelve sus nodos |
++| `mesh_integrity` | Solo si la ficha lleva `[mesh]` (sin ella, ni sale). Integridad de la malla soldada por mm frente a la topología declarada; ver abajo |
++
++**Integridad de la malla (`[mesh]`).** Una ficha de piezas (no una receta:
++`mesh_on_generator`) pide la comprobación con una tabla propia:
++
++```toml
++[mesh]                 # su sola presencia la activa
++components = 1         # piezas sueltas; por defecto 1
++genus = 1              # género total; por defecto 0
++normals = "inward"     # "outward" (sólido, por defecto) | "inward" (cavidad)
++```
++
++`verify` suelda el GLB por mm y gana el primer fallo, en este orden:
++`mesh_layout` (más de una malla o de un nodo con malla, una colocación que no
++es una traslación en la rejilla de 1 mm, o una primitiva que no es de
++triángulos), `mesh_offgrid` (vértice fuera de la rejilla, tolerancia 0,05 mm),
++`mesh_degenerate`, `mesh_too_small`, `mesh_open_edge`,
++`mesh_non_manifold_edge`, `mesh_orientation`, `mesh_pinched_vertex`,
++`mesh_topology` (piezas y V − E + F frente a 2·`components` − 2·`genus`),
++`mesh_normals` (signo del volumen) y `mesh_self_intersection`. Un GLB que no se
++puede leer da `mesh_unreadable`. Todos son errores: la comprobación falla y
++`publish` no publica. El hallazgo dice el código, el elemento (triángulo o
++vértice soldado) y dónde está, por ejemplo `mesh_open_edge, elemento 4: borde
++abierto: triángulo soldado 4 (primitiva 0, triángulo 4, en [-1.0, 0.0, 0.0] m)`.
++Una clave desconocida dentro de `[mesh]` deja la ficha ilegible; una tabla
++mal nombrada (`[meshes]`) se ignora: si `verify` no dice `mesh_integrity`, no
++se comprobó.
+ 
+ **Publicar.** `kiln publish` solo publica si la última verificación pasó y
+ corresponde al GLB de ahora (por sha256). Copia el GLB, sus variantes y el
+diff --git a/crates/kiln-cli/src/verify.rs b/crates/kiln-cli/src/verify.rs
+index cd59464..0bd52b6 100644
+--- a/crates/kiln-cli/src/verify.rs
++++ b/crates/kiln-cli/src/verify.rs
+@@ -87,6 +87,10 @@ pub fn verify_asset(
+     }
+     let mut checks = vec![Check::own(&findings)];
+     if readable {
++        if let Some((check, found)) = validate::mesh_check(&subject, spec, &bytes) {
++            checks.push(check);
++            findings.extend(found);
++        }
+         let (check, found) = khronos(&cfg, &dir, &file, &subject, &mut say)?;
+         checks.push(check);
+         findings.extend(found);
+diff --git a/crates/kiln-core/src/canonical/topology.rs b/crates/kiln-core/src/canonical/topology.rs
+index 5f693fd..d386f6e 100644
+--- a/crates/kiln-core/src/canonical/topology.rs
++++ b/crates/kiln-core/src/canonical/topology.rs
+@@ -81,6 +81,22 @@ pub fn check_i1_i5(g: &Geometry) -> Result<(), Rejection> {
+ /// I6 and I7, assuming I1–I5 hold (closed, consistently oriented, every
+ /// vertex used).
+ pub fn check_i6_i7(g: &Geometry) -> Result<(), Rejection> {
++    check_i6(g)?;
++    let (_, chi, outside) = pieces_and_euler(g);
++    if let Some(t) = outside {
++        let detail = format!("triangle {t} {:?} is not connected to triangle 0", g.triangles[t]);
++        return Err(Rejection::new("I7_not_connected", Some(t), detail));
++    }
++    if chi != 2 {
++        let edges = g.vertices.len() as i64 + g.triangles.len() as i64 - chi;
++        let detail = format!("V - E + F = {} - {edges} + {} = {chi}, need 2", g.vertices.len(), g.triangles.len());
++        return Err(Rejection::new("I7_not_a_sphere", None, detail));
++    }
++    Ok(())
++}
++
++/// I6, assuming I1–I5 hold: every vertex fan is a single cycle.
++pub fn check_i6(g: &Geometry) -> Result<(), Rejection> {
+     let (vs, ts) = (&g.vertices, &g.triangles);
+     // Fan of each vertex: the link edge b->c of every triangle around it.
+     let mut fans: Vec<Vec<(u32, u32)>> = vec![Vec::new(); vs.len()];
+@@ -104,6 +120,13 @@ pub fn check_i6_i7(g: &Geometry) -> Result<(), Rejection> {
+             return Err(Rejection::new("I6_pinched_vertex", Some(v), detail));
+         }
+     }
++    Ok(())
++}
++
++/// Connected pieces of the triangles (through shared vertices), V - E + F,
++/// and the first triangle outside the piece of triangle 0.
++pub fn pieces_and_euler(g: &Geometry) -> (usize, i64, Option<usize>) {
++    let (vs, ts) = (&g.vertices, &g.triangles);
+     let mut parent: Vec<usize> = (0..vs.len()).collect();
+     fn root(parent: &mut [usize], mut x: usize) -> usize {
+         while parent[x] != x {
+@@ -118,18 +141,12 @@ pub fn check_i6_i7(g: &Geometry) -> Result<(), Rejection> {
+             parent[rx] = ry;
+         }
+     }
+-    let piece = root(&mut parent, ts[0][0] as usize);
+-    if let Some(t) = (0..ts.len()).find(|&t| root(&mut parent, ts[t][0] as usize) != piece) {
+-        let detail = format!("triangle {t} {:?} is not connected to triangle 0", ts[t]);
+-        return Err(Rejection::new("I7_not_connected", Some(t), detail));
+-    }
++    let roots: Vec<usize> = ts.iter().map(|t| root(&mut parent, t[0] as usize)).collect();
++    let outside = roots.first().and_then(|&piece| roots.iter().position(|&r| r != piece));
++    let pieces = roots.iter().collect::<std::collections::HashSet<_>>().len();
+     let edges = ts.iter().flat_map(edges).map(undirected).collect::<std::collections::HashSet<_>>().len();
+     let chi = vs.len() as i64 - edges as i64 + ts.len() as i64;
+-    if chi != 2 {
+-        let detail = format!("V - E + F = {} - {edges} + {} = {chi}, need 2", vs.len(), ts.len());
+-        return Err(Rejection::new("I7_not_a_sphere", None, detail));
+-    }
+-    Ok(())
++    (pieces, chi, outside)
+ }
+ 
+ pub fn check_i1_i7(g: &Geometry) -> Result<(), Rejection> {
+@@ -315,4 +332,14 @@ mod tests {
+         let detail = rejects_i1_i7(&torus(3, 4), "I7_not_a_sphere", None);
+         assert!(detail.contains("= 0"), "{detail}");
+     }
++
++    #[test]
++    fn pieces_and_euler_counts_a_torus() {
++        assert_eq!(pieces_and_euler(&torus(4, 4)), (1, 0, None));
++        assert_eq!(pieces_and_euler(&octa()), (1, 2, None));
++        let mut g = octa();
++        g.vertices.extend(octa().vertices.iter().map(|p| p.map(|c| c / 10)));
++        g.triangles.extend(octa().triangles.iter().map(|t| t.map(|i| i + 6)));
++        assert_eq!(pieces_and_euler(&g), (2, 4, Some(8)));
++    }
+ }
+diff --git a/crates/kiln-core/src/lib.rs b/crates/kiln-core/src/lib.rs
+index e6f69de..42d8a94 100644
+--- a/crates/kiln-core/src/lib.rs
++++ b/crates/kiln-core/src/lib.rs
+@@ -16,6 +16,7 @@ pub mod context;
+ pub mod generate;
+ pub mod glb;
+ pub mod godot;
++pub mod integrity;
+ pub mod license;
+ pub mod mesh;
+ pub mod new_game;
+diff --git a/crates/kiln-core/src/mesh.rs b/crates/kiln-core/src/mesh.rs
+index fa14baa..4802793 100644
+--- a/crates/kiln-core/src/mesh.rs
++++ b/crates/kiln-core/src/mesh.rs
+@@ -19,6 +19,15 @@ pub fn read(path: &Path) -> Result<Vec<Mesh>, String> {
+ }
+ 
+ pub fn read_bytes(bytes: &[u8]) -> Result<Vec<Mesh>, String> {
++    read_within(bytes, MAX_VERTICES).map(|(meshes, _)| meshes)
++}
++
++/// The meshes read, and the (mesh, primitive) pairs skipped because their
++/// `mode` is not triangles.
++pub type WithSkipped = (Vec<Mesh>, Vec<(usize, usize)>);
++
++/// Like `read_bytes`, plus the primitives it skips.
++pub fn read_bytes_with_skipped(bytes: &[u8]) -> Result<WithSkipped, String> {
+     read_within(bytes, MAX_VERTICES)
+ }
+ 
+@@ -72,17 +81,18 @@ pub fn node_transform_bytes(bytes: &[u8]) -> Result<Option<String>, String> {
+ /// Primitives may share accessors, so a small file can name the same big
+ /// buffer many times: the vertices of the whole file are bounded, not only
+ /// those of each primitive.
+-fn read_within(bytes: &[u8], max_total: usize) -> Result<Vec<Mesh>, String> {
++fn read_within(bytes: &[u8], max_total: usize) -> Result<WithSkipped, String> {
+     let mut total = 0usize;
+     let doc = json_chunk(bytes)?;
+     if u32_at(bytes, 4) != Some(2) {
+         return Err("GLB roto: solo se admite la versión 2".into());
+     }
+     let bin = bin_chunk(bytes)?;
+-    let mut meshes = Vec::new();
+-    for mesh in doc["meshes"].as_array().into_iter().flatten() {
+-        for prim in mesh["primitives"].as_array().into_iter().flatten() {
++    let (mut meshes, mut skipped) = (Vec::new(), Vec::new());
++    for (mi, mesh) in doc["meshes"].as_array().into_iter().flatten().enumerate() {
++        for (pi, prim) in mesh["primitives"].as_array().into_iter().flatten().enumerate() {
+             if prim.get("mode").is_some_and(|m| m.as_u64() != Some(4)) {
++                skipped.push((mi, pi));
+                 continue;
+             }
+             let m = primitive(&doc, bin, prim)?;
+@@ -93,7 +103,7 @@ fn read_within(bytes: &[u8], max_total: usize) -> Result<Vec<Mesh>, String> {
+             meshes.push(m);
+         }
+     }
+-    Ok(meshes)
++    Ok((meshes, skipped))
+ }
+ 
+ fn u32_at(b: &[u8], at: usize) -> Option<u32> {
+diff --git a/crates/kiln-core/src/spec.rs b/crates/kiln-core/src/spec.rs
+index 21470ca..995a378 100644
+--- a/crates/kiln-core/src/spec.rs
++++ b/crates/kiln-core/src/spec.rs
+@@ -22,6 +22,9 @@ pub struct Spec {
+     /// The recipe of an asset generated in the game (instead of parts).
+     #[serde(default, skip_serializing_if = "Option::is_none")]
+     pub generator: Option<crate::generate::Generator>,
++    /// Mesh integrity rules for `verify`; their presence turns them on.
++    #[serde(default, skip_serializing_if = "Option::is_none")]
++    pub mesh: Option<MeshRules>,
+     /// Relative path of the file it was read from (set by Kiln).
+     #[serde(default, skip_deserializing)]
+     pub file: String,
+@@ -134,6 +137,32 @@ pub struct Source {
+     pub why: Option<String>,
+ }
+ 
++/// The topology a built mesh must have: `[mesh]` in the spec.
++#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(deny_unknown_fields)]
++pub struct MeshRules {
++    #[serde(default = "one")]
++    pub components: u32,
++    /// Total genus over all the components.
++    #[serde(default)]
++    pub genus: u32,
++    #[serde(default)]
++    pub normals: Normals,
++}
++
++fn one() -> u32 {
++    1
++}
++
++/// Which way the faces point: out of a solid or into a cavity.
++#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
++#[serde(rename_all = "lowercase")]
++pub enum Normals {
++    #[default]
++    Outward,
++    Inward,
++}
++
+ pub const KINDS: [&str; 5] = ["reuse", "variant", "search", "retouch", "asset"];
+ 
+ pub fn parse(text: &str) -> Result<Spec, String> {
+@@ -356,6 +385,24 @@ pub fn check(s: &Spec, rules: &crate::config::Rules, cat: &mut Catalog) {
+             "la ficha lleva receta y piezas: es una cosa o la otra".into(),
+         );
+     }
++    if let Some(m) = &s.mesh {
++        if m.components == 0 {
++            push(
++                Severity::Error,
++                id.clone(),
++                "mesh_components",
++                "[mesh] pide 0 componentes: una malla tiene al menos una".into(),
++            );
++        }
++        if s.generator.is_some() {
++            push(
++                Severity::Error,
++                id.clone(),
++                "mesh_on_generator",
++                "[mesh] en una receta: su geometría ya la comprueba la canónica".into(),
++            );
++        }
++    }
+     let mut parts_tris = 0u64;
+     for p in &s.parts {
+         let subject = format!("part:{}/{}", s.asset.id, p.id);
+@@ -1022,3 +1069,46 @@ mod anchor_tests {
+         assert!(!c.iter().any(|x| x.starts_with("anchor_")), "{c:?}");
+     }
+ }
++
++#[cfg(test)]
++mod mesh_tests {
++    use super::*;
++
++    const HEAD: &str = "[asset]\nid = \"a\"\nname = \"A\"\n[[parts]]\nid = \"p\"\nwhat = \"p\"\nmaterial = \"oak\"\n[parts.source]\nkind = \"search\"\nquery = \"q\"\n";
++    const RECIPE: &str = "[asset]\nid = \"a\"\nname = \"A\"\n[generator]\nmaterial = \"oak\"\n[[generator.ops]]\nop = \"sphere\"\n";
++
++    #[test]
++    fn an_existing_spec_has_no_mesh_rules() {
++        let s = parse(include_str!("../../../examples/specs/hoist.toml")).unwrap();
++        assert!(s.mesh.is_none());
++        let out = toml::to_string(&s).unwrap();
++        assert!(!out.contains("mesh"), "{out}");
++    }
++
++    #[test]
++    fn mesh_rules_are_checked() {
++        let read = parse(&format!("{HEAD}[mesh]\ngenus = 1\nnormals = \"inward\"\n")).unwrap();
++        let m = read.mesh.unwrap();
++        assert_eq!((m.components, m.genus, m.normals), (1, 1, Normals::Inward));
++        assert_eq!(parse(&format!("{HEAD}[mesh]\n")).unwrap().mesh.unwrap().normals, Normals::Outward);
++        // (text, readable, codes expected from spec::check)
++        let cases: [(String, bool, &[&str]); 5] = [
++            (format!("{HEAD}[mesh]\ngenius = 1\n"), false, &[]),
++            (format!("{HEAD}[mesh]\nnormals = \"up\"\n"), false, &[]),
++            (format!("{HEAD}[mesh]\ncomponents = 0\n"), true, &["mesh_components"]),
++            (format!("{RECIPE}[mesh]\n"), true, &["mesh_on_generator"]),
++            (format!("{HEAD}[mesh]\ncomponents = 2\ngenus = 3\n"), true, &[]),
++        ];
++        for (text, readable, want) in cases {
++            let Ok(s) = parse(&text) else {
++                assert!(!readable, "should read: {text}");
++                continue;
++            };
++            assert!(readable, "should not read: {text}");
++            let mut cat = Catalog::default();
++            check(&s, &Default::default(), &mut cat);
++            let got: Vec<&str> = cat.findings.iter().map(|f| f.code.as_str()).filter(|c| c.starts_with("mesh_")).collect();
++            assert_eq!(got, want, "{text}");
++        }
++    }
++}
+diff --git a/crates/kiln-core/src/validate.rs b/crates/kiln-core/src/validate.rs
+index 2637a45..fa98c4b 100644
+--- a/crates/kiln-core/src/validate.rs
++++ b/crates/kiln-core/src/validate.rs
+@@ -513,6 +513,41 @@ pub fn khronos(subject: &str, report: &Value) -> (Check, Vec<Finding>) {
+     (check, findings)
+ }
+ 
++/// `[mesh]` in the spec: the welded GLB against the topology it declares.
++/// `None` without `[mesh]`, so the report of an existing spec does not change.
++/// A GLB that cannot be read or welded fails the check too: what the spec
++/// asks for cannot be shown.
++pub fn mesh_check(subject: &str, spec: &crate::Spec, bytes: &[u8]) -> Option<(Check, Vec<Finding>)> {
++    let rules = spec.mesh.as_ref()?;
++    let verdict = match crate::integrity::weld(bytes) {
++        Err(e) => Err(("mesh_unreadable", None, format!("el GLB no se puede leer: {e}"))),
++        Ok(welded) => welded
++            .and_then(|w| crate::integrity::check(&w, rules))
++            .map_err(|r| (r.code, r.element, r.detail)),
++    };
++    let mut check = Check {
++        name: "mesh_integrity".into(),
++        status: "passed".into(),
++        errors: 0,
++        warnings: 0,
++        detail: None,
++    };
++    let Err((code, element, detail)) = verdict else {
++        return Some((check, Vec::new()));
++    };
++    check.status = "failed".into();
++    check.errors = 1;
++    check.detail = Some(code.into());
++    let at = element.map_or(String::new(), |e| format!(", elemento {e}"));
++    let finding = Finding {
++        severity: Severity::Error,
++        subject: subject.into(),
++        code: code.into(),
++        message: format!("{code}{at}: {detail}"),
++    };
++    Some((check, vec![finding]))
++}
++
+ impl Report {
+     /// `valid` is true when no check failed.
+     pub fn new(
+@@ -1140,6 +1175,71 @@ at = [0.0, 1.0, 0.0]
+         }
+     }
+ 
++    /// The octahedron of ±1 m placed by a translation, with its first `tris`
++    /// triangles in one primitive of `mode`.
++    fn octahedron(tris: usize, mode: u32) -> Vec<u8> {
++        const V: [[f32; 3]; 6] = [[1., 0., 0.], [-1., 0., 0.], [0., 1., 0.], [0., -1., 0.], [0., 0., 1.], [0., 0., -1.]];
++        const T: [u32; 24] = [0, 2, 4, 1, 4, 2, 0, 4, 3, 0, 5, 2, 1, 3, 4, 1, 2, 5, 0, 3, 5, 1, 5, 3];
++        let mut bin: Vec<u8> = V.iter().flatten().flat_map(|c| c.to_le_bytes()).collect();
++        let at = bin.len();
++        bin.extend(T[..tris * 3].iter().flat_map(|i| i.to_le_bytes()));
++        let doc = json!({
++            "asset": {"version": "2.0"}, "scene": 0, "scenes": [{"nodes": [0]}],
++            "nodes": [{"name": "root", "children": [1]}, {"name": "body", "mesh": 0, "translation": [0, 2, 0]}],
++            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}, "indices": 1, "mode": mode}]}],
++            "accessors": [
++                {"bufferView": 0, "componentType": 5126, "count": 6, "type": "VEC3"},
++                {"bufferView": 1, "componentType": 5125, "count": tris * 3, "type": "SCALAR"}
++            ],
++            "bufferViews": [
++                {"buffer": 0, "byteOffset": 0, "byteLength": at},
++                {"buffer": 0, "byteOffset": at, "byteLength": tris * 12}
++            ],
++            "buffers": [{"byteLength": bin.len()}]
++        });
++        glb(&doc, Some(&bin))
++    }
++
++    #[test]
++    fn mesh_integrity_runs_only_when_the_spec_asks_for_it() {
++        let existing = crate::spec::parse(include_str!("../../../examples/specs/hoist.toml")).unwrap();
++        let asks = crate::spec::parse(&format!("{SPEC}\n[mesh]\n")).unwrap();
++        let open = octahedron(7, 4);
++        // (case, spec, GLB, expected: None, or the failing code; "" when it passes)
++        let cases: [(&str, &crate::Spec, Vec<u8>, Option<&str>); 5] = [
++            ("existing spec, open GLB", &existing, open.clone(), None),
++            ("[mesh], open GLB", &asks, open, Some("mesh_open_edge")),
++            ("[mesh], octahedron", &asks, octahedron(8, 4), Some("")),
++            ("[mesh], lines", &asks, octahedron(8, 1), Some("mesh_layout")),
++            ("[mesh], unreadable", &asks, b"glTF not a glb".to_vec(), Some("mesh_unreadable")),
++        ];
++        for (name, spec, bytes, want) in cases {
++            let got = mesh_check("asset:crate", spec, &bytes);
++            let Some(code) = want else {
++                assert!(got.is_none(), "{name}: {got:?}");
++                continue;
++            };
++            let (check, findings) = got.unwrap_or_else(|| panic!("{name}: no check"));
++            assert_eq!(check.name, "mesh_integrity", "{name}");
++            let report = Report::new("crate", "h".into(), "s".into(), vec![Check::own(&[]), check.clone()], findings.clone());
++            if code.is_empty() {
++                assert_eq!((check.status.as_str(), check.errors), ("passed", 0), "{name}: {findings:?}");
++                assert!(findings.is_empty() && report.valid, "{name}: {findings:?}");
++                continue;
++            }
++            assert_eq!((check.status.as_str(), check.errors), ("failed", 1), "{name}");
++            assert!(!report.valid, "{name}: a failed integrity blocks publish");
++            let [f] = findings.as_slice() else { panic!("{name}: {findings:?}") };
++            assert_eq!((f.severity, f.code.as_str(), f.subject.as_str()), (Severity::Error, code, "asset:crate"), "{name}");
++            assert!(f.message.starts_with(code), "{name}: {}", f.message);
++            assert_eq!(check.detail.as_deref(), Some(code), "{name}");
++            if code == "mesh_open_edge" {
++                let want = "mesh_open_edge, elemento 4: borde abierto: triángulo soldado 4 (primitiva 0, triángulo 4, en [-1.0, 0.0, 0.0] m)";
++                assert_eq!(f.message, want);
++            }
++        }
++    }
++
+     #[test]
+     fn a_report_without_recipe_has_no_recipe_key() {
+         let r = Report::new("a", "h".into(), "s".into(), vec![], vec![]);
+diff --git a/skills/asset/SKILL.md b/skills/asset/SKILL.md
+index 334accd..35382c0 100644
+--- a/skills/asset/SKILL.md
++++ b/skills/asset/SKILL.md
+@@ -134,6 +134,19 @@ de las acciones: `animations = ["idle", "walk"]`. Esa pieza va una sola vez
+ queda el origen de su fuente (los pies, si el `.blend` los tiene en el origen).
+ El kit de un personaje vive fuera del proyecto de Godot.
+ 
++Si la malla debe ser cerrada y de una topología concreta (una cavidad, un
++casco), añade `[mesh]` y `kiln verify` la comprueba (borde abierto, aristas,
++orientación, piezas y género, sentido de las normales, autointersección);
++un fallo bloquea `publish`. Solo en fichas de piezas, nunca con `[generator]`.
++Sin la tabla no se comprueba nada de esto.
++
++```toml
++[mesh]
++components = 1        # por defecto 1
++genus = 0             # género total; por defecto 0
++normals = "outward"   # "outward" (sólido) | "inward" (cavidad)
++```
++
+ ## Un asset generado
+ 
+ La ficha lleva `[asset]` como siempre (con `budget_tris`), ninguna

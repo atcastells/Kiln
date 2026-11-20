@@ -1,0 +1,23 @@
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 4.81s
+     Running unittests src/lib.rs (target/debug/deps/kiln_core-1b0997d9069dbce5)
+
+running 15 tests
+test canonical::topology::tests::canonical_topology_i1_too_small ... ok
+test canonical::topology::tests::canonical_topology_i2_index_out_of_range ... ok
+test canonical::topology::tests::canonical_topology_i2_repeated_index ... ok
+test canonical::topology::tests::canonical_topology_i3_unused_vertex ... ok
+test canonical::topology::tests::canonical_topology_i3_duplicate_position ... ok
+test canonical::topology::tests::canonical_topology_i5_inconsistent_orientation ... ok
+test canonical::topology::tests::canonical_topology_i4_edge_shared_by_more_than_two ... ok
+test canonical::topology::tests::canonical_topology_i4_open_edge ... ok
+test canonical::topology::tests::canonical_topology_i1_out_of_range ... ok
+test canonical::topology::tests::canonical_topology_accepts_tetra_and_octa ... ok
+test canonical::topology::tests::pieces_and_euler_counts_a_torus ... ok
+test canonical::topology::tests::canonical_topology_i7_not_connected ... ok
+test canonical::topology::tests::canonical_topology_i6_pinched_vertex ... ok
+test canonical::topology::tests::canonical_topology_i7_not_a_sphere ... ok
+test canonical::topology::tests::canonical_topology_i6_i7_accepts_closed_spheres ... ok
+
+test result: ok. 15 passed; 0 failed; 0 ignored; 0 measured; 357 filtered out; finished in 0.00s
+

@@ -1,0 +1,9 @@
+tube axis x n=20200: Ok(()) in 38.087167ms
+tube axis y n=20200: Ok(()) in 41.893917ms
+tube axis z n=20200: Ok(()) in 45.462667ms
+tube axis x n=80400: Ok(()) in 167.523125ms
+tube axis y n=80400: Ok(()) in 211.6255ms
+tube axis z n=80400: Ok(()) in 224.804875ms
+tube axis x n=160800: Ok(()) in 399.157791ms
+tube axis y n=160800: Ok(()) in 462.184834ms
+tube axis z n=160800: Ok(()) in 512.1435ms

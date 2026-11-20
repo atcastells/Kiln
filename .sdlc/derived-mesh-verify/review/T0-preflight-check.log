@@ -1,0 +1,6 @@
+aviso  excavations/historic_cavity        blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  part:historic_cavity/cavity        material_missing     el material «exc_rock_ceiling» no está en la paleta
+aviso  part:historic_cavity/cavity        material_missing     el material «exc_rock_floor» no está en la paleta
+aviso  part:historic_cavity/cavity        material_missing     el material «exc_rock_wall» no está en la paleta
+info   excavations/historic_cavity        not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+1 piezas, 0 errores, 4 avisos

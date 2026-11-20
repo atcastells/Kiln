@@ -1,0 +1,25 @@
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.66s
+     Running tests/canonical_cases.rs (target/debug/deps/canonical_cases-907311b816a91866)
+
+running 17 tests
+test canonical_cases_empty ... ok
+test canonical_cases_positive_tetrahedron ... ok
+test canonical_cases_second_body_inside ... ok
+test canonical_cases_pinched_vertex ... ok
+test canonical_cases_tetrahedron_off_centre ... ok
+test canonical_cases_torus ... ok
+test canonical_cases_real_index_out_of_range ... ok
+test canonical_cases_real_out_of_range ... ok
+test canonical_cases_real_unused_vertex ... ok
+test canonical_cases_real_duplicate_position ... ok
+test canonical_cases_double_wrap ... ok
+test canonical_cases_real_triangle_removed ... ok
+test canonical_cases_real_triangle_repeated ... ok
+test canonical_cases_real_triangle_flipped ... ok
+test canonical_cases_positive_real_fixture ... ok
+test canonical_cases_real_vertex_through_centre ... ok
+test canonical_cases_real_overhang ... ok
+
+test result: ok. 17 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.05s
+

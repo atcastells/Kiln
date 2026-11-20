@@ -1,0 +1,58 @@
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+error[E0425]: cannot find function `pieces_and_euler` in this scope
+   --> crates/kiln-core/src/canonical/topology.rs:321:20
+    |
+321 |         assert_eq!(pieces_and_euler(&torus(4, 4)), (1, 0, None));
+    |                    ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `pieces_and_euler` in this scope
+   --> crates/kiln-core/src/canonical/topology.rs:322:20
+    |
+322 |         assert_eq!(pieces_and_euler(&octa()), (1, 2, None));
+    |                    ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `pieces_and_euler` in this scope
+   --> crates/kiln-core/src/canonical/topology.rs:326:20
+    |
+326 |         assert_eq!(pieces_and_euler(&g), (2, 4, Some(8)));
+    |                    ^^^^^^^^^^^^^^^^ not found in this scope
+
+error[E0609]: no field `mesh` on type `spec::Spec`
+    --> crates/kiln-core/src/spec.rs:1036:19
+     |
+1036 |         assert!(s.mesh.is_none());
+     |                   ^^^^ unknown field
+     |
+     = note: available fields are: `asset`, `parts`, `variants`, `anchors`, `generator`, `file`
+
+error[E0609]: no field `mesh` on type `spec::Spec`
+    --> crates/kiln-core/src/spec.rs:1044:22
+     |
+1044 |         let m = read.mesh.unwrap();
+     |                      ^^^^ unknown field
+     |
+     = note: available fields are: `asset`, `parts`, `variants`, `anchors`, `generator`, `file`
+
+error[E0433]: failed to resolve: use of undeclared type `Normals`
+    --> crates/kiln-core/src/spec.rs:1045:63
+     |
+1045 |         assert_eq!((m.components, m.genus, m.normals), (1, 1, Normals::Inward));
+     |                                                               ^^^^^^^ use of undeclared type `Normals`
+
+error[E0609]: no field `mesh` on type `spec::Spec`
+    --> crates/kiln-core/src/spec.rs:1046:63
+     |
+1046 |         assert_eq!(parse(&format!("{HEAD}[mesh]\n")).unwrap().mesh.unwrap().normals, Normals::Outward);
+     |                                                               ^^^^ unknown field
+     |
+     = note: available fields are: `asset`, `parts`, `variants`, `anchors`, `generator`, `file`
+
+error[E0433]: failed to resolve: use of undeclared type `Normals`
+    --> crates/kiln-core/src/spec.rs:1046:86
+     |
+1046 |         assert_eq!(parse(&format!("{HEAD}[mesh]\n")).unwrap().mesh.unwrap().normals, Normals::Outward);
+     |                                                                                      ^^^^^^^ use of undeclared type `Normals`
+
+Some errors have detailed explanations: E0425, E0433, E0609.
+For more information about an error, try `rustc --explain E0425`.
+error: could not compile `kiln-core` (lib test) due to 8 previous errors

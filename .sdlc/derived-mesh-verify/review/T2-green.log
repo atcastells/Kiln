@@ -1,0 +1,28 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/deps/kiln_core-1b0997d9069dbce5)
+
+running 21 tests
+test spec::source_tests::a_variant_id_that_is_not_a_plain_name_is_refused ... ok
+test spec::source_tests::a_search_becomes_a_reuse ... ok
+test spec::anchor_tests::reads_anchors_with_defaults ... ok
+test spec::anchor_tests::a_clean_spec_has_neither ... ok
+test spec::source_tests::clears_a_parts_materials ... ok
+test spec::tests::reads_declared_animations ... ok
+test spec::anchor_tests::flags_a_repeated_anchor_id ... ok
+test spec::anchor_tests::flags_a_bad_anchor_id ... ok
+test spec::tests::no_animations_is_empty_and_not_serialized ... ok
+test spec::tests::rigged_asset_places_each_part_once ... ok
+test spec::anchor_tests::a_spec_without_anchors_serializes_as_before ... ok
+test spec::nesting_tests::an_asset_part_is_a_closed_box ... ok
+test spec::nesting_tests::flags_missing_specs_variants_and_loops ... ok
+test spec::nesting_tests::assets_go_from_the_bottom_up ... ok
+test spec::tests::reads_zone_materials_and_variants ... ok
+test spec::tests::checks_zones_and_variants ... ok
+test spec::mesh_tests::an_existing_spec_has_no_mesh_rules ... ok
+test spec::source_tests::sets_and_removes_variant_materials ... ok
+test spec::tests::reads_the_hoist_example ... ok
+test spec::source_tests::sets_and_removes_zone_materials ... ok
+test spec::mesh_tests::mesh_rules_are_checked ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 351 filtered out; finished in 0.00s
+

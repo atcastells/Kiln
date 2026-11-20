@@ -1,0 +1,12 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running tests/integrity_fixture.rs (target/debug/deps/integrity_fixture-67cd2e8cd470b188)
+
+running 1 test
+welded: 322 triangles, 161 vertices, 1 pieces, V - E + F = 0
+check genus 1 inward (full sweep included): Ok(()) in 15.690583ms
+check genus 0: mesh_topology None: 1 piezas, V − E + F = 0; la ficha declara 1 componentes y género 0, que dan 2
+check outward: mesh_normals None: volumen con signo -2766337.4668674446 m³; con normals = "outward" debe ser positivo
+test the_published_cavity_passes_its_declared_topology ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.02s
+

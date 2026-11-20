@@ -1,0 +1,23 @@
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.86s
+     Running unittests src/lib.rs (target/debug/deps/kiln_core-1b0997d9069dbce5)
+
+running 3 tests
+test integrity::tests::self_intersection_sweep_misses_no_pair ... ok
+test integrity::tests::self_intersection_sweep_prunes_a_fine_torus ... ok
+test integrity::tests::self_intersection_sweep_avoids_the_axis_of_long_triangles ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 376 filtered out; finished in 2.75s
+
+     Running tests/canonical_cases.rs (target/debug/deps/canonical_cases-907311b816a91866)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 17 filtered out; finished in 0.00s
+
+     Running tests/integrity_fixture.rs (target/debug/deps/integrity_fixture-67cd2e8cd470b188)
+
+running 0 tests
+
+test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 1 filtered out; finished in 0.00s
+

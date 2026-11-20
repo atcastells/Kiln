@@ -19,6 +19,15 @@ pub fn read(path: &Path) -> Result<Vec<Mesh>, String> {
 }
 
 pub fn read_bytes(bytes: &[u8]) -> Result<Vec<Mesh>, String> {
+    read_within(bytes, MAX_VERTICES).map(|(meshes, _)| meshes)
+}
+
+/// The meshes read, and the (mesh, primitive) pairs skipped because their
+/// `mode` is not triangles.
+pub type WithSkipped = (Vec<Mesh>, Vec<(usize, usize)>);
+
+/// Like `read_bytes`, plus the primitives it skips.
+pub fn read_bytes_with_skipped(bytes: &[u8]) -> Result<WithSkipped, String> {
     read_within(bytes, MAX_VERTICES)
 }
 
@@ -72,17 +81,18 @@ pub fn node_transform_bytes(bytes: &[u8]) -> Result<Option<String>, String> {
 /// Primitives may share accessors, so a small file can name the same big
 /// buffer many times: the vertices of the whole file are bounded, not only
 /// those of each primitive.
-fn read_within(bytes: &[u8], max_total: usize) -> Result<Vec<Mesh>, String> {
+fn read_within(bytes: &[u8], max_total: usize) -> Result<WithSkipped, String> {
     let mut total = 0usize;
     let doc = json_chunk(bytes)?;
     if u32_at(bytes, 4) != Some(2) {
         return Err("GLB roto: solo se admite la versión 2".into());
     }
     let bin = bin_chunk(bytes)?;
-    let mut meshes = Vec::new();
-    for mesh in doc["meshes"].as_array().into_iter().flatten() {
-        for prim in mesh["primitives"].as_array().into_iter().flatten() {
+    let (mut meshes, mut skipped) = (Vec::new(), Vec::new());
+    for (mi, mesh) in doc["meshes"].as_array().into_iter().flatten().enumerate() {
+        for (pi, prim) in mesh["primitives"].as_array().into_iter().flatten().enumerate() {
             if prim.get("mode").is_some_and(|m| m.as_u64() != Some(4)) {
+                skipped.push((mi, pi));
                 continue;
             }
             let m = primitive(&doc, bin, prim)?;
@@ -93,7 +103,7 @@ fn read_within(bytes: &[u8], max_total: usize) -> Result<Vec<Mesh>, String> {
             meshes.push(m);
         }
     }
-    Ok(meshes)
+    Ok((meshes, skipped))
 }
 
 fn u32_at(b: &[u8], at: usize) -> Option<u32> {
