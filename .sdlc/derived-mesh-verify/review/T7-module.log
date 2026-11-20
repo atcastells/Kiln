@@ -1,0 +1,12 @@
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.02s
+     Running unittests src/lib.rs (target/debug/deps/kiln_core-1b0997d9069dbce5)
+
+running 5 tests
+test integrity::intersect::tests::intersect_pairs_with_known_answers ... ok
+test integrity::tests::welding_reports_what_it_cannot_weld_honestly ... ok
+test integrity::tests::mesh_rules_find_one_code_per_mutation ... ok
+test integrity::tests::self_intersection_sweep_misses_no_pair ... ok
+test integrity::tests::self_intersection_sweep_prunes_a_fine_torus ... ok
+
+test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 372 filtered out; finished in 0.27s
+

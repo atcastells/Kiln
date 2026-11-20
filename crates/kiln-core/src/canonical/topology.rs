@@ -81,6 +81,24 @@ pub fn check_i1_i5(g: &Geometry) -> Result<(), Rejection> {
 /// I6 and I7, assuming I1–I5 hold (closed, consistently oriented, every
 /// vertex used).
 pub fn check_i6_i7(g: &Geometry) -> Result<(), Rejection> {
+    check_i6(g)?;
+    let (_, chi, outside) = pieces_and_euler(g);
+    if let Some(t) = outside {
+        let detail = format!("triangle {t} {:?} is not connected to triangle 0", g.triangles[t]);
+        return Err(Rejection::new("I7_not_connected", Some(t), detail));
+    }
+    if chi != 2 {
+        let edges = g.vertices.len() as i64 + g.triangles.len() as i64 - chi;
+        let detail = format!("V - E + F = {} - {edges} + {} = {chi}, need 2", g.vertices.len(), g.triangles.len());
+        return Err(Rejection::new("I7_not_a_sphere", None, detail));
+    }
+    Ok(())
+}
+
+/// I6, assuming I1–I5 hold: every vertex fan is a single cycle.
+/// Precondition: call it only after `check_i1_i5` passed; on an open mesh or
+/// one with an unused vertex it panics.
+pub fn check_i6(g: &Geometry) -> Result<(), Rejection> {
     let (vs, ts) = (&g.vertices, &g.triangles);
     // Fan of each vertex: the link edge b->c of every triangle around it.
     let mut fans: Vec<Vec<(u32, u32)>> = vec![Vec::new(); vs.len()];
@@ -104,6 +122,13 @@ pub fn check_i6_i7(g: &Geometry) -> Result<(), Rejection> {
             return Err(Rejection::new("I6_pinched_vertex", Some(v), detail));
         }
     }
+    Ok(())
+}
+
+/// Connected pieces of the triangles (through shared vertices), V - E + F,
+/// and the first triangle outside the piece of triangle 0.
+pub fn pieces_and_euler(g: &Geometry) -> (usize, i64, Option<usize>) {
+    let (vs, ts) = (&g.vertices, &g.triangles);
     let mut parent: Vec<usize> = (0..vs.len()).collect();
     fn root(parent: &mut [usize], mut x: usize) -> usize {
         while parent[x] != x {
@@ -118,18 +143,12 @@ pub fn check_i6_i7(g: &Geometry) -> Result<(), Rejection> {
             parent[rx] = ry;
         }
     }
-    let piece = root(&mut parent, ts[0][0] as usize);
-    if let Some(t) = (0..ts.len()).find(|&t| root(&mut parent, ts[t][0] as usize) != piece) {
-        let detail = format!("triangle {t} {:?} is not connected to triangle 0", ts[t]);
-        return Err(Rejection::new("I7_not_connected", Some(t), detail));
-    }
+    let roots: Vec<usize> = ts.iter().map(|t| root(&mut parent, t[0] as usize)).collect();
+    let outside = roots.first().and_then(|&piece| roots.iter().position(|&r| r != piece));
+    let pieces = roots.iter().collect::<std::collections::HashSet<_>>().len();
     let edges = ts.iter().flat_map(edges).map(undirected).collect::<std::collections::HashSet<_>>().len();
     let chi = vs.len() as i64 - edges as i64 + ts.len() as i64;
-    if chi != 2 {
-        let detail = format!("V - E + F = {} - {edges} + {} = {chi}, need 2", vs.len(), ts.len());
-        return Err(Rejection::new("I7_not_a_sphere", None, detail));
-    }
-    Ok(())
+    (pieces, chi, outside)
 }
 
 pub fn check_i1_i7(g: &Geometry) -> Result<(), Rejection> {
@@ -314,5 +333,15 @@ mod tests {
     fn canonical_topology_i7_not_a_sphere() {
         let detail = rejects_i1_i7(&torus(3, 4), "I7_not_a_sphere", None);
         assert!(detail.contains("= 0"), "{detail}");
+    }
+
+    #[test]
+    fn pieces_and_euler_counts_a_torus() {
+        assert_eq!(pieces_and_euler(&torus(4, 4)), (1, 0, None));
+        assert_eq!(pieces_and_euler(&octa()), (1, 2, None));
+        let mut g = octa();
+        g.vertices.extend(octa().vertices.iter().map(|p| p.map(|c| c / 10)));
+        g.triangles.extend(octa().triangles.iter().map(|t| t.map(|i| i + 6)));
+        assert_eq!(pieces_and_euler(&g), (2, 4, Some(8)));
     }
 }

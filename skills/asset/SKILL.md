@@ -134,6 +134,19 @@ de las acciones: `animations = ["idle", "walk"]`. Esa pieza va una sola vez
 queda el origen de su fuente (los pies, si el `.blend` los tiene en el origen).
 El kit de un personaje vive fuera del proyecto de Godot.
 
+Si la malla debe ser cerrada y de una topología concreta (una cavidad, un
+casco), añade `[mesh]` y `kiln verify` la comprueba (borde abierto, aristas,
+orientación, piezas y género, sentido de las normales, autointersección);
+un fallo bloquea `publish`. Solo en fichas de piezas, nunca con `[generator]`.
+Sin la tabla no se comprueba nada de esto.
+
+```toml
+[mesh]
+components = 1        # por defecto 1
+genus = 0             # género total; por defecto 0
+normals = "outward"   # "outward" (sólido) | "inward" (cavidad)
+```
+
 ## Un asset generado
 
 La ficha lleva `[asset]` como siempre (con `budget_tris`), ninguna

@@ -1,0 +1,56 @@
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.09s
+     Running unittests src/lib.rs (target/debug/deps/kiln_core-1b0997d9069dbce5)
+
+running 45 tests
+test canonical::tests::canonical_bytes_round_trip ... ok
+test canonical::radial::tests::radial_accepts_centred_tetrahedron_and_octahedron ... ok
+test canonical::radial::tests::radial_perturbed_direction_on_a_boundary_hits_one_face ... ok
+test canonical::tests::canonical_bytes_have_exact_size_and_header ... ok
+test canonical::build::tests::canonical_quantize_halves_away_from_zero ... ok
+test canonical::tests::canonical_bytes_reject_other_header ... ok
+test canonical::radial::tests::radial_rejects_vertex_pushed_through_centre ... ok
+test canonical::tests::canonical_bytes_reject_wrong_size ... ok
+test canonical::build::tests::canonical_build_rejects_unquantizable_position ... ok
+test canonical::build::tests::canonical_sphere_8_gives_34_and_64 ... ok
+test canonical::build::tests::canonical_count_rejects_wrong_segments ... ok
+test canonical::radial::tests::radial_rejects_tetrahedron_not_containing_centre ... ok
+test canonical::build::tests::canonical_build_rejects_bad_indices ... ok
+test canonical::tests::canonical_hash_is_sha256_of_bytes ... ok
+test canonical::topology::tests::canonical_topology_i1_too_small ... ok
+test canonical::topology::tests::canonical_topology_i2_index_out_of_range ... ok
+test canonical::radial::tests::radial_rejects_double_wrap_with_i9 ... ok
+test canonical::topology::tests::canonical_topology_i2_repeated_index ... ok
+test canonical::topology::tests::canonical_topology_i3_duplicate_position ... ok
+test canonical::topology::tests::canonical_topology_i3_unused_vertex ... ok
+test canonical::topology::tests::canonical_topology_i1_out_of_range ... ok
+test canonical::topology::tests::canonical_topology_i4_edge_shared_by_more_than_two ... ok
+test canonical::topology::tests::canonical_topology_i4_open_edge ... ok
+test canonical::topology::tests::canonical_topology_accepts_tetra_and_octa ... ok
+test canonical::topology::tests::canonical_topology_i5_inconsistent_orientation ... ok
+test canonical::topology::tests::pieces_and_euler_counts_a_torus ... ok
+test canonical::topology::tests::canonical_topology_i6_pinched_vertex ... ok
+test canonical::topology::tests::canonical_topology_i7_not_connected ... ok
+test canonical::topology::tests::canonical_topology_i7_not_a_sphere ... ok
+test canonical::topology::tests::canonical_topology_i6_i7_accepts_closed_spheres ... ok
+test integrity::intersect::tests::intersect_pairs_with_known_answers ... ok
+test mesh::tests::skips_other_modes ... ok
+test mesh::tests::honours_byte_stride ... ok
+test mesh::tests::reads_every_form_of_tetrahedron ... ok
+test mesh::tests::the_whole_file_is_bounded_not_each_primitive ... ok
+test mesh::tests::damaged_files_are_errors ... ok
+test mesh::tests::an_identity_or_absent_transform_is_not_detected ... ok
+test mesh::tests::detects_a_transform_on_the_mesh_node ... ok
+test config::tests::canonical_geometry_is_off_without_the_key ... ok
+test config::tests::rejects_an_unknown_canonical_class ... ok
+test config::tests::reads_the_canonical_class ... ok
+test canonical::build::tests::canonical_sphere_64_gives_2050_and_4096 ... ok
+test generate::hash::tests::the_canonical_form_is_pinned ... ok
+test integrity::tests::welding_reports_what_it_cannot_weld_honestly ... ok
+test generate::check::tests::canonical_refuses_segments_that_can_be_odd ... ok
+
+test result: ok. 45 passed; 0 failed; 0 ignored; 0 measured; 329 filtered out; finished in 0.01s
+
+    Checking kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+    Checking kiln-cli v0.1.0 (/Users/acastells/Kiln/crates/kiln-cli)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 12.09s

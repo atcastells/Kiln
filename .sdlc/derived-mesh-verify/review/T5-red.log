@@ -1,0 +1,31 @@
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+warning: unused import: `topology`
+ --> crates/kiln-core/src/integrity.rs:5:24
+  |
+5 | use crate::canonical::{topology, Geometry, Rejection};
+  |                        ^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: `kiln-core` (lib test) generated 1 warning (run `cargo fix --lib -p kiln-core --tests` to apply 1 suggestion)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.91s
+     Running unittests src/lib.rs (target/debug/deps/kiln_core-1b0997d9069dbce5)
+
+running 1 test
+test integrity::tests::mesh_rules_find_one_code_per_mutation ... FAILED
+
+failures:
+
+---- integrity::tests::mesh_rules_find_one_code_per_mutation stdout ----
+
+thread 'integrity::tests::mesh_rules_find_one_code_per_mutation' (59822702) panicked at crates/kiln-core/src/integrity.rs:328:46:
+too_small: passed, want mesh_too_small
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    integrity::tests::mesh_rules_find_one_code_per_mutation
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 374 filtered out; finished in 0.00s
+
+error: test failed, to rerun pass `-p kiln-core --lib`

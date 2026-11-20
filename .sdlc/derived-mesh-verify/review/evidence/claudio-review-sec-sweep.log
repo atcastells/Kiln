@@ -1,0 +1,7 @@
+k=1000 glb_bytes=72516 tris=4000 verts=2002 result=Err("mesh_normals volumen con signo -31415.714376 m³; con normals = \"outward\" debe ser positivo") time=1.236167ms
+k=1000 glb_bytes=72516 tris=4000 verts=2002 result=Ok(()) time=504.433292ms
+k=2000 glb_bytes=144516 tris=8000 verts=4002 result=Err("mesh_normals volumen con signo -31415.87502 m³; con normals = \"outward\" debe ser positivo") time=2.491041ms
+k=2000 glb_bytes=144516 tris=8000 verts=4002 result=Ok(()) time=2.023149625s
+k=4000 glb_bytes=288516 tris=16000 verts=8002 result=Err("mesh_normals volumen con signo -31415.913088 m³; con normals = \"outward\" debe ser positivo") time=5.085708ms
+k=4000 glb_bytes=288516 tris=16000 verts=8002 result=Ok(()) time=8.13011825s
+k=8000 glb_bytes=576520 tris=32000 verts=16002 result=Ok(()) time=33.505573708s

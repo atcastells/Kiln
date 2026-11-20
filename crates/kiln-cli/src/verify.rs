@@ -87,6 +87,10 @@ pub fn verify_asset(
     }
     let mut checks = vec![Check::own(&findings)];
     if readable {
+        if let Some((check, found)) = validate::mesh_check(&subject, spec, &bytes) {
+            checks.push(check);
+            findings.extend(found);
+        }
         let (check, found) = khronos(&cfg, &dir, &file, &subject, &mut say)?;
         checks.push(check);
         findings.extend(found);

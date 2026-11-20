@@ -513,6 +513,41 @@ pub fn khronos(subject: &str, report: &Value) -> (Check, Vec<Finding>) {
     (check, findings)
 }
 
+/// `[mesh]` in the spec: the welded GLB against the topology it declares.
+/// `None` without `[mesh]`, so the report of an existing spec does not change.
+/// A GLB that cannot be read or welded fails the check too: what the spec
+/// asks for cannot be shown.
+pub fn mesh_check(subject: &str, spec: &crate::Spec, bytes: &[u8]) -> Option<(Check, Vec<Finding>)> {
+    let rules = spec.mesh.as_ref()?;
+    let verdict = match crate::integrity::weld(bytes) {
+        Err(e) => Err(("mesh_unreadable", None, format!("el GLB no se puede leer: {e}"))),
+        Ok(welded) => welded
+            .and_then(|w| crate::integrity::check(&w, rules))
+            .map_err(|r| (r.code, r.element, r.detail)),
+    };
+    let mut check = Check {
+        name: "mesh_integrity".into(),
+        status: "passed".into(),
+        errors: 0,
+        warnings: 0,
+        detail: None,
+    };
+    let Err((code, element, detail)) = verdict else {
+        return Some((check, Vec::new()));
+    };
+    check.status = "failed".into();
+    check.errors = 1;
+    check.detail = Some(code.into());
+    let at = element.map_or(String::new(), |e| format!(", elemento {e}"));
+    let finding = Finding {
+        severity: Severity::Error,
+        subject: subject.into(),
+        code: code.into(),
+        message: format!("{code}{at}: {detail}"),
+    };
+    Some((check, vec![finding]))
+}
+
 impl Report {
     /// `valid` is true when no check failed.
     pub fn new(
@@ -1137,6 +1172,71 @@ at = [0.0, 1.0, 0.0]
             "findings",
         ] {
             assert!(v.get(k).is_some(), "{k}");
+        }
+    }
+
+    /// The octahedron of ±1 m placed by a translation, with its first `tris`
+    /// triangles in one primitive of `mode`.
+    fn octahedron(tris: usize, mode: u32) -> Vec<u8> {
+        const V: [[f32; 3]; 6] = [[1., 0., 0.], [-1., 0., 0.], [0., 1., 0.], [0., -1., 0.], [0., 0., 1.], [0., 0., -1.]];
+        const T: [u32; 24] = [0, 2, 4, 1, 4, 2, 0, 4, 3, 0, 5, 2, 1, 3, 4, 1, 2, 5, 0, 3, 5, 1, 5, 3];
+        let mut bin: Vec<u8> = V.iter().flatten().flat_map(|c| c.to_le_bytes()).collect();
+        let at = bin.len();
+        bin.extend(T[..tris * 3].iter().flat_map(|i| i.to_le_bytes()));
+        let doc = json!({
+            "asset": {"version": "2.0"}, "scene": 0, "scenes": [{"nodes": [0]}],
+            "nodes": [{"name": "root", "children": [1]}, {"name": "body", "mesh": 0, "translation": [0, 2, 0]}],
+            "meshes": [{"primitives": [{"attributes": {"POSITION": 0}, "indices": 1, "mode": mode}]}],
+            "accessors": [
+                {"bufferView": 0, "componentType": 5126, "count": 6, "type": "VEC3"},
+                {"bufferView": 1, "componentType": 5125, "count": tris * 3, "type": "SCALAR"}
+            ],
+            "bufferViews": [
+                {"buffer": 0, "byteOffset": 0, "byteLength": at},
+                {"buffer": 0, "byteOffset": at, "byteLength": tris * 12}
+            ],
+            "buffers": [{"byteLength": bin.len()}]
+        });
+        glb(&doc, Some(&bin))
+    }
+
+    #[test]
+    fn mesh_integrity_runs_only_when_the_spec_asks_for_it() {
+        let existing = crate::spec::parse(include_str!("../../../examples/specs/hoist.toml")).unwrap();
+        let asks = crate::spec::parse(&format!("{SPEC}\n[mesh]\n")).unwrap();
+        let open = octahedron(7, 4);
+        // (case, spec, GLB, expected: None, or the failing code; "" when it passes)
+        let cases: [(&str, &crate::Spec, Vec<u8>, Option<&str>); 5] = [
+            ("existing spec, open GLB", &existing, open.clone(), None),
+            ("[mesh], open GLB", &asks, open, Some("mesh_open_edge")),
+            ("[mesh], octahedron", &asks, octahedron(8, 4), Some("")),
+            ("[mesh], lines", &asks, octahedron(8, 1), Some("mesh_layout")),
+            ("[mesh], unreadable", &asks, b"glTF not a glb".to_vec(), Some("mesh_unreadable")),
+        ];
+        for (name, spec, bytes, want) in cases {
+            let got = mesh_check("asset:crate", spec, &bytes);
+            let Some(code) = want else {
+                assert!(got.is_none(), "{name}: {got:?}");
+                continue;
+            };
+            let (check, findings) = got.unwrap_or_else(|| panic!("{name}: no check"));
+            assert_eq!(check.name, "mesh_integrity", "{name}");
+            let report = Report::new("crate", "h".into(), "s".into(), vec![Check::own(&[]), check.clone()], findings.clone());
+            if code.is_empty() {
+                assert_eq!((check.status.as_str(), check.errors), ("passed", 0), "{name}: {findings:?}");
+                assert!(findings.is_empty() && report.valid, "{name}: {findings:?}");
+                continue;
+            }
+            assert_eq!((check.status.as_str(), check.errors), ("failed", 1), "{name}");
+            assert!(!report.valid, "{name}: a failed integrity blocks publish");
+            let [f] = findings.as_slice() else { panic!("{name}: {findings:?}") };
+            assert_eq!((f.severity, f.code.as_str(), f.subject.as_str()), (Severity::Error, code, "asset:crate"), "{name}");
+            assert!(f.message.starts_with(code), "{name}: {}", f.message);
+            assert_eq!(check.detail.as_deref(), Some(code), "{name}");
+            if code == "mesh_open_edge" {
+                let want = "mesh_open_edge, elemento 4: borde abierto: triángulo soldado 4 (primitiva 0, triángulo 4, en [-1.0, 0.0, 0.0] m)";
+                assert_eq!(f.message, want);
+            }
         }
     }
 

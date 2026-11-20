@@ -22,6 +22,9 @@ pub struct Spec {
     /// The recipe of an asset generated in the game (instead of parts).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub generator: Option<crate::generate::Generator>,
+    /// Mesh integrity rules for `verify`; their presence turns them on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mesh: Option<MeshRules>,
     /// Relative path of the file it was read from (set by Kiln).
     #[serde(default, skip_deserializing)]
     pub file: String,
@@ -132,6 +135,32 @@ pub struct Source {
     pub query: Option<String>,
     #[serde(default)]
     pub why: Option<String>,
+}
+
+/// The topology a built mesh must have: `[mesh]` in the spec.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct MeshRules {
+    #[serde(default = "one")]
+    pub components: u32,
+    /// Total genus over all the components.
+    #[serde(default)]
+    pub genus: u32,
+    #[serde(default)]
+    pub normals: Normals,
+}
+
+fn one() -> u32 {
+    1
+}
+
+/// Which way the faces point: out of a solid or into a cavity.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Normals {
+    #[default]
+    Outward,
+    Inward,
 }
 
 pub const KINDS: [&str; 5] = ["reuse", "variant", "search", "retouch", "asset"];
@@ -355,6 +384,24 @@ pub fn check(s: &Spec, rules: &crate::config::Rules, cat: &mut Catalog) {
             "generator_and_parts",
             "la ficha lleva receta y piezas: es una cosa o la otra".into(),
         );
+    }
+    if let Some(m) = &s.mesh {
+        if m.components == 0 {
+            push(
+                Severity::Error,
+                id.clone(),
+                "mesh_components",
+                "[mesh] pide 0 componentes: una malla tiene al menos una".into(),
+            );
+        }
+        if s.generator.is_some() {
+            push(
+                Severity::Error,
+                id.clone(),
+                "mesh_on_generator",
+                "[mesh] en una receta: su geometría ya la comprueba la canónica".into(),
+            );
+        }
     }
     let mut parts_tris = 0u64;
     for p in &s.parts {
@@ -1020,5 +1067,48 @@ mod anchor_tests {
     fn a_clean_spec_has_neither() {
         let c = codes("[[anchors]]\nid = \"top\"\nclass = \"s\"\n[[anchors]]\nid = \"base\"\nclass = \"s\"\n");
         assert!(!c.iter().any(|x| x.starts_with("anchor_")), "{c:?}");
+    }
+}
+
+#[cfg(test)]
+mod mesh_tests {
+    use super::*;
+
+    const HEAD: &str = "[asset]\nid = \"a\"\nname = \"A\"\n[[parts]]\nid = \"p\"\nwhat = \"p\"\nmaterial = \"oak\"\n[parts.source]\nkind = \"search\"\nquery = \"q\"\n";
+    const RECIPE: &str = "[asset]\nid = \"a\"\nname = \"A\"\n[generator]\nmaterial = \"oak\"\n[[generator.ops]]\nop = \"sphere\"\n";
+
+    #[test]
+    fn an_existing_spec_has_no_mesh_rules() {
+        let s = parse(include_str!("../../../examples/specs/hoist.toml")).unwrap();
+        assert!(s.mesh.is_none());
+        let out = toml::to_string(&s).unwrap();
+        assert!(!out.contains("mesh"), "{out}");
+    }
+
+    #[test]
+    fn mesh_rules_are_checked() {
+        let read = parse(&format!("{HEAD}[mesh]\ngenus = 1\nnormals = \"inward\"\n")).unwrap();
+        let m = read.mesh.unwrap();
+        assert_eq!((m.components, m.genus, m.normals), (1, 1, Normals::Inward));
+        assert_eq!(parse(&format!("{HEAD}[mesh]\n")).unwrap().mesh.unwrap().normals, Normals::Outward);
+        // (text, readable, codes expected from spec::check)
+        let cases: [(String, bool, &[&str]); 5] = [
+            (format!("{HEAD}[mesh]\ngenius = 1\n"), false, &[]),
+            (format!("{HEAD}[mesh]\nnormals = \"up\"\n"), false, &[]),
+            (format!("{HEAD}[mesh]\ncomponents = 0\n"), true, &["mesh_components"]),
+            (format!("{RECIPE}[mesh]\n"), true, &["mesh_on_generator"]),
+            (format!("{HEAD}[mesh]\ncomponents = 2\ngenus = 3\n"), true, &[]),
+        ];
+        for (text, readable, want) in cases {
+            let Ok(s) = parse(&text) else {
+                assert!(!readable, "should read: {text}");
+                continue;
+            };
+            assert!(readable, "should not read: {text}");
+            let mut cat = Catalog::default();
+            check(&s, &Default::default(), &mut cat);
+            let got: Vec<&str> = cat.findings.iter().map(|f| f.code.as_str()).filter(|c| c.starts_with("mesh_")).collect();
+            assert_eq!(got, want, "{text}");
+        }
     }
 }

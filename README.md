@@ -565,7 +565,7 @@ estructural sale de los nodos, su jerarquía, sus transformaciones (a 0,1 mm),
 los triángulos y los materiales: dos montajes con el mismo hash estructural
 son equivalentes aunque los ficheros no fueran idénticos byte a byte.
 
-**Verificar.** `kiln verify` hace tres comprobaciones y escribe
+**Verificar.** `kiln verify` hace tres comprobaciones (cuatro con `[mesh]`) y escribe
 `validation.json`:
 
 | Comprobación | Qué mira |
@@ -573,6 +573,33 @@ son equivalentes aunque los ficheros no fueran idénticos byte a byte.
 | `kiln` | Que sea un GLB válido y sin referencias rotas; nombres de nodo vacíos o repetidos; escala negativa o desigual en la raíz; triángulos sobre el presupuesto; medidas distintas de las que dio Blender; materiales sin clave de la paleta; piezas pendientes; anclajes que faltan o están fuera de sitio |
 | `gltf_validator` | El informe del validador de Khronos. Si no está instalado consta como ausente y no cuenta como fallo |
 | `godot_import` | Godot importa el GLB en un proyecto de prueba de la caché, lo instancia y devuelve sus nodos |
+| `mesh_integrity` | Solo si la ficha lleva `[mesh]` (sin ella, ni sale). Integridad de la malla soldada por mm frente a la topología declarada; ver abajo |
+
+**Integridad de la malla (`[mesh]`).** Una ficha de piezas (no una receta:
+`mesh_on_generator`) pide la comprobación con una tabla propia:
+
+```toml
+[mesh]                 # su sola presencia la activa
+components = 1         # piezas sueltas; por defecto 1
+genus = 1              # género total; por defecto 0
+normals = "inward"     # "outward" (sólido, por defecto) | "inward" (cavidad)
+```
+
+`verify` suelda el GLB por mm y gana el primer fallo, en este orden:
+`mesh_layout` (más de una malla o de un nodo con malla, una colocación que no
+es una traslación en la rejilla de 1 mm, o una primitiva que no es de
+triángulos), `mesh_offgrid` (vértice fuera de la rejilla, tolerancia 0,05 mm),
+`mesh_degenerate`, `mesh_too_small`, `mesh_open_edge`,
+`mesh_non_manifold_edge`, `mesh_orientation`, `mesh_pinched_vertex`,
+`mesh_topology` (piezas y V − E + F frente a 2·`components` − 2·`genus`),
+`mesh_normals` (signo del volumen) y `mesh_self_intersection`. Un GLB que no se
+puede leer da `mesh_unreadable`. Todos son errores: la comprobación falla y
+`publish` no publica. El hallazgo dice el código, el elemento (triángulo o
+vértice soldado) y dónde está, por ejemplo `mesh_open_edge, elemento 4: borde
+abierto: triángulo soldado 4 (primitiva 0, triángulo 4, en [-1.0, 0.0, 0.0] m)`.
+Una clave desconocida dentro de `[mesh]` deja la ficha ilegible; una tabla
+mal nombrada (`[meshes]`) se ignora: si `verify` no dice `mesh_integrity`, no
+se comprobó.
 
 **Publicar.** `kiln publish` solo publica si la última verificación pasó y
 corresponde al GLB de ahora (por sha256). Copia el GLB, sus variantes y el

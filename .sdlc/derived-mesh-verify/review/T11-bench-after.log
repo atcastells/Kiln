@@ -1,0 +1,21 @@
+strip tube x h=500: n=4000 Ok(()) in 5.892542ms
+strip tube y h=500: n=4000 Ok(()) in 5.552542ms
+strip tube z h=500: n=4000 Ok(()) in 5.251833ms
+fan tube x h=500: n=4000 Ok(()) in 314.911416ms
+strip tube diagonal h=500: n=4000 Ok(()) in 167.174958ms
+strip tube x h=1000: n=8000 Ok(()) in 10.5725ms
+strip tube y h=1000: n=8000 Ok(()) in 10.460125ms
+strip tube z h=1000: n=8000 Ok(()) in 10.345334ms
+fan tube x h=1000: n=8000 Ok(()) in 1.256119166s
+strip tube diagonal h=1000: n=8000 Ok(()) in 672.212ms
+strip tube x h=2000: n=16000 Ok(()) in 22.0755ms
+strip tube y h=2000: n=16000 Ok(()) in 21.28375ms
+strip tube z h=2000: n=16000 Ok(()) in 21.498375ms
+fan tube x h=2000: n=16000 Ok(()) in 5.031669s
+strip tube diagonal h=2000: n=16000 Ok(()) in 2.664848s
+strip tube x h=6000: n=48000 Ok(()) in 63.648875ms
+strip tube y h=6000: n=48000 Ok(()) in 63.518ms
+strip tube z h=6000: n=48000 Ok(()) in 64.06025ms
+fan tube x h=6000: n=48000 Ok(()) in 45.545678667s
+strip tube diagonal h=6000: n=48000 Ok(()) in 23.880812917s
+cavity: n=322 Ok(()) x100 in 93.576ms

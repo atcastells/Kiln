@@ -1,0 +1,25 @@
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.51s
+     Running unittests src/lib.rs (target/debug/deps/kiln_core-1b0997d9069dbce5)
+
+running 3 tests
+test integrity::tests::self_intersection_sweep_misses_no_pair ... ok
+fine torus: 16000 triangles, 127992000 pairs, 1541656 overlap in x, 111272 boxes overlap, 267.236375ms
+test integrity::tests::self_intersection_sweep_prunes_a_fine_torus ... ok
+prism along x: 48000 triangles, 1007999999 pairs scanned, 40.159396s
+prism along y: 48000 triangles, 551924 pairs scanned, 902.222542ms
+prism along z: 48000 triangles, 576215972 pairs scanned, 16.216658709s
+
+thread 'integrity::tests::self_intersection_sweep_avoids_the_axis_of_long_triangles' (60181953) panicked at crates/kiln-core/src/integrity.rs:576:13:
+along x: 1007999999 pairs scanned for 48000 triangles
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+test integrity::tests::self_intersection_sweep_avoids_the_axis_of_long_triangles ... FAILED
+
+failures:
+
+failures:
+    integrity::tests::self_intersection_sweep_avoids_the_axis_of_long_triangles
+
+test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 376 filtered out; finished in 57.29s
+
+error: test failed, to rerun pass `-p kiln-core --lib`

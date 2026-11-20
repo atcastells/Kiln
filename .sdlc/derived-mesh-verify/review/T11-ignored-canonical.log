@@ -1,0 +1,11 @@
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+   Compiling kiln-cli v0.1.0 (/Users/acastells/Kiln/crates/kiln-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 8.82s
+     Running tests/godot_canonical.rs (target/debug/deps/godot_canonical-5785ef4b72cf1df8)
+
+running 2 tests
+test glbs_straight_to_the_validator_give_the_verdicts_of_m8 ... ok
+test recipes_through_godot_give_the_verdicts_of_m8 ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 5.17s
+

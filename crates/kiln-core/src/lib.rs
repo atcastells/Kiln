@@ -16,6 +16,7 @@ pub mod context;
 pub mod generate;
 pub mod glb;
 pub mod godot;
+pub mod integrity;
 pub mod license;
 pub mod mesh;
 pub mod new_game;

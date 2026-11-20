@@ -1,0 +1,21 @@
+octa 1 m                     -> OK
+octa 1.07e6 m (near 2^30 mm) -> OK
+octa 1.08e6 m (>2^30 mm)     -> mesh_offgrid: coordenada fuera de ±2^30 mm: vértice soldado 0 (primitiva 0, índice 0, en [1080000.0, 0.0
+octa 1e30 m                  -> weld mesh_offgrid: primitiva 0, vértice 0 en [1e30, 0.0, 0.0] m: fuera de la rejilla de 1 mm
+octa f32::MAX                -> weld mesh_offgrid: primitiva 0, vértice 0 en [3.4028235e38, 0.0, 0.0] m: fuera de la rejilla de 1 mm
+NaN position                 -> unreadable: GLB roto: posición no finita
+inf position                 -> unreadable: GLB roto: posición no finita
+no indices, 12 verts         -> mesh_orientation: orientación incoherente con un triángulo anterior: triángulo soldado 2 (primitiva 0, trián
+count u32::MAX               -> unreadable: GLB roto: 4294967295 elementos pasan del máximo 2000000
+count usize::MAX-ish         -> unreadable: GLB roto: 18446744073709551615 elementos pasan del máximo 2000000
+stride 1                     -> weld mesh_degenerate: 6 de 8 triángulos degenerados; el triángulo 1 (primitiva 0, triángulo 1, en [0.0, 0.0, 0.0
+stride huge                  -> unreadable: GLB roto: accessor desbordado
+mode 5                       -> weld mesh_layout: malla 0, primitiva 0: mode 5; solo se admiten triángulos (4)
+index oob                    -> unreadable: GLB roto: un índice pasa del último vértice
+indices not mult of 3        -> unreadable: GLB roto: el número de índices no es múltiplo de 3
+zero indices                 -> mesh_too_small: menos de 4 vértices o 4 triángulos: 0 vértices y 0 triángulos
+zero positions               -> mesh_too_small: menos de 4 vértices o 4 triángulos: 0 vértices y 0 triángulos
+truncated file               -> unreadable: GLB sin bloque JSON
+empty                        -> unreadable: no es un GLB (falta la cabecera glTF)
+octa 1.0004 m (offgrid)      -> weld mesh_offgrid: primitiva 0, vértice 0 en [1.0004, 0.0, 0.0] m: fuera de la rejilla de 1 mm
+deep JSON                    -> unreadable: JSON del GLB roto: recursion limit exceeded at line 1 column 137

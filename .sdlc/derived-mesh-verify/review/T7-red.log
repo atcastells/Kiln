@@ -1,0 +1,32 @@
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.63s
+     Running unittests src/lib.rs (target/debug/deps/kiln_core-1b0997d9069dbce5)
+
+running 2 tests
+test integrity::tests::self_intersection_sweep_prunes_a_fine_torus ... FAILED
+test integrity::tests::self_intersection_sweep_misses_no_pair ... FAILED
+
+failures:
+
+---- integrity::tests::self_intersection_sweep_prunes_a_fine_torus stdout ----
+fine torus: 16000 triangles, 127992000 pairs, 0 overlap in x, 0 boxes overlap, 0ns
+
+thread 'integrity::tests::self_intersection_sweep_prunes_a_fine_torus' (59853424) panicked at crates/kiln-core/src/integrity.rs:480:9:
+0 boxes overlap for 16000 triangles
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+---- integrity::tests::self_intersection_sweep_misses_no_pair stdout ----
+
+thread 'integrity::tests::self_intersection_sweep_misses_no_pair' (59853423) panicked at crates/kiln-core/src/integrity.rs:456:13:
+assertion `left == right` failed: moved: sweep against every pair
+  left: (None, 0)
+ right: (Some((1, 2)), 3)
+
+
+failures:
+    integrity::tests::self_intersection_sweep_misses_no_pair
+    integrity::tests::self_intersection_sweep_prunes_a_fine_torus
+
+test result: FAILED. 0 passed; 2 failed; 0 ignored; 0 measured; 375 filtered out; finished in 0.15s
+
+error: test failed, to rerun pass `-p kiln-core --lib`

@@ -1,0 +1,13 @@
+ERROR  godot/ui/astra_theme.tres          ui-theme             `godot/ui/astra_theme.tres`: no se puede leer
+ERROR  kiln/specs/historic_cavity.toml    spec_unreadable      ficha ilegible: TOML parse error at line 20, column 1
+   |
+20 | genius = 1
+   | ^^^^^^
+unknown field `genius`, expected one of `components`, `genus`, `normals`
+
+aviso  excavations/historic_cavity        blend_stale          el .blend no se ha exportado o ha cambiado desde entonces; ejecuta el trabajo de medida (`kiln godot`) o construye un asset que lo use
+aviso  station                            content_no_definitions ningún fichero coincide con ["content/astra/**/*.ron"]
+aviso  station:kiln/content_manifest.json content_manifest_missing manifiesto de Godot ausente: ejecuta `kiln content-manifest`
+info   excavations/historic_cavity        not_measured         formato blend: sin medir; mídela con Godot (`kiln godot`)
+1 piezas, 2 errores, 3 avisos
+exit=1

@@ -1,0 +1,36 @@
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.10s
+     Running unittests src/lib.rs (target/debug/deps/kiln_core-1b0997d9069dbce5)
+
+running 28 tests
+test validate::tests::khronos_garbage_fails ... ok
+test validate::tests::khronos_clean_report_passes ... ok
+test validate::tests::a_report_without_recipe_has_no_recipe_key ... ok
+test validate::tests::khronos_error_fails_and_warning_does_not ... ok
+test validate::tests::not_a_glb_is_invalid ... ok
+test validate::tests::clean_glb_has_no_findings ... ok
+test validate::tests::declared_animations_all_present ... ok
+test validate::tests::material_without_a_palette_key ... ok
+test validate::tests::declared_animations_without_a_skeleton ... ok
+test validate::tests::a_skinned_mesh_is_reported_once ... ok
+test validate::tests::buffer_view_beyond_the_binary_chunk ... ok
+test validate::tests::anchors_missing_or_moved ... ok
+test validate::tests::declared_animation_missing_from_the_glb ... ok
+test validate::tests::matching_asset_has_no_findings ... ok
+test validate::tests::own_check_counts_findings ... ok
+test validate::tests::nothing_declared_ignores_the_rig ... ok
+test validate::tests::report_is_valid_unless_a_check_failed ... ok
+test validate::tests::external_image_uri ... ok
+test validate::tests::size_differs_from_the_reported_one ... ok
+test validate::tests::stand_in_nodes_are_reported ... ok
+test validate::tests::triangles_over_the_budget ... ok
+test validate::tests::other_texture_slots_are_checked ... ok
+test validate::tests::node_names ... ok
+test validate::tests::well_formed_rig_has_no_findings ... ok
+test validate::tests::root_scale ... ok
+test validate::tests::mesh_integrity_runs_only_when_the_spec_asks_for_it ... ok
+test validate::tests::malformed_rig_is_reported ... ok
+test validate::tests::broken_references_are_reported_with_their_pointer ... ok
+
+test result: ok. 28 passed; 0 failed; 0 ignored; 0 measured; 350 filtered out; finished in 0.01s
+

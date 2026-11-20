@@ -1,0 +1,7 @@
+Kiln comprueba el GLB
+glTF Validator comprueba el GLB (gltf_validator)
+Godot importa e instancia el GLB (godot)
+kiln: pasa
+gltf_validator: pasa (glTF Validator 2.0.0-dev.3.10)
+godot_import: pasa (proyecto de prueba en kiln/cache/verify/historic_cavity)
+/private/var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T/claudio-t10-6gCyqU/kiln/build/historic_cavity/validation.json
