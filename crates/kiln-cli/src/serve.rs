@@ -7,7 +7,7 @@ use std::net::{TcpListener, TcpStream};
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use std::sync::{Arc, Mutex, OnceLock, RwLock};
+use std::sync::{Arc, Mutex, OnceLock};
 
 const PAGE: &str = include_str!("../ui/index.html");
 const THREE: &str = include_str!("../ui/vendor/three.js");
@@ -109,51 +109,92 @@ fn route_ui_served(path: &str) -> Option<Reply> {
     route_ui(path, UI_DIR.get().map(PathBuf::as_path))
 }
 
-/// The project the server works on; `None` while the folder has no
-/// `kiln.toml` and the start wizard is open.
-type Slot = Arc<RwLock<Option<Arc<Ctx>>>>;
-
+use crate::core::{Page, Shared};
 use crate::ops::{self, ctx as make_ctx};
 
-pub fn run(
-    project: PathBuf,
-    config: Option<PathBuf>,
-    port: u16,
-    ui_dir: Option<PathBuf>,
-) -> Result<(), String> {
+/// The port of the page, on 127.0.0.1 only.
+pub fn bind(port: u16) -> Result<TcpListener, String> {
+    TcpListener::bind(("127.0.0.1", port)).map_err(|e| format!("no se puede abrir el puerto {port}: {e}"))
+}
+
+/// The page shows `project` from now on: the project, or the start wizard
+/// when the folder has no `kiln.toml`.
+pub fn open_page(shared: &Shared, project: &Path, config: Option<PathBuf>) -> Result<(), String> {
+    let new = config.is_none() && !project.join(kiln_core::config::FILE).exists();
+    let ctx = if new { None } else { Some(Arc::new(make_ctx(project, config)?)) };
+    shared.show(project, ctx);
+    Ok(())
+}
+
+/// Serves the page of whatever project `shared` shows at each request.
+pub fn listen(listener: TcpListener, shared: Shared, ui_dir: Option<PathBuf>) {
     if let Some(d) = ui_dir {
         eprintln!("interfaz leida de {}", d.display());
         let _ = UI_DIR.set(d);
     }
-    let new = config.is_none() && !project.join(kiln_core::config::FILE).exists();
-    let slot: Slot = Arc::new(RwLock::new(if new {
-        None
-    } else {
-        Some(Arc::new(make_ctx(&project, config)?))
-    }));
-    let jobs: Jobs = Default::default();
-    let listener = TcpListener::bind(("127.0.0.1", port))
-        .map_err(|e| format!("no se puede abrir el puerto {port}: {e}"))?;
-    eprintln!(
-        "Kiln en http://127.0.0.1:{port}  ({} {})",
-        if new { "juego nuevo en" } else { "proyecto" },
-        project.display()
-    );
-    let project = Arc::new(project);
+    let port = listener.local_addr().map(|a| a.port()).unwrap_or_default();
+    let p = shared.page.read().unwrap().clone();
+    match (&p.dir, &p.ctx) {
+        (Some(d), Some(_)) => eprintln!("Kiln en http://127.0.0.1:{port}  (proyecto {})", d.display()),
+        (Some(d), None) => eprintln!("Kiln en http://127.0.0.1:{port}  (juego nuevo en {})", d.display()),
+        (None, _) => eprintln!("Kiln en http://127.0.0.1:{port}  (sin proyecto: lo abre la primera sesión MCP)"),
+    }
     for stream in listener.incoming().flatten() {
-        let (slot, jobs, project) = (slot.clone(), jobs.clone(), project.clone());
+        let shared = shared.clone();
         std::thread::spawn(move || {
-            let current = slot.read().unwrap().clone();
-            let r = match current {
-                Some(ctx) => handle(stream, &ctx, &jobs),
-                None => handle_new(stream, &project, &slot, &jobs),
-            };
+            shared.touch();
+            let r = read_request(&stream).and_then(|req| {
+                let page = shared.page.read().unwrap().clone();
+                if stale(&req, &page) {
+                    return respond(stream, "409 Conflict", "application/json", STALE);
+                }
+                match (&page.ctx, &page.dir) {
+                    (Some(ctx), _) => handle(stream, req, ctx, &shared.jobs, &page),
+                    (None, Some(dir)) => handle_new(stream, req, dir, &shared, &page),
+                    (None, None) => handle_none(stream, req, &shared, &page),
+                }
+            });
             if let Err(e) = r {
                 eprintln!("petición fallida: {e}");
             }
         });
     }
-    Ok(())
+}
+
+const STALE: &[u8] = "{\"error\":\"Kiln abrió otro proyecto desde Claude Code: recarga la página y vuelve a intentarlo\"}".as_bytes();
+
+/// A write from a page that still shows the project it loaded before an MCP
+/// session opened another one (`x-kiln-rev` is the `rev` it loaded): it must
+/// not land on the new project.
+fn stale(req: &Request, page: &Page) -> bool {
+    req.method == "POST"
+        && req
+            .headers
+            .iter()
+            .find(|(h, _)| h == "x-kiln-rev")
+            .and_then(|(_, v)| v.trim().parse::<u64>().ok())
+            .is_some_and(|r| r != page.rev)
+}
+
+/// What the page polls to follow the core: the folder it shows and its
+/// `rev`, which changes when an MCP session opens another project.
+fn session(page: &Page) -> serde_json::Value {
+    serde_json::json!({ "rev": page.rev, "project": page.dir.as_ref().map(|d| d.display().to_string()) })
+}
+
+const NO_PROJECT: &[u8] = "{\"error\":\"Kiln no tiene ningún proyecto abierto: ábrelo desde Claude Code (project_open) o con kiln serve --project CARPETA\"}".as_bytes();
+
+/// The page before anything is open: it waits for a project.
+fn handle_none(stream: TcpStream, req: Request, shared: &Shared, page: &Page) -> std::io::Result<()> {
+    let json = |v: serde_json::Value| serde_json::to_vec(&v).unwrap_or_default();
+    let (status, kind, body) = match (req.method.as_str(), req.path.as_str()) {
+        ("GET", "/classic") => ("200 OK", "text/html; charset=utf-8", classic_page()),
+        ("GET", p) if route_ui_served(p).is_some() => route_ui_served(p).unwrap(),
+        ("GET", "/api/session") => ("200 OK", "application/json", json(session(page))),
+        ("GET", "/api/jobs") => ("200 OK", "application/json", json(jobs_list(&shared.jobs, None))),
+        _ => ("409 Conflict", "application/json", NO_PROJECT.to_vec()),
+    };
+    respond(stream, status, kind, &body)
 }
 
 fn from_page(req: &Request) -> bool {
@@ -190,13 +231,14 @@ fn respond_with(
 
 /// The server of a folder without `kiln.toml`: the page and the first step
 /// of the wizard, which writes the project and opens it.
-fn handle_new(stream: TcpStream, project: &Path, slot: &Slot, jobs: &Jobs) -> std::io::Result<()> {
-    let req = read_request(&stream)?;
+fn handle_new(stream: TcpStream, req: Request, project: &Path, shared: &Shared, page: &Page) -> std::io::Result<()> {
+    let jobs = &shared.jobs;
     let json = |v: serde_json::Value| serde_json::to_vec(&v).unwrap_or_default();
     let (status, kind, body) = match (req.method.as_str(), req.path.as_str()) {
         ("GET", "/classic") => ("200 OK", "text/html; charset=utf-8", classic_page()),
         ("GET", p) if route_ui_served(p).is_some() => route_ui_served(p).unwrap(),
-        ("GET", "/api/jobs") => ("200 OK", "application/json", json(jobs_list(jobs))),
+        ("GET", "/api/session") => ("200 OK", "application/json", json(session(page))),
+        ("GET", "/api/jobs") => ("200 OK", "application/json", json(jobs_list(jobs, Some(project)))),
         ("GET", "/api/new") => ("200 OK", "application/json", json(ops::new_game::options(project, None).unwrap_or_default())),
         ("GET", p) if p.starts_with("/api/jobs/") => match job_of(jobs, p) {
             Some(job) => ("200 OK", "application/json", json(serde_json::to_value(job).unwrap_or_default())),
@@ -213,7 +255,7 @@ fn handle_new(stream: TcpStream, project: &Path, slot: &Slot, jobs: &Jobs) -> st
                 .and_then(|g| ops::new_game::create(project, g));
             match made {
                 Ok((files, ctx)) => {
-                    *slot.write().unwrap() = Some(Arc::new(ctx));
+                    shared.show(project, Some(Arc::new(ctx)));
                     ("200 OK", "application/json", json(serde_json::json!({ "ok": true, "files": files })))
                 }
                 Err(e) => ("400 Bad Request", "application/json", json(serde_json::json!({ "error": e }))),
@@ -281,8 +323,7 @@ fn catalog_request(ctx: &Ctx, headers: &[(String, String)]) -> (&'static str, Op
     catalog_reply(ctx, inm)
 }
 
-fn handle(stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result<()> {
-    let req = read_request(&stream)?;
+fn handle(stream: TcpStream, req: Request, ctx: &Arc<Ctx>, jobs: &Jobs, page: &Page) -> std::io::Result<()> {
     if req.method == "GET" && req.path == "/api/catalog" {
         let (status, etag, body) = catalog_request(ctx, &req.headers);
         return respond_with(stream, status, "application/json", &body, etag.as_deref());
@@ -324,7 +365,8 @@ fn handle(stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result<()>
     let (status, kind, body) = match (req.method.as_str(), req.path.as_str()) {
         ("GET", "/classic") => ("200 OK", "text/html; charset=utf-8", classic_page()),
         ("GET", p) if route_ui_served(p).is_some() => route_ui_served(p).unwrap(),
-        ("GET", "/api/jobs") => json(jobs_list(jobs)),
+        ("GET", "/api/session") => json(session(page)),
+        ("GET", "/api/jobs") => json(jobs_list(jobs, Some(&ctx.project))),
         // Only the page itself may post here: a custom header forces a CORS
         // preflight this server never answers, so another site cannot.
         ("POST", _) if !from_page => (
@@ -369,7 +411,7 @@ fn handle(stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result<()>
             }
         }
         ("POST", "/api/review") => started(ops::production::review(jobs, ctx.clone(), &field("asset"))),
-        ("POST", "/api/godot") => started(Ok(ops::production::godot_measure(jobs, ctx.clone()))),
+        ("POST", "/api/godot") => started(ops::production::godot_measure(jobs, ctx.clone())),
         ("POST", "/api/search") => answer(ops::sources::search(ctx, &field("asset"), &field("part"))),
         ("POST", "/api/import") => started(ops::production::import(
             jobs,
@@ -478,11 +520,16 @@ fn handle(stream: TcpStream, ctx: &Arc<Ctx>, jobs: &Jobs) -> std::io::Result<()>
     respond(stream, status, kind, &body)
 }
 
-/// Active jobs and the latest finished ones, for a page that reloaded and
-/// needs to find its job again. Logs stay out: `/api/jobs/<id>` has them.
-fn jobs_list(jobs: &Jobs) -> serde_json::Value {
+/// Active jobs and the latest finished ones of the project the page shows
+/// (whoever launched them: the page or an MCP session), for a page that
+/// reloaded and needs to find its job again. Logs stay out:
+/// `/api/jobs/<id>` has them.
+fn jobs_list(jobs: &Jobs, project: Option<&Path>) -> serde_json::Value {
     const FINISHED_KEPT: usize = 5;
-    let all = jobs.lock().unwrap();
+    let project = project.map(|p| p.display().to_string());
+    let lock = jobs.lock().unwrap();
+    let all: Vec<&agent::Job> =
+        lock.iter().filter(|j| project.is_none() || j.project.is_none() || j.project == project).collect();
     let recent: Vec<u64> = all
         .iter()
         .rev()
@@ -1072,7 +1119,7 @@ mod tests {
     // ---- jobs list (T10)
 
     fn job(id: u64, status: &str) -> agent::Job {
-        agent::Job { id, asked: format!("tarea {id}"), status: status.into(), log: vec!["linea".into()], spec: None, reply: None, offer: None, kind: "montar".into(), started: 1_700_000_000 + id, project: None }
+        agent::Job { id, asked: format!("tarea {id}"), status: status.into(), log: vec!["linea".into()], spec: None, reply: None, offer: None, kind: "montar".into(), started: 1_700_000_000 + id, project: None, writes: false }
     }
 
     #[test]
@@ -1082,7 +1129,7 @@ mod tests {
             let mut j = jobs.lock().unwrap();
             for i in 1..=9 { j.push(job(i, if i == 2 { "running" } else if i % 2 == 0 { "failed" } else { "done" })); }
         }
-        let v = jobs_list(&jobs);
+        let v = jobs_list(&jobs, None);
         let list = v["jobs"].as_array().unwrap();
         let ids: Vec<u64> = list.iter().map(|j| j["id"].as_u64().unwrap()).collect();
         assert_eq!(ids, vec![2, 5, 6, 7, 8, 9]);
@@ -1091,6 +1138,6 @@ mod tests {
         assert_eq!(list[0]["kind"], "montar");
         assert_eq!(list[0]["started"], 1_700_000_002u64);
         assert!(list[0].get("log").is_none());
-        assert_eq!(jobs_list(&Default::default())["jobs"].as_array().unwrap().len(), 0);
+        assert_eq!(jobs_list(&Default::default(), None)["jobs"].as_array().unwrap().len(), 0);
     }
 }

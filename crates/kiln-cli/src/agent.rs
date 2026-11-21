@@ -1,18 +1,18 @@
 //! Runs Claude Code without a window (`claude -p`) to break a request into
 //! an asset spec, and keeps what it does as a job the graph page can follow.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::SystemTime;
 
 const SKILL: &str = include_str!("../../../skills/asset/SKILL.md");
 const CONTEXT_SKILL: &str = include_str!("../../../skills/context/SKILL.md");
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Job {
     pub id: u64,
     pub asked: String,
@@ -23,26 +23,30 @@ pub struct Job {
     /// The spec it wrote, relative to the project root.
     pub spec: Option<String>,
     /// What the agent said to the person, without the `kiln` block.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reply: Option<String>,
     /// What the agent offers for the wizard, from its `kiln` block.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub offer: Option<kiln_core::chat::Offer>,
     /// ask | layout | sort | refine | chat, or the first word of a tool job
     /// (montar, revisar, ...).
     pub kind: String,
     /// Unix seconds when the job was created.
     pub started: u64,
-    /// The project folder the job works on, when the session can switch projects.
-    #[serde(skip_serializing_if = "Option::is_none")]
+    /// The project folder the job works on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub project: Option<String>,
+    /// It writes the project's builds and caches (Blender, Godot, imports):
+    /// only one such job runs at a time in a project.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub writes: bool,
 }
 
 fn now_secs() -> u64 {
     SystemTime::now().duration_since(SystemTime::UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0)
 }
 
-pub type Jobs = Arc<Mutex<Vec<Job>>>;
+pub use crate::jobs::Jobs;
 
 pub struct Ctx {
     pub project: PathBuf,
@@ -94,7 +98,8 @@ pub fn start(jobs: &Jobs, ctx: Arc<Ctx>, task: Task) -> u64 {
             offer: None,
             kind: kind.into(),
             started: now_secs(),
-            project: None,
+            project: Some(ctx.project.display().to_string()),
+            writes: false,
         });
         id
     };
@@ -122,13 +127,53 @@ pub fn start(jobs: &Jobs, ctx: Arc<Ctx>, task: Task) -> u64 {
 }
 
 /// A job that is not the agent (Blender, Godot): `work` says its lines and
-/// returns the file it made, relative to the project root.
+/// returns the file it made, relative to the project root. Tests use it; Kiln
+/// itself always launches jobs in a project (`job_in`).
+#[cfg(test)]
 pub fn job<F>(jobs: &Jobs, asked: String, work: F) -> u64
 where
     F: FnOnce(&dyn Fn(String)) -> Result<Option<String>, String> + Send + 'static,
 {
+    spawn_job(jobs, None, asked, work).expect("a job outside any project always starts")
+}
+
+/// A job that writes the builds and caches of `project`. It is refused while
+/// another such job runs in the same project, so the page and every MCP
+/// session never build, paint or publish over each other.
+pub fn job_in<F>(jobs: &Jobs, project: &Path, asked: String, work: F) -> Result<u64, String>
+where
+    F: FnOnce(&dyn Fn(String)) -> Result<Option<String>, String> + Send + 'static,
+{
+    spawn_job(jobs, Some(project), asked, work)
+}
+
+/// The write job running in `project`, said as an error, if there is one.
+pub fn busy(jobs: &Jobs, project: &Path) -> Result<(), String> {
+    let p = project.display().to_string();
+    match jobs.lock().unwrap().iter().find(|j| j.writes && j.status == "running" && j.project.as_deref() == Some(p.as_str())) {
+        Some(b) => Err(format!(
+            "ya hay un trabajo en marcha en este proyecto (trabajo {}, «{}»): espera a que termine (`job` con su id) antes de lanzar otro",
+            b.id, b.asked
+        )),
+        None => Ok(()),
+    }
+}
+
+fn spawn_job<F>(jobs: &Jobs, project: Option<&Path>, asked: String, work: F) -> Result<u64, String>
+where
+    F: FnOnce(&dyn Fn(String)) -> Result<Option<String>, String> + Send + 'static,
+{
+    let project = project.map(|p| p.display().to_string());
     let id = {
         let mut j = jobs.lock().unwrap();
+        if let Some(p) = &project
+            && let Some(b) = j.iter().find(|j| j.writes && j.status == "running" && j.project.as_ref() == Some(p))
+        {
+            return Err(format!(
+                "ya hay un trabajo en marcha en este proyecto (trabajo {}, «{}»): espera a que termine (`job` con su id) antes de lanzar otro",
+                b.id, b.asked
+            ));
+        }
         let id = j.len() as u64 + 1;
         let kind = asked.split_whitespace().next().unwrap_or("job").to_string();
         j.push(Job {
@@ -141,7 +186,8 @@ where
             offer: None,
             kind,
             started: now_secs(),
-            project: None,
+            writes: project.is_some(),
+            project,
         });
         id
     };
@@ -162,7 +208,7 @@ where
             }
         }
     });
-    id
+    Ok(id)
 }
 
 fn log(jobs: &Jobs, id: u64, line: String) {
@@ -276,7 +322,8 @@ pub fn chat(jobs: &Jobs, project: PathBuf, ctx: Option<Arc<Ctx>>, turn: Turn) ->
             offer: None,
             kind: "chat".into(),
             started: now_secs(),
-            project: None,
+            project: Some(project.display().to_string()),
+            writes: false,
         });
         id
     };

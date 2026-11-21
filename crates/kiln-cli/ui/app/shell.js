@@ -10,12 +10,15 @@ import { indexFor } from "./search.js";
 
 const SEV_TEXT = { error: "con errores", warn: "con avisos", info: "con notas", busy: "en curso" };
 const POLL_FIRST = 1500, POLL_MAX = 8000;
+// How often the page asks the core what it shows: an MCP session may open
+// another project or launch a job at any time.
+const WATCH_EVERY = 4000;
 
 export function createShell({ doc = document, store, api, router, registry }) {
   const $ = id => doc.getElementById(id);
   const main = $("main"), shellEl = $("shell"), navEl = $("nav"), detailEl = $("detail");
   const toasts = createToasts($("toastwrap"));
-  let unmountView = null, mountToken = 0, pollTimer = null, pollDelay = POLL_FIRST;
+  let unmountView = null, mountToken = 0, pollTimer = null, pollDelay = POLL_FIRST, watchTimer = null, shownRev;
 
   // ---- data
   function setCatalog(cat) {
@@ -61,6 +64,20 @@ export function createShell({ doc = document, store, api, router, registry }) {
     clearTimeout(pollTimer);
     if (running) { pollTimer = setTimeout(refreshJobs, pollDelay); pollDelay = Math.min(POLL_MAX, Math.round(pollDelay * 1.5)); }
     else pollDelay = POLL_FIRST;
+  }
+
+  // ---- the core: another project opened from Claude Code reloads the page;
+  // a job launched there shows up in the list
+  async function watchCore({ first = false } = {}) {
+    clearTimeout(watchTimer);
+    let s = null;
+    try { api.forget("/api/session"); s = await api.getJSON("/api/session"); } catch { /* an older server, or Kiln stopped */ }
+    if (s && typeof s.rev === "number") {
+      if (shownRev === undefined) { shownRev = s.rev; api.setRev?.(s.rev); }
+      else if (s.rev !== shownRev) { doc.defaultView?.location?.reload(); return; }
+    }
+    if (!first && !doc.hidden && !store.get("job")) await refreshJobs();
+    watchTimer = setTimeout(watchCore, WATCH_EVERY);
   }
 
   // ---- views
@@ -191,6 +208,7 @@ export function createShell({ doc = document, store, api, router, registry }) {
       let wz = null;
       try { api.forget("/api/new"); const n = await api.getJSON("/api/new"); wz = n.step ? n : null; } catch { /* not a server with the wizard endpoint */ }
       store.set("wizard", wz);
+      await watchCore({ first: true });
       store.set("route", wz ? NEW : router.current());
       router.onChange(r => store.set("route", store.get("wizard") ? NEW : r));
       if (wz) {

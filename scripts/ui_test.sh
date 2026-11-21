@@ -73,7 +73,7 @@ free_port() { node -e 'const s=require("net").createServer().listen(0,"127.0.0.1
 ARGS=()
 serve() { # name dir
   local port; port="$(free_port)"
-  "$KILN" serve --project "$2" --port "$port" >"$OUT/serve-$1.log" 2>&1 &
+  KILN_HOME="$OUT/home-$1" "$KILN" serve --project "$2" --port "$port" >"$OUT/serve-$1.log" 2>&1 &
   PIDS+=("$!")
   for _ in $(seq 1 100); do curl -sf -o /dev/null "http://127.0.0.1:$port/" && break; sleep 0.1; done
   curl -sf -o /dev/null "http://127.0.0.1:$port/" || { echo "kiln serve did not start for $1:" >&2; cat "$OUT/serve-$1.log" >&2; exit 1; }
@@ -126,7 +126,7 @@ chmod +x "$GEN/fake_godot.sh"
 awk -v g="godot = \"$GEN/fake_godot.sh\"" '{print} /^godot_project = /{print g}' "$GEN/kiln.toml" > "$GEN/kiln.toml.new"
 mv "$GEN/kiln.toml.new" "$GEN/kiln.toml"
 GEN_PORT="$(free_port)"
-"$KILN" serve --project "$GEN" --port "$GEN_PORT" >"$OUT/serve-generated.log" 2>&1 &
+KILN_HOME="$OUT/home-generated" "$KILN" serve --project "$GEN" --port "$GEN_PORT" >"$OUT/serve-generated.log" 2>&1 &
 PIDS+=("$!")
 for _ in $(seq 1 100); do curl -sf -o /dev/null "http://127.0.0.1:$GEN_PORT/" && break; sleep 0.1; done
 curl -sf -o /dev/null "http://127.0.0.1:$GEN_PORT/" || { echo "kiln serve did not start for generated:" >&2; cat "$OUT/serve-generated.log" >&2; exit 1; }
