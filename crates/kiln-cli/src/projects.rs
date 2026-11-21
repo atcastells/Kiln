@@ -37,7 +37,7 @@ pub fn list(dir: &Path) -> Vec<Entry> {
         .ok()
         .and_then(|b| serde_json::from_slice(&b).ok())
         .unwrap_or_default();
-    v.sort_by(|a, b| b.last_opened.cmp(&a.last_opened));
+    v.sort_by_key(|e| std::cmp::Reverse(e.last_opened));
     v
 }
 

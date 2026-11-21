@@ -26,10 +26,18 @@ habla de editar el fichero del contexto: aquí no lo edites, usa las herramienta
 - Las palabras de la persona pasan por `context_edit`.\n\
 - No cambies nunca lo que está fijado (pinned).";
 
-const REVIEW_HEADER: &str = "Kiln ejecuta este revisor por sí mismo con la herramienta `review` \
-(decisión D1: un revisor independiente). Este prompt no es para juzgar tu propio montaje: \
-úsalo para leer `review_sheets` y explicar a la persona los hallazgos, con lo concreto que \
-hay que corregir en la ficha. Texto de la skill del revisor, como referencia:";
+const REVIEW_HEADER: &str = "Eres el revisor del montaje (decisión D1: revisa el agente del cliente, \
+no un segundo Claude). El texto de la skill de abajo habla de ficheros y rutas: aquí no leas ni \
+escribas ficheros, usa las herramientas de Kiln.\n\
+- Si aún no hay hojas, lanza `review` con el asset y sigue su trabajo con `job` hasta que termine.\n\
+- Mira las hojas y las medidas con `review_sheets`; la ficha, con `spec_get`; el contexto, con `context_get`.\n\
+- Revisa como dice la skill: primero describe en `seen` lo que ves, después juzga. Si colocaste tú las \
+piezas, sé más duro, no menos: busca lo que está mal.\n\
+- Manda la revisión, en el TOML de la skill, con `review_submit`. Kiln aplica a la ficha las \
+correcciones que pueda y te dice qué hacer después (otra vuelta con `review` y next_round = true, o \
+`verify` y `publish`).\n\
+- Explica a la persona lo que encontraste, con lo concreto que queda para ella.\n\
+Texto de la skill del revisor:";
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 struct AssetArgs {
@@ -94,10 +102,10 @@ impl Kiln {
         Ok(user(text))
     }
 
-    /// Entender los hallazgos de la revisión.
+    /// Revisar el montaje de un asset.
     #[prompt(
         name = "kiln-review",
-        description = "Explica a la persona los hallazgos de la revisión (la revisión la ejecuta Kiln con `review`)."
+        description = "Revisa tú el montaje de un asset: Kiln saca las hojas con `review` y tú mandas la revisión con `review_submit`."
     )]
     async fn kiln_review(&self, Parameters(_): Parameters<ReviewArgs>) -> Vec<PromptMessage> {
         user(format!("{REVIEW_HEADER}\n\n{REVIEW_SKILL}"))

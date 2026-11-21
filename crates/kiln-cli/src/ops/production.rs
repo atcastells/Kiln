@@ -15,10 +15,10 @@ pub fn build(jobs: &Jobs, ctx: Arc<Ctx>, asset: &str) -> Result<u64, String> {
         return Err("falta el asset".into());
     }
     let id = asset.to_string();
-    Ok(agent::job(jobs, format!("montar {id}"), move |say| {
+    agent::job_in(jobs, &ctx.project.clone(), format!("montar {id}"), move |say| {
         let glb = crate::production::build_asset(&ctx.project, ctx.config.as_deref(), &id, say)?;
         Ok(Some(super::rel(&ctx.project, &glb)))
-    }))
+    })
 }
 
 pub fn paint(jobs: &Jobs, ctx: Arc<Ctx>, asset: &str, variant: Option<String>) -> Result<u64, String> {
@@ -26,11 +26,11 @@ pub fn paint(jobs: &Jobs, ctx: Arc<Ctx>, asset: &str, variant: Option<String>) -
         return Err("falta el asset".into());
     }
     let id = asset.to_string();
-    Ok(agent::job(jobs, format!("aplicar materiales a {id}"), move |say| {
+    agent::job_in(jobs, &ctx.project.clone(), format!("aplicar materiales a {id}"), move |say| {
         let v = variant.as_deref().filter(|v| !v.is_empty());
         let glb = crate::production::paint_asset(&ctx.project, ctx.config.as_deref(), &id, v, say)?;
         Ok(Some(super::rel(&ctx.project, &glb)))
-    }))
+    })
 }
 
 pub fn verify(jobs: &Jobs, ctx: Arc<Ctx>, asset: &str) -> Result<u64, String> {
@@ -38,10 +38,10 @@ pub fn verify(jobs: &Jobs, ctx: Arc<Ctx>, asset: &str) -> Result<u64, String> {
         return Err("falta el asset".into());
     }
     let id = asset.to_string();
-    Ok(agent::job(jobs, format!("verificar {id}"), move |say| {
+    agent::job_in(jobs, &ctx.project.clone(), format!("verificar {id}"), move |say| {
         let report = crate::verify::verify_asset(&ctx.project, ctx.config.as_deref(), &id, say)?;
         Ok(Some(super::rel(&ctx.project, &report)))
-    }))
+    })
 }
 
 pub fn publish(jobs: &Jobs, ctx: Arc<Ctx>, asset: &str) -> Result<u64, String> {
@@ -49,10 +49,10 @@ pub fn publish(jobs: &Jobs, ctx: Arc<Ctx>, asset: &str) -> Result<u64, String> {
         return Err("falta el asset".into());
     }
     let id = asset.to_string();
-    Ok(agent::job(jobs, format!("publicar {id}"), move |say| {
+    agent::job_in(jobs, &ctx.project.clone(), format!("publicar {id}"), move |say| {
         let done = super::publish::publish_asset(&ctx.project, ctx.config.as_deref(), &id, say)?;
         Ok(Some(format!("{}/asset.json", done.dir)))
-    }))
+    })
 }
 
 /// Generates the GLB of a generated asset. `recipe` is a spec as TOML text
@@ -76,14 +76,14 @@ pub fn generate(
         })?;
     }
     let id = asset.to_string();
-    Ok(agent::job(jobs, format!("generar {id}"), move |say| {
+    agent::job_in(jobs, &ctx.project.clone(), format!("generar {id}"), move |say| {
         let got = crate::generate::generate_asset(&ctx.project, ctx.config.as_deref(), &id, seed, say)?;
         Ok(Some(got.rel))
-    }))
+    })
 }
 
-pub fn godot_measure(jobs: &Jobs, ctx: Arc<Ctx>) -> u64 {
-    agent::job(jobs, "medir con Godot".into(), move |say| {
+pub fn godot_measure(jobs: &Jobs, ctx: Arc<Ctx>) -> Result<u64, String> {
+    agent::job_in(jobs, &ctx.project.clone(), "medir con Godot".into(), move |say| {
         crate::production::measure(&ctx.project, ctx.config.as_deref(), say).map(|_| None)
     })
 }
@@ -101,9 +101,9 @@ pub fn content_manifest(jobs: &Jobs, ctx: Arc<Ctx>, set: Option<String>) -> Resu
         Some(s) => format!("manifiesto {s}"),
         None => "manifiesto de contenido".into(),
     };
-    Ok(agent::job(jobs, asked, move |say| {
+    agent::job_in(jobs, &ctx.project.clone(), asked, move |say| {
         crate::content::export(&ctx.project, ctx.config.as_deref(), set.as_deref(), say).map(|_| None)
-    }))
+    })
 }
 
 pub fn review(jobs: &Jobs, ctx: Arc<Ctx>, asset: &str) -> Result<u64, String> {
@@ -111,10 +111,31 @@ pub fn review(jobs: &Jobs, ctx: Arc<Ctx>, asset: &str) -> Result<u64, String> {
         return Err("falta el asset".into());
     }
     let id = asset.to_string();
-    Ok(agent::job(jobs, format!("revisar {id}"), move |say| {
+    agent::job_in(jobs, &ctx.project.clone(), format!("revisar {id}"), move |say| {
         let file = crate::review::run(&ctx.project, ctx.config.as_deref(), &id, say)?;
         Ok(Some(super::rel(&ctx.project, &file)))
-    }))
+    })
+}
+
+/// One round of the review with no reviewer of Kiln's own: build and render
+/// the sheets; the agent of the client judges them (D1).
+pub fn review_round(jobs: &Jobs, ctx: Arc<Ctx>, asset: &str, next: bool) -> Result<u64, String> {
+    super::check_id("el asset", asset)?;
+    let id = asset.to_string();
+    let asked = if next { format!("revisar {id}: otra vuelta") } else { format!("revisar {id}: hojas") };
+    agent::job_in(jobs, &ctx.project.clone(), asked, move |say| {
+        let dir = crate::review::render_round(&ctx.project, ctx.config.as_deref(), &id, next, say)?;
+        Ok(Some(super::rel(&ctx.project, &dir)))
+    })
+}
+
+/// The client's review of the last round: it may change the spec, so not
+/// while a build or another write runs in the project.
+pub fn review_submit(jobs: &Jobs, ctx: &Ctx, asset: &str, review: &str) -> Result<crate::review::Submitted, String> {
+    super::check_id("el asset", asset)?;
+    super::check_len("la revisión", review, 100_000)?;
+    agent::busy(jobs, &ctx.project)?;
+    crate::review::submit(&ctx.project, ctx.config.as_deref(), asset, review)
 }
 
 pub fn import(
@@ -129,9 +150,9 @@ pub fn import(
         return Err("falta el asset, la pieza, el sitio o el modelo".into());
     }
     let (asset, part, site, id) = (asset.to_string(), part.to_string(), site.to_string(), id.to_string());
-    Ok(agent::job(jobs, format!("traer {site}/{id} para {part}"), move |say| {
+    agent::job_in(jobs, &ctx.project.clone(), format!("traer {site}/{id} para {part}"), move |say| {
         crate::fetch::import(&ctx.project, ctx.config.as_deref(), &asset, &part, &site, &id, say).map(Some)
-    }))
+    })
 }
 
 /// The lookup the page makes (`id.max(1)`: id 0 reads the first job).
@@ -193,10 +214,15 @@ pub struct JobSummary {
     pub project: Option<String>,
 }
 
+/// The newest `JOBS_LISTED` jobs and every one still running, oldest first.
 pub fn jobs_list(jobs: &Jobs) -> Vec<JobSummary> {
+    const JOBS_LISTED: usize = 30;
     let j = jobs.lock().unwrap();
+    let from = j.len().saturating_sub(JOBS_LISTED);
     j.iter()
-        .map(|j| JobSummary {
+        .enumerate()
+        .filter(|(i, j)| *i >= from || j.status == "running")
+        .map(|(_, j)| JobSummary {
             id: j.id,
             asked: j.asked.clone(),
             status: j.status.clone(),

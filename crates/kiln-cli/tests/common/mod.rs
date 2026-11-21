@@ -70,10 +70,12 @@ pub fn empty_dir() -> TempDir {
     TempDir::new()
 }
 
-/// A running `kiln serve`, killed when dropped.
+/// A running `kiln serve`, killed when dropped. It is a core of its own,
+/// with its own `KILN_HOME`.
 pub struct Server {
     child: Child,
     pub port: u16,
+    pub home: TempDir,
 }
 
 impl Server {
@@ -82,7 +84,9 @@ impl Server {
             let l = TcpListener::bind("127.0.0.1:0").unwrap();
             l.local_addr().unwrap().port()
         };
+        let home = TempDir::new();
         let mut child = Command::new(env!("CARGO_BIN_EXE_kiln"))
+            .env("KILN_HOME", home.path())
             .args(["serve", "--project"])
             .arg(dir.path())
             .args(["--port", &port.to_string()])
@@ -105,7 +109,7 @@ impl Server {
             }
             std::thread::sleep(Duration::from_millis(50));
         }
-        Server { child, port }
+        Server { child, port, home }
     }
 
     fn request(&self, head: &str, body: &[u8]) -> (u16, Vec<u8>) {
@@ -197,8 +201,12 @@ impl Mcp {
 
     fn spawn(mut cmd: Command, env: &[(&str, &str)], roots: Option<&[&str]>) -> Mcp {
         let home = TempDir::new();
+        // through the core, as in real use: one per KILN_HOME, page on a free
+        // port, gone a few seconds after its last session
         let mut child = cmd
             .env("KILN_HOME", home.path())
+            .env("KILN_PORT", "0")
+            .env("KILN_CORE_IDLE_S", "3")
             .envs(env.iter().copied())
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())

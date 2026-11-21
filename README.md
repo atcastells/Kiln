@@ -423,14 +423,14 @@ Los proyectos que crea Kiln (`project_create`, `new_game`) y el de `--project`
 ya cuentan como de confianza. La lista está en `trusted.json`, junto al
 registro; `status` y `projects` dicen `trusted`.
 
-Son 35 herramientas. Empieza por `status`, que dice qué carpeta está abierta.
+Son 36 herramientas. Empieza por `status`, que dice qué carpeta está abierta.
 
 | Grupo | Herramientas |
 |---|---|
 | Leer | `status` resumen y siguiente paso; `tree` árbol, un nivel cada vez; `catalog` kits, piezas, materiales, fichas o la UI del juego (`what=ui`); `check` hallazgos; `content` conjuntos de contenido; `spec_get` una ficha; `review_sheets` hojas de la revisión como imágenes |
 | Fichas | `spec_write` escribe una ficha si pasa la comprobación; `spec_layout` solo coloca piezas (`at`, `turn`) |
 | Contexto | `context_get` lee; `context_propose` la voz del agente; `context_edit` la voz de la persona |
-| Producción y trabajos | `build` monta con Blender; `generate` genera con Godot un asset de receta; `paint` aplica materiales; `godot_measure` mide lo que solo Godot abre y exporta las piezas `.blend`; `review` revisa el montaje; `verify` comprueba el GLB montado; `publish` lo lleva al juego; `tools` dice qué herramientas externas hay y su versión; `job` y `jobs` siguen los trabajos |
+| Producción y trabajos | `build` monta con Blender; `generate` genera con Godot un asset de receta; `paint` aplica materiales; `godot_measure` mide lo que solo Godot abre y exporta las piezas `.blend`; `review` monta y saca las hojas de una vuelta de la revisión; `review_submit` manda la revisión del cliente; `verify` comprueba el GLB montado; `publish` lo lleva al juego; `tools` dice qué herramientas externas hay y su versión; `job` y `jobs` siguen los trabajos |
 | Materiales y zonas | `material_set` material de una zona; `material_validate` lo pasa al catálogo; `bind` vincula una ranura a la paleta; `zones_split` parte una pieza en zonas |
 | Fuera | `search` busca candidatos (no escribe); `import` trae un modelo con su licencia |
 | Proyectos | `projects` los recientes y cuál está abierto; `project_open` abre otro por su ruta; `project_create` empieza uno en una carpeta nueva o en una de Godot sin `kiln.toml` |
@@ -438,8 +438,8 @@ Son 35 herramientas. Empieza por `status`, que dice qué carpeta está abierta.
 | Contenido | `content_manifest` Godot escribe el manifiesto de escenas (la orden `kiln content-manifest`) |
 
 Tres prompts: `kiln-asset` (de la petición a la ficha), `kiln-context`
-(ordenar o afinar el contexto) y `kiln-review` (explicar los hallazgos de la
-revisión).
+(ordenar o afinar el contexto) y `kiln-review` (revisar el montaje, con
+`review_sheets` y `review_submit`).
 
 ### Lo que hace la página, por MCP
 
@@ -466,14 +466,20 @@ un trabajo. `job` espera hasta 30 s a que haya líneas nuevas o termine, y
 cuando llegan sigue juntándolas hasta un segundo de silencio; se vuelve a
 llamar con `since` = el `next` anterior hasta que el estado deje de ser
 `running`. `jobs` los lista, con la carpeta del proyecto en que se lanzó cada
-uno: cambiar de proyecto no para los trabajos en curso.
+uno: cambiar de proyecto no para los trabajos en curso, y cerrar la
+conversación tampoco (ver «Entrega 17: un núcleo compartido»).
 
 `kiln-asset` se puede lanzar sin argumentos (`/mcp__kiln__kiln-asset`): el
 agente pregunta qué asset quieres. Claude Code parte el slash command por
 espacios, así que una petición de varias palabras va en el mensaje siguiente.
 
-`review` cambia la ficha con lo que corrige el revisor y deja cada vuelta en
-`<build>/<id>/review/round-N/`.
+`review` deja cada vuelta en `<build>/<id>/review/round-N/`. El revisor es el
+propio agente del cliente (D1): `review` monta el asset y saca las hojas;
+el agente las mira con `review_sheets`, juzga con el prompt `kiln-review` y
+manda su revisión con `review_submit`, que aplica a la ficha lo que se
+puede corregir y dice si hace falta otra vuelta (`review` con
+`next_round = true`). Con `reviewer = "kiln"` lo hace todo el revisor propio
+de Kiln, aparte, como en la página.
 
 ### Las dos voces del contexto
 
@@ -483,14 +489,11 @@ elige con sus palabras, y lo que registra queda fijado.
 
 ### Límites
 
-- `review` sigue lanzando el revisor propio de Kiln, aparte (D1): usa la
-  sesión de `claude` y gasta uso de la suscripción.
+- `review` con `reviewer = "kiln"` y el botón de la página siguen lanzando el
+  revisor propio de Kiln, aparte: usa la sesión de `claude` y gasta uso de la
+  suscripción.
 - No hay chat por MCP (D2): el agente que llama ya es el agente.
 - Probado solo con Claude Code (D3).
-- Los trabajos viven en el proceso: cerrarlo pierde el que esté en curso.
-- `kiln serve` y `kiln mcp` abiertos a la vez sobre el mismo juego pueden
-  escribir los mismos ficheros, sin bloqueo. La página no ve los trabajos
-  lanzados por MCP.
 - Las claves de Poly Pizza y Sketchfab nunca salen de Kiln.
 
 ## Entrega 12: de la fuente al juego (K006)
@@ -1319,6 +1322,54 @@ soltarlo, el siguiente lo toma cuando lleva sin dar señales más que el
 plazo de una herramienta (`[tools] timeout_s`) y un minuto. Entre
 máquinas o versiones de Godot no está comprobado que la misma semilla dé la
 misma malla.
+
+## Entrega 17: un núcleo compartido (K016)
+
+Un solo proceso de Kiln por persona, el núcleo, con la página y el MCP como
+dos puertas al mismo estado. `kiln mcp` pasa a ser un puente fino por stdio:
+si el núcleo no está en marcha lo arranca en segundo plano, y si está le
+pasa la conversación. Varias conversaciones a la vez, y la página, ven los
+mismos trabajos. El registro en Claude Code no cambia:
+
+```bash
+claude mcp add --scope user kiln -- /ruta/a/kiln mcp
+```
+
+- **Los trabajos sobreviven al cliente.** Un montaje lanzado desde Claude Code
+  sigue corriendo en el núcleo aunque se cierre la conversación; al volver,
+  `jobs` y `job` lo encuentran. Se guardan en `jobs.json` (junto al registro
+  de proyectos), así que también siguen ahí tras reiniciar el núcleo; uno que
+  corría cuando el núcleo se cerró queda fallido y lo dice.
+- **Un trabajo de escritura a la vez por proyecto.** Montar, pintar, generar,
+  verificar, publicar, revisar, medir, traer y el manifiesto se niegan
+  mientras otro de esos corre en el mismo proyecto, venga de la página o de
+  otra conversación; `review_submit` también espera.
+- **La página sigue al agente.** El núcleo sirve la página en
+  `http://127.0.0.1:4330` y muestra el proyecto que abrió la última
+  conversación; si una conversación abre otro, la página se recarga sola en
+  él, y los trabajos lanzados por MCP aparecen en su lista. Una página que aún
+  no se ha recargado no puede escribir en el proyecto nuevo. `kiln mcp` dice
+  en su stderr en qué puerto está.
+- **`kiln serve --project DIR`** arranca el núcleo con ese proyecto en la
+  página, como antes. Si ya hay un núcleo en marcha, le pide que muestre
+  `DIR` y sale.
+- **`kiln stop`** cierra el núcleo guardando los trabajos; se niega si hay
+  trabajos en marcha, salvo con `--force`. Hace falta tras actualizar `kiln`,
+  para que arranque el nuevo.
+
+Cómo se hablan: el núcleo escucha la página en 127.0.0.1, como siempre, y el
+MCP en un socket Unix, `core.sock` en la carpeta de Kiln (`KILN_HOME`), que
+solo puede abrir tu usuario. Un núcleo que arrancó `kiln mcp` se cierra solo
+tras 30 minutos sin conversaciones, sin trabajos y sin la página abierta
+(`KILN_CORE_IDLE_S` lo cambia); lo que dice va a `core.log`. Si el puerto
+4330 está ocupado sigue sin página; `KILN_PORT` elige otro. Sin carpeta de
+Kiln, fuera de macOS y Linux, o con `KILN_CORE=off`, `kiln mcp` funciona
+como antes, todo en su propio proceso.
+
+El núcleo hereda el entorno del primer `kiln mcp` que lo arrancó (`PATH`,
+`KILN_CLAUDE`, las claves de Poly Pizza y Sketchfab): un cambio en ellas cuenta
+tras `kiln stop`. La orden `kiln build` y las demás de la terminal siguen
+trabajando por su cuenta, fuera del núcleo.
 
 ## Lo que viene
 

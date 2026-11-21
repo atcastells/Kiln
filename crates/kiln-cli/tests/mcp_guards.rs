@@ -10,7 +10,7 @@ use std::io::{BufRead, Write};
 use std::path::Path;
 
 /// (name, readOnly, destructive, idempotent, openWorld); absent hint = false.
-const SURFACE: [(&str, bool, bool, bool, bool); 35] = [
+const SURFACE: [(&str, bool, bool, bool, bool); 36] = [
     ("bind", false, true, true, false),
     ("build", false, true, false, false),
     ("catalog", true, false, false, false),
@@ -36,6 +36,7 @@ const SURFACE: [(&str, bool, bool, bool, bool); 35] = [
     ("publish", false, true, false, false),
     ("review", false, true, false, false),
     ("review_sheets", true, false, false, false),
+    ("review_submit", false, true, false, false),
     ("search", true, false, false, true),
     ("settle", false, false, false, false),
     ("spec_get", true, false, false, false),
@@ -129,9 +130,12 @@ fn bad_ids_and_paths_are_refused_without_touching_the_disk() {
 
 /// Sends a `prompts/get` over raw JSON-RPC and returns the response.
 fn raw_prompt(dir: &Path, args: serde_json::Value) -> serde_json::Value {
+    let home = common::empty_dir();
     let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_kiln"))
         .args(["mcp", "--project"])
         .arg(dir)
+        .env("KILN_HOME", home.path())
+        .env("KILN_CORE", "off")
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
@@ -169,7 +173,7 @@ fn one_megabyte_inputs_are_refused_and_nothing_changes() {
     ];
     for (tool, args) in calls {
         let r = m.call(tool, args);
-        assert!(r.is_error, "{tool} accepted 1 MB: {}", &r.text.chars().take(200).collect::<String>());
+        assert!(r.is_error, "{tool} accepted 1 MB: {}", r.text.chars().take(200).collect::<String>());
     }
     drop(m);
 

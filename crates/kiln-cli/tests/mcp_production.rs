@@ -200,3 +200,36 @@ fn annotations_tell_what_each_tool_does() {
         assert_eq!(tool(&mut m, n)["annotations"]["readOnlyHint"], true, "{n}");
     }
 }
+
+#[test]
+fn review_checks_who_reviews() {
+    let p = temp_project("");
+    let mut m = Mcp::start(p.path());
+    let r = m.call("review", json!({"asset": "hoist", "reviewer": "otro"}));
+    assert!(r.is_error && r.text.contains("client o kiln"), "{}", r.text);
+    let r = m.call("review", json!({"asset": "hoist", "reviewer": "kiln", "next_round": true}));
+    assert!(r.is_error, "{}", r.text);
+    let r = m.call("review", json!({"asset": "hoist", "next_round": true}));
+    let id = r.json()["job"].as_u64().unwrap();
+    let j = m.call("job", json!({"id": id, "wait_s": 10})).json();
+    assert_eq!(j["status"], "failed", "{j}");
+    assert!(j["lines"].to_string().contains("sin next_round"), "{j}");
+}
+
+#[test]
+fn review_submit_applies_the_client_review() {
+    let p = temp_project("");
+    let round = p.path().join("kiln/build/hoist/review/round-1");
+    std::fs::create_dir_all(&round).unwrap();
+    std::fs::copy(p.path().join("specs/hoist.toml"), round.join("spec.toml")).unwrap();
+    std::fs::write(round.join("measures.json"), "{}").unwrap();
+    let mut m = Mcp::start(p.path());
+    let review = "seen = \"un ascensor\"\nverdict = \"revise\"\n\n[[findings]]\npart = \"crossbeam\"\ncriterion = \"construction\"\nseverity = \"major\"\nproblem = \"flota\"\nevidence = \"alzados\"\nfix = { at = [[0, 4.4, 0]] }\n";
+    let r = m.call("review_submit", json!({"asset": "hoist", "review": review}));
+    assert!(!r.is_error, "{}", r.text);
+    assert_eq!(r.json()["applied"].as_array().unwrap().len(), 1, "{}", r.text);
+    assert!(p.read("specs/hoist.toml").contains("4.4"));
+    assert!(p.exists("kiln/build/hoist/review/review.json"));
+    let bad = m.call("review_submit", json!({"asset": "hoist", "review": "verdict = ["}));
+    assert!(bad.is_error, "{}", bad.text);
+}
