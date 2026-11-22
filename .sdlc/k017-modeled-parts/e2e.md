@@ -36,7 +36,12 @@ Capturas: `shots/side-by-side.png` muestra el original y las dos pasadas a 0° y
 60°, con el mismo renderizador. `shots/original-elevations.png` y
 `shots/model-b-elevations.png` son las vistas de frente y de lado.
 
-## Frente a R8, tal como está escrito
+## Frente a R8, tal como estaba escrito
+
+El 2026-11-22, el product owner cambió R8 para comparar con el presupuesto
+de la ficha y exigir que cada zona esté pintada (D2). Con ese criterio, las
+dos pasadas cumplen: 264 y 276 triángulos, de 300. Lo de abajo es la lectura
+contra el texto original.
 
 - **Cumple.** `kiln verify` en verde y publicado, solo con el MCP, sin cajas
   de relleno. Las medidas son las pedidas (±0 cm). A ojo de la sesión

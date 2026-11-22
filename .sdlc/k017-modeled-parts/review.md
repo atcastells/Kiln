@@ -17,7 +17,7 @@ fichero:línea citado.
 | I6 | conformidad | README: «36 herramientas», y faltaba `guide` | 37, `guide` en la tabla y en el párrafo de prompts | — |
 | I7 | conformidad | La batería se corrió antes de T9b | Batería final sobre el árbol definitivo (abajo) | `review/final-*.log` |
 
-## Pendiente de decisión del product owner
+## Decisiones del product owner (2026-11-22, «Acepto las dos»: D1 y D2 aceptadas como se proponen)
 
 | # | Pasada | Qué | Propuesta |
 |---|---|---|---|

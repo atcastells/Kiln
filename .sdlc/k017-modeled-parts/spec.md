@@ -15,7 +15,7 @@
 | R5 | Medidas y presupuesto se conocen antes de Blender: `size_m` sale de las formas; si la ficha lo da y no coincide (±1 mm), error `model_size`; los triángulos de las formas por sus copias se suman a la cuenta de `budget` de `kiln check` (aviso, como las piezas reutilizadas; `verify` ya da error sobre el GLB) | «cumple… escala… presupuesto de triángulos» | Tres casos en `kiln check`: sin `size_m`, con uno que no casa, con el presupuesto superado |
 | R6 | Límites que impiden una ficha abusiva: 256 formas por pieza, `segments` de 3 a 32, coordenadas finitas y dentro de ±100 m, formas sin volumen rechazadas | Seguridad del servidor (CLAUDE.md) y OWASP | Una tabla de casos rotos da su código, sin pánico y sin lanzar Blender |
 | R7 | El agente aprende el vocabulario por el MCP: el prompt `kiln-asset` y la petición del agente de la página llevan «Vocabulario de modelado», y la skill `asset` explica cuándo modelar | «Una sesión de Claude, solo con las herramientas del MCP de Kiln» | `mcp_prompts` y `agent` comprueban el texto; la skill tiene su sección con un ejemplo sin nombres de ASTRA |
-| R8 | De principio a fin sobre una copia de ASTRA: una sesión `claude -p` con solo las herramientas de `kiln mcp` rehace `workbench` como pieza modelada, la monta, la verifica y la publica en la copia | «How we will know it is solved», puntos 1 y 3 | `kiln verify` en verde; capturas del original y del modelado con el mismo renderizador, lado a lado; triángulos dentro de ±10 % del original, medidas ±1 cm, mismas zonas |
+| R8 | De principio a fin sobre una copia de ASTRA: una sesión `claude -p` con solo las herramientas de `kiln mcp` rehace `workbench` como pieza modelada, la monta, la verifica y la publica en la copia | «How we will know it is solved», puntos 1 y 3 | `kiln verify` en verde; capturas del original y del modelado con el mismo renderizador, lado a lado; triángulos dentro del presupuesto de la ficha, medidas ±1 cm, cada zona pintada con la paleta. (Antes decía «triángulos dentro de ±10 % del original» y «mismas zonas»; el product owner lo cambió el 2026-11-22, D2.) |
 | R9 | Sin piezas `model`, nada cambia | Regresión | Las pruebas existentes pasan sin tocarlas; `examples/` monta y publica igual (mismos checks) |
 
 ## Design
@@ -73,7 +73,7 @@ existen y monta con `build`. Cambia el texto del prompt `kiln-asset`
 y el README. La revisión visual usa `review`/`review_sheets`/`review_submit`
 de K016.
 
-**Desviación (T9b, pendiente de visto bueno del product owner):** se añade
+**Desviación (T9b), aceptada por el product owner el 2026-11-22 («Acepto las dos», D1):** se añade
 una herramienta, `guide` (`asset`, `review`, `context`), que devuelve el
 texto de los prompts. La prueba de punta a punta mostró que `claude -p` no
 pasa los prompts MCP al modelo, así que el vocabulario solo llegaba por los
