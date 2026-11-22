@@ -3,7 +3,7 @@
 import { html } from "./html.js";
 import { derive } from "./derive.js";
 import { navModel, isRunning } from "./nav.js";
-import { createToasts, busy } from "./ui/feedback.js";
+import { createToasts, busy, trustNotice } from "./ui/feedback.js";
 import { askText, confirmDialog } from "./ui/dialog.js";
 import { createSearch, openPalette } from "./ui/palette.js";
 import { indexFor } from "./search.js";
@@ -18,7 +18,7 @@ export function createShell({ doc = document, store, api, router, registry }) {
   const $ = id => doc.getElementById(id);
   const main = $("main"), shellEl = $("shell"), navEl = $("nav"), detailEl = $("detail");
   const toasts = createToasts($("toastwrap"));
-  let unmountView = null, mountToken = 0, pollTimer = null, pollDelay = POLL_FIRST, watchTimer = null, shownRev;
+  let unmountView = null, mountToken = 0, pollTimer = null, pollDelay = POLL_FIRST, watchTimer = null, shownRev, shownNotice = "";
 
   // ---- data
   function setCatalog(cat) {
@@ -72,6 +72,9 @@ export function createShell({ doc = document, store, api, router, registry }) {
     clearTimeout(watchTimer);
     let s = null;
     try { api.forget("/api/session"); s = await api.getJSON("/api/session"); } catch { /* an older server, or Kiln stopped */ }
+    // Compared with the last string written, not innerHTML, which the DOM re-serializes.
+    const notice = trustNotice(s), noticeEl = $("trustNotice");
+    if (noticeEl && notice !== shownNotice) { noticeEl.innerHTML = notice; shownNotice = notice; }
     if (s && typeof s.rev === "number") {
       if (shownRev === undefined) { shownRev = s.rev; api.setRev?.(s.rev); }
       else if (s.rev !== shownRev) { doc.defaultView?.location?.reload(); return; }

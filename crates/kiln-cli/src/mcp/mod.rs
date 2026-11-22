@@ -92,14 +92,11 @@ impl Kiln {
             prompt_router: Self::prompts_router(),
         };
         match project {
-            Some(p) => {
-                kiln.open(&p, config, true)?;
-                kiln.active.write().unwrap().vouched = true;
-            }
+            Some(p) => kiln.open(&p, config, true, true)?,
             None => {
                 let recent = kiln.home.as_deref().map(registry::list).unwrap_or_default();
                 if let Some(p) = registry::pick(&here, &recent)
-                    && let Err(e) = kiln.open(&p, None, false)
+                    && let Err(e) = kiln.open(&p, None, false, false)
                 {
                     eprintln!("no se pudo abrir {}: {e}", p.display());
                 }
@@ -109,12 +106,13 @@ impl Kiln {
     }
 
     /// Makes `dir` the open project and notes it in the registry. A folder
-    /// without `kiln.toml` stays open with no project yet.
-    pub fn open(&self, dir: &Path, config: Option<PathBuf>, chosen: bool) -> Result<(), String> {
+    /// without `kiln.toml` stays open with no project yet. `vouched`: the
+    /// person named it (`--project`).
+    pub fn open(&self, dir: &Path, config: Option<PathBuf>, chosen: bool, vouched: bool) -> Result<(), String> {
         let has_toml = config.is_some() || registry::kind(dir).kiln;
         let ctx = if has_toml { Some(Arc::new(crate::ops::ctx(dir, config)?)) } else { None };
-        self.show(dir, ctx.clone());
-        *self.active.write().unwrap() = Active { dir: Some(dir.to_path_buf()), ctx, chosen, vouched: false };
+        self.show(dir, ctx.clone(), vouched);
+        *self.active.write().unwrap() = Active { dir: Some(dir.to_path_buf()), ctx, chosen, vouched };
         self.remember(dir);
         Ok(())
     }
@@ -124,7 +122,7 @@ impl Kiln {
     /// held a Godot project keeps its own plugins and needs `kiln trust`.
     pub fn made(&self, dir: &Path, ctx: Ctx, fresh: bool) {
         let ctx = Arc::new(ctx);
-        self.show(dir, Some(ctx.clone()));
+        self.show(dir, Some(ctx.clone()), fresh);
         *self.active.write().unwrap() =
             Active { dir: Some(dir.to_path_buf()), ctx: Some(ctx), chosen: true, vouched: fresh };
         if fresh
@@ -164,9 +162,9 @@ impl Kiln {
     }
 
     /// In the core, the page shows what this session just opened.
-    fn show(&self, dir: &Path, ctx: Option<Arc<Ctx>>) {
+    fn show(&self, dir: &Path, ctx: Option<Arc<Ctx>>, vouched: bool) {
         if let Some(s) = &self.shared {
-            s.show(dir, ctx);
+            s.show(dir, ctx, vouched);
         }
     }
 
@@ -231,7 +229,7 @@ impl Kiln {
         if self.active.read().unwrap().chosen {
             return;
         }
-        match self.open(&p, None, false) {
+        match self.open(&p, None, false, false) {
             Ok(()) => eprintln!("proyecto de las roots del cliente: {}", p.display()),
             Err(e) => eprintln!("no se pudo abrir {}: {e}", p.display()),
         }

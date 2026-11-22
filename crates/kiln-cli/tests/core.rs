@@ -71,6 +71,22 @@ fn post_from(port: u16, path: &str, rev: u64) -> u16 {
     raw.split_whitespace().nth(1).unwrap().parse().unwrap()
 }
 
+/// Like `post_from`, with a body and the answer's body.
+fn post_body(port: u16, path: &str, rev: u64, body: &str) -> (u16, String) {
+    let mut s = std::net::TcpStream::connect(("127.0.0.1", port)).unwrap();
+    s.set_read_timeout(Some(Duration::from_secs(10))).unwrap();
+    write!(
+        s,
+        "POST {path} HTTP/1.1\r\nHost: 127.0.0.1:{port}\r\nx-kiln: 1\r\nx-kiln-rev: {rev}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    )
+    .unwrap();
+    let mut raw = String::new();
+    let _ = s.read_to_string(&mut raw);
+    let status = raw.split_whitespace().nth(1).unwrap().parse().unwrap();
+    (status, raw.split_once("\r\n\r\n").map(|(_, b)| b.to_string()).unwrap_or_default())
+}
+
 fn wait_for(what: impl Fn() -> bool, secs: u64) -> bool {
     let end = Instant::now() + Duration::from_secs(secs);
     while Instant::now() < end {
@@ -163,8 +179,74 @@ fn the_page_follows_the_project_a_session_opens() {
     let shown = kiln(&home, &["serve", "--project", a.path().to_str().unwrap()]);
     assert!(shown.status.success(), "{}", String::from_utf8_lossy(&shown.stderr));
     assert_eq!(get(port, "/api/session")["project"], canon(a.path()));
+    assert_eq!(get(port, "/api/session")["trusted"], true, "the person named it on the command line");
     drop(m);
     let _ = kiln(&home, &["stop"]);
+}
+
+/// Every POST of the page that runs Blender, Godot or Claude.
+const RUNS: &[&str] = &[
+    "/api/godot",
+    "/api/build",
+    "/api/paint",
+    "/api/generate",
+    "/api/review",
+    "/api/import",
+    "/api/ask",
+    "/api/chat",
+    "/api/context/sort",
+    "/api/context/refine",
+];
+
+#[test]
+fn an_untrusted_project_is_read_only_on_the_page() {
+    let home = empty_dir();
+    let p = slow_project(0);
+    let mut m = Mcp::start_free(empty_dir().path(), &env(&home));
+    assert!(!m.call("project_open", json!({"path": p.path().to_str().unwrap()})).is_error);
+    let port = port(&home);
+    let s = get(port, "/api/session");
+    assert_eq!(s["trusted"], false, "{s}");
+    let rev = s["rev"].as_u64().unwrap();
+    for route in RUNS {
+        let (status, body) = post_body(port, route, rev, "{}");
+        assert_eq!(status, 403, "{route}: {body}");
+        assert!(body.contains("kiln trust --project"), "{route}: {body}");
+    }
+    assert!(get(port, "/api/jobs")["jobs"].as_array().unwrap().is_empty(), "nothing was launched");
+    assert!(!p.path().join("ran").exists(), "Godot ran in an untrusted project");
+
+    // a folder with only a Godot project: the new-game page cannot run Claude either
+    let g = empty_dir();
+    std::fs::write(g.path().join("project.godot"), "").unwrap();
+    assert!(!m.call("project_open", json!({"path": g.path().to_str().unwrap()})).is_error);
+    let s = get(port, "/api/session");
+    assert_eq!(s["trusted"], false, "{s}");
+    assert_eq!(post_body(port, "/api/chat", s["rev"].as_u64().unwrap(), "{}").0, 403);
+
+    // `kiln serve` in a folder without naming it does not vouch for it
+    let served = std::process::Command::new(env!("CARGO_BIN_EXE_kiln"))
+        .arg("serve")
+        .current_dir(p.path())
+        .env("KILN_HOME", home.path())
+        .output()
+        .unwrap();
+    assert!(served.status.success(), "{}", String::from_utf8_lossy(&served.stderr));
+    let s = get(port, "/api/session");
+    assert_eq!(s["project"], std::fs::canonicalize(p.path()).unwrap().display().to_string());
+    assert_eq!(s["trusted"], false, "{s}");
+
+    // `kiln trust` counts at once, without opening the project again
+    assert!(!m.call("project_open", json!({"path": p.path().to_str().unwrap()})).is_error);
+    let trusted = kiln(&home, &["trust", "--project", p.path().to_str().unwrap()]);
+    assert!(trusted.status.success(), "{}", String::from_utf8_lossy(&trusted.stderr));
+    let s = get(port, "/api/session");
+    assert_eq!(s["trusted"], true, "{s}");
+    let (status, body) = post_body(port, "/api/generate", s["rev"].as_u64().unwrap(), r#"{"asset":"rock"}"#);
+    assert_eq!(status, 200, "{body}");
+    assert!(wait_for(|| p.path().join("ran").exists(), 10), "Godot did not run once trusted");
+    drop(m);
+    let _ = kiln(&home, &["stop", "--force"]);
 }
 
 #[test]

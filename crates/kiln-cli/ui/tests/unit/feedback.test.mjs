@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { busy } from "../../app/ui/feedback.js";
+import { busy, trustNotice } from "../../app/ui/feedback.js";
 
 function control() {
   const attrs = new Map([["title", "original"]]);
@@ -35,4 +35,14 @@ test("busy removes the title it added when there was none", async () => {
   const c = control(); c.attrs.delete("title");
   await busy(c, "x", async () => {});
   assert.equal(c.getAttribute("title"), null);
+});
+
+test("trustNotice shows the kiln trust command only for an untrusted project", () => {
+  assert.match(trustNotice({ trusted: false, project: "/p/juego" }), /kiln trust --project \/p\/juego/);
+  const odd = trustNotice({ trusted: false, project: "/p/<b>" });
+  assert.ok(odd.includes("&lt;b&gt;") && !odd.includes("<b>"));
+  assert.equal(trustNotice({ trusted: true, project: "/p" }), "");
+  assert.equal(trustNotice({ project: "/p" }), "");
+  assert.equal(trustNotice(null), "");
+  assert.equal(trustNotice({ rev: 0, project: null, trusted: false }), "", "no project open yet: nothing to trust");
 });
