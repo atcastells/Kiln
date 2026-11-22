@@ -1,0 +1,616 @@
+== unit tests (node --test)
+# tests 103
+# pass 103
+# fail 0
+Chrome: Chrome/157.0.8103.79
+
+== examples (port 50753)
+  ok   examples/load: project drawn
+  ok   examples/load: no JS errors
+  ok   examples/load: project name shown
+  ok   examples/view Contexto: tab present
+  ok   examples/view Contexto: no JS errors
+  ok   examples/view Contexto: shows the game node
+  ok   examples/view Contexto: one node per layer
+  ok   examples/view Contexto: shows each claim
+  ok   examples/view Contexto: chat panel visible
+  ok   examples/view Contexto: side panel filled
+  ok   examples/view Contexto: search "electricidad" narrows (7 dimmed)
+  ok   examples/view Contexto: search no JS errors
+  ok   examples/view Contexto: selecting a layer fills the side panel
+  ok   examples/view Árbol: tab present
+  ok   examples/view Árbol: no JS errors
+  ok   examples/view Árbol: root node shown
+  ok   examples/view Árbol: root's children shown
+  ok   examples/view Árbol: side panel filled
+  ok   examples/view Árbol: selecting a node fills the side panel
+  ok   examples/view Árbol: search lists the matching asset
+  ok   examples/view Árbol: nonsense search lists nothing
+  ok   examples/view Contenido: tab absent (no content sets)
+  ok   examples/view Catálogo: tab present
+  ok   examples/view Catálogo: no JS errors
+  ok   examples/view Catálogo: lists every kit (2)
+  ok   examples/view Catálogo: lists materials (6)
+  ok   examples/view Catálogo: side panel filled
+  ok   examples/view Catálogo: search "props" narrows (1 dimmed)
+  ok   examples/view Catálogo: search no JS errors
+  ok   examples/view Catálogo: search also filters materials
+  ok   examples/view Catálogo: clearing the search restores everything
+  ok   examples/view Catálogo: selecting a kit fills the side panel
+  ok   examples/view Catálogo: an open kit lists its pieces (3)
+  ok   examples/view Catálogo: selecting a piece fills the side panel
+  ok   examples/view Catálogo: selecting a piece raises no JS error (3D preview included)
+  note examples: piece preview: 3D canvas drawn
+  ok   examples/view Catálogo: selecting a material fills the side panel
+  ok   examples/spec sheet: opens from the search
+  ok   examples/spec sheet: side panel filled
+  ok   examples/build node: fills the side panel
+  ok   examples/spec sheet: Volver returns to the tree
+  ok   examples/spec sheet: no JS errors
+  note examples: review view and the 3D of a built asset need Blender output: not covered
+  ok   examples/Releer el proyecto: responds, same items, no errors
+
+== content (port 50759)
+  ok   content/load: project drawn
+  ok   content/load: no JS errors
+  ok   content/load: project name shown
+  ok   content/view Contexto: tab present
+  ok   content/view Contexto: no JS errors
+  ok   content/view Contexto: shows the game node
+  ok   content/view Contexto: one node per layer
+  ok   content/view Contexto: shows each claim
+  ok   content/view Contexto: chat panel visible
+  ok   content/view Contexto: side panel filled
+  note content: Contexto search skipped: the project has fewer than 2 claims
+  ok   content/view Contexto: selecting a layer fills the side panel
+  ok   content/view Árbol: tab present
+  ok   content/view Árbol: no JS errors
+  ok   content/view Árbol: root node shown
+  ok   content/view Árbol: root's children shown
+  ok   content/view Árbol: side panel filled
+  ok   content/view Árbol: search with no specs lists nothing and does not break
+  note content: Árbol search only matches asset specs; this project has none, so nothing narrows
+  ok   content/view Contenido: tab present
+  ok   content/view Contenido: no JS errors
+  ok   content/view Contenido: container visible
+  ok   content/view Contenido: lists set "world"
+  ok   content/view Contenido: one row per element (5)
+  ok   content/view Contenido: side panel filled
+  note content: Contenido: search does NOT narrow the table (5 -> 5 rows)
+  ok   content/view Contenido: typing in search keeps the table
+  note content: Contenido: rows are not selectable; the side panel only shows the summary
+  ok   content/view Catálogo: tab present
+  ok   content/view Catálogo: no JS errors
+  ok   content/view Catálogo: lists every kit (1)
+  ok   content/view Catálogo: lists materials (0)
+  ok   content/view Catálogo: side panel filled
+  ok   content/view Catálogo: selecting a kit fills the side panel
+  ok   content/view Catálogo: an open kit lists its pieces (2)
+  ok   content/view Catálogo: selecting a piece fills the side panel
+  ok   content/view Catálogo: selecting a piece raises no JS error (3D preview included)
+  note content: piece preview: 3D canvas drawn
+  note content: spec/build sub-view skipped: project without specs
+  ok   content/Releer el proyecto: responds, same items, no errors
+
+== synthetic (port 50762)
+  ok   synthetic/load: project drawn
+  ok   synthetic/load: no JS errors
+  ok   synthetic/load: project name shown
+  ok   synthetic/view Contexto: tab present
+  ok   synthetic/view Contexto: no JS errors
+  ok   synthetic/view Contexto: shows the game node
+  ok   synthetic/view Contexto: one node per layer
+  ok   synthetic/view Contexto: shows each claim
+  ok   synthetic/view Contexto: chat panel visible
+  ok   synthetic/view Contexto: side panel filled
+  note synthetic: Contexto search skipped: the project has fewer than 2 claims
+  ok   synthetic/view Contexto: selecting a layer fills the side panel
+  ok   synthetic/view Árbol: tab present
+  ok   synthetic/view Árbol: no JS errors
+  ok   synthetic/view Árbol: root node shown
+  ok   synthetic/view Árbol: root's children shown
+  ok   synthetic/view Árbol: side panel filled
+  ok   synthetic/view Árbol: selecting a node fills the side panel
+  ok   synthetic/view Árbol: search with no specs lists nothing and does not break
+  note synthetic: Árbol search only matches asset specs; this project has none, so nothing narrows
+  ok   synthetic/view Contenido: tab present
+  ok   synthetic/view Contenido: no JS errors
+  ok   synthetic/view Contenido: container visible
+  ok   synthetic/view Contenido: lists set "world"
+  ok   synthetic/view Contenido: one row per element (299)
+  ok   synthetic/view Contenido: side panel filled
+  note synthetic: Contenido: search does NOT narrow the table (299 -> 299 rows)
+  ok   synthetic/view Contenido: typing in search keeps the table
+  note synthetic: Contenido: rows are not selectable; the side panel only shows the summary
+  ok   synthetic/view Catálogo: tab present
+  ok   synthetic/view Catálogo: no JS errors
+  ok   synthetic/view Catálogo: lists every kit (20)
+  ok   synthetic/view Catálogo: lists materials (60)
+  ok   synthetic/view Catálogo: side panel filled
+  ok   synthetic/view Catálogo: search "kit19" narrows (19 dimmed)
+  ok   synthetic/view Catálogo: search no JS errors
+  ok   synthetic/view Catálogo: search also filters materials
+  ok   synthetic/view Catálogo: clearing the search restores everything
+  ok   synthetic/view Catálogo: selecting a kit fills the side panel
+  ok   synthetic/view Catálogo: an open kit lists its pieces (250)
+  ok   synthetic/view Catálogo: selecting a piece fills the side panel
+  ok   synthetic/view Catálogo: selecting a piece raises no JS error (3D preview included)
+  note synthetic: piece preview: no 3D canvas (no se pudo abrir: THREE.GLTFLoader: Unsupported asset. glTF )
+  ok   synthetic/view Catálogo: selecting a material fills the side panel
+  note synthetic: spec/build sub-view skipped: project without specs
+  ok   synthetic/Releer el proyecto: responds, same items, no errors
+
+== wizard (port 50765)
+  ok   wizard/start wizard: opens on a folder without kiln.toml
+  ok   wizard/start wizard: has a text field and a primary button
+  ok   wizard/start wizard: chat panel visible
+  ok   wizard/start wizard: no JS errors
+  note wizard: wizard steps beyond the first are not driven (they scaffold files and call the agent)
+
+== examples/ new UI (port 50753)
+  ok   examples/app: home drawn
+  ok   examples/app: project name in the top bar
+  ok   examples/app: shell has top bar, nav, main, search, Comandos, Releer
+  ok   examples/nav: entries present (Contenido only with content sets)
+  ok   examples/nav: counters match the catalog
+  ok   examples/nav: catalog dot is the worst severity of its findings
+  ok   examples/home: shows counts from the catalog
+  ok   examples/home: no errors or warnings shows the calm state
+  ok   examples/home: next-step card follows the rules
+  ok   examples/home: no JS errors
+  ok   examples/routes: the new UI links to the previous one (Interfaz anterior -> /classic)
+  ok   examples/routes: / serves the new UI, /app the same page, /classic the old one with its banner
+  ok   examples/app: usable at 900 px (no horizontal overflow)
+  ok   examples/app: Releer answers with a toast and gives the button back
+  ok   examples/app: Releer no JS errors
+  ok   examples/catalog: one link per kit
+  ok   examples/catalog: the counter matches the catalog
+  ok   examples/catalog: only a window of rows is in the DOM (< 80)
+  ok   examples/catalog: the filter narrows and the counter says how many
+  ok   examples/catalog: the filter is kept in the URL
+  ok   examples/catalog: selecting a row fills the panel (data, findings)
+  ok   examples/catalog: the selection is in the URL
+  ok   examples/catalog: the deep link to a piece survives a reload
+  note examples: catalog chips: no piece has findings
+  ok   examples/catalog: choosing a kit lists only its pieces
+  ok   examples/catalog: the kit panel shows its folder
+  ok   examples/catalog: sorting a column is kept in the URL
+  ok   examples/catalog: a failing bind shows a clear error toast
+  ok   examples/catalog: no JS errors
+  ok   examples/catalog: usable at 900 px (no horizontal overflow)
+  ok   examples/materials: the list is not cut (counter = every material)
+  ok   examples/materials: a window of rows (< 80)
+  ok   examples/materials: the filter narrows
+  ok   examples/materials: selecting a row shows the material, where it is used and its findings
+  ok   examples/materials: the deep link survives a reload
+  ok   examples/materials: no JS errors
+  ok   examples/tree: the root and its children are listed
+  ok   examples/tree: only expanded branches are in the DOM
+  ok   examples/tree: the panel shows the root
+  ok   examples/tree: selecting a node fills the panel, the breadcrumb and the URL
+  ok   examples/tree: the deep link survives a reload
+  ok   examples/tree: a leaf with a spec links to it
+  ok   examples/tree: Expandir todo lists every node
+  ok   examples/tree: Plegar todo leaves the root
+  ok   examples/tree: no JS errors
+  ok   examples/search: results are grouped by type with the total of each
+  ok   examples/search: each group is capped at 5
+  ok   examples/search: ArrowDown marks an option (aria-activedescendant)
+  ok   examples/search: Enter opens the option
+  ok   examples/search: the opened piece shows in the panel
+  ok   examples/search: nothing found says so
+  ok   examples/search: Esc closes the results
+  ok   examples/palette: Ctrl+K opens the dialog with the views and Releer
+  ok   examples/palette: typing a view and Enter goes there, the dialog closes
+  ok   examples/palette: a piece name jumps to that piece
+  ok   examples/palette: Esc closes it
+  ok   examples/palette: the Releer action runs (toast)
+  ok   examples/palette: no JS errors
+  ok   examples/context: view renders with text, layers and the talk panel
+  ok   examples/context: adding a claim opens a dialog (not prompt) that Esc closes without writing
+  ok   examples/context: the dialog is gone after Esc
+  ok   examples/context: choosing a layer keeps it in the URL
+  ok   examples/context: no JS errors
+  ok   examples/spec: the list shows every spec
+  ok   examples/spec: the ask form without text answers with a toast
+  ok   examples/spec: the detail renders parts and findings
+  ok   examples/spec: selecting a part fills the panel
+  ok   examples/build: the view renders its actions and the review area
+  ok   examples/spec/build: no JS errors
+  ok   examples/numbers: no 4+ digit number is left ungrouped in the catalog
+  ok   examples/catalog: header columns do not overlap (no clipped header cell)
+  ok   examples/3d: opened and closed 20 times, every viewer drawn and every renderer disposed
+  ok   examples/3d: a fresh WebGL context is still available afterwards
+  ok   examples/3d: the piece detail has its Ver en 3D button
+  ok   examples/jobs: with no jobs the view says so and offers where jobs come from
+  ok   examples/jobs: following a job shows its state and log
+  ok   examples/jobs: the status bar pill links to Trabajos while it runs
+  ok   examples/jobs: scrolled up, the log does not jump and offers Ir al final
+  ok   examples/jobs: Ir al final goes to the end
+  ok   examples/jobs: after a reload the same job is followed again with its log
+  ok   examples/jobs: it ends in 'hecho' with what to do next
+  ok   examples/new views: no JS errors
+  ok   examples/a11y: the catalog grid has aria-rowcount and aria-sort on every column header
+  ok   examples/keyboard: Tab reaches the Inicio entry of the navigation
+  ok   examples/keyboard: Tab and Enter on Catálogo open the catalog
+  ok   examples/keyboard: Tab to the filter and typing narrows the list
+  ok   examples/keyboard: arrows and Enter select a row and open the detail panel
+  ok   examples/keyboard: focus stays on the grid while the panel is open
+  ok   examples/keyboard: Esc closes the detail panel and focus returns to the grid
+  ok   examples/keyboard: Ctrl+K opens the palette with focus in its field
+  ok   examples/keyboard: the palette jumps to the chosen view and closes
+  ok   examples/keyboard: focus was never lost to <body> along the whole path
+  ok   examples/a11y: no element with a pointer cursor is out of the keyboard's reach
+  ok   examples/a11y: every button and link has an accessible name
+  ok   examples/a11y: every form input has a label
+  ok   examples/a11y: headings never skip a level
+  ok   examples/a11y: exactly one h1 per view
+  ok   examples/a11y: landmarks and live regions (status, toasts, alerts) in every view
+  ok   examples/a11y: every control reached with Tab shows a focus ring
+  ok   examples/a11y: every view is usable at 900 px (no horizontal scroll)
+  ok   examples/a11y: at 900 px the detail panel is an overlay inside the window
+  ok   examples/a11y: Esc closes the overlay panel and focus returns to Detalle
+  ok   examples/a11y: walkthrough ran without JS errors
+  ok   examples/list: 5,000 rows render fewer than 80 row nodes
+  ok   examples/list: scrolling renders the window at the new position
+  ok   examples/list: counter shows the total
+  ok   examples/list: header click sorts and sets aria-sort
+  ok   examples/list: filter narrows rows and counter
+  ok   examples/list: arrows move the active row, Enter selects, Home/End jump
+  ok   examples/toasts: errors in role=alert and stay, success auto-dismisses, close works
+  ok   examples/dialog: opens modal with focus inside
+  ok   examples/dialog: Enter with invalid input shows the error and stays open
+  ok   examples/dialog: Esc cancels (null) and focus returns to the opener
+  ok   examples/components: no JS errors
+  ok   examples/app: ran without JS errors
+
+== content/ new UI (port 50759)
+  ok   content/app: home drawn
+  ok   content/app: project name in the top bar
+  ok   content/app: shell has top bar, nav, main, search, Comandos, Releer
+  ok   content/nav: entries present (Contenido only with content sets)
+  ok   content/nav: counters match the catalog
+  ok   content/nav: catalog dot is the worst severity of its findings
+  ok   content/home: shows counts from the catalog
+  ok   content/home: shows each content set with its status
+  ok   content/home: no errors or warnings shows the calm state
+  ok   content/home: next-step card follows the rules
+  ok   content/home: no JS errors
+  ok   content/routes: the new UI links to the previous one (Interfaz anterior -> /classic)
+  ok   content/routes: / serves the new UI, /app the same page, /classic the old one with its banner
+  ok   content/app: usable at 900 px (no horizontal overflow)
+  ok   content/app: Releer answers with a toast and gives the button back
+  ok   content/app: Releer no JS errors
+  ok   content/catalog: one link per kit
+  ok   content/catalog: the counter matches the catalog
+  ok   content/catalog: only a window of rows is in the DOM (< 80)
+  ok   content/catalog: the filter narrows and the counter says how many
+  ok   content/catalog: the filter is kept in the URL
+  ok   content/catalog: selecting a row fills the panel (data, findings)
+  ok   content/catalog: the selection is in the URL
+  ok   content/catalog: the deep link to a piece survives a reload
+  note content: catalog chips: no piece has findings
+  ok   content/catalog: choosing a kit lists only its pieces
+  ok   content/catalog: the kit panel shows its folder
+  ok   content/catalog: sorting a column is kept in the URL
+  note content: catalog actions: no piece with material slots
+  ok   content/catalog: no JS errors
+  ok   content/catalog: usable at 900 px (no horizontal overflow)
+  ok   content/materials: the empty state is explained
+  ok   content/materials: no JS errors
+  ok   content/content: shows the set and one row per element (counter)
+  ok   content/content: one chip per kind
+  ok   content/content: a set without findings shows the calm state
+  ok   content/content: the set-level findings are shown
+  ok   content/content: the filter narrows the rows
+  ok   content/content: selecting a row fills the panel
+  ok   content/content: the deep link to an element survives a reload
+  ok   content/content: no JS errors
+  ok   content/tree: the root and its children are listed
+  ok   content/tree: only expanded branches are in the DOM
+  ok   content/tree: the panel shows the root
+  ok   content/tree: Expandir todo lists every node
+  ok   content/tree: Plegar todo leaves the root
+  ok   content/tree: no JS errors
+  ok   content/search: results are grouped by type with the total of each
+  ok   content/search: each group is capped at 5
+  ok   content/search: ArrowDown marks an option (aria-activedescendant)
+  ok   content/search: Enter opens the option
+  ok   content/search: the opened piece shows in the panel
+  ok   content/search: nothing found says so
+  ok   content/search: Esc closes the results
+  ok   content/palette: Ctrl+K opens the dialog with the views and Releer
+  ok   content/palette: typing a view and Enter goes there, the dialog closes
+  ok   content/palette: a piece name jumps to that piece
+  ok   content/palette: Esc closes it
+  ok   content/palette: the Releer action runs (toast)
+  ok   content/palette: no JS errors
+  ok   content/context: view renders with text, layers and the talk panel
+  ok   content/context: adding a claim opens a dialog (not prompt) that Esc closes without writing
+  ok   content/context: the dialog is gone after Esc
+  ok   content/context: choosing a layer keeps it in the URL
+  ok   content/context: no JS errors
+  ok   content/spec: examples-like project without specs shows the empty state
+  ok   content/spec/build: no JS errors
+  ok   content/numbers: no 4+ digit number is left ungrouped in the catalog
+  ok   content/catalog: header columns do not overlap (no clipped header cell)
+  ok   content/3d: opened and closed 20 times, every viewer drawn and every renderer disposed
+  ok   content/3d: a fresh WebGL context is still available afterwards
+  ok   content/3d: the piece detail has its Ver en 3D button
+  ok   content/jobs: with no jobs the view says so and offers where jobs come from
+  ok   content/new views: no JS errors
+  ok   content/a11y: the catalog grid has aria-rowcount and aria-sort on every column header
+  ok   content/keyboard: Tab reaches the Inicio entry of the navigation
+  ok   content/keyboard: Tab and Enter on Catálogo open the catalog
+  ok   content/keyboard: Tab to the filter and typing narrows the list
+  ok   content/keyboard: arrows and Enter select a row and open the detail panel
+  ok   content/keyboard: focus stays on the grid while the panel is open
+  ok   content/keyboard: Esc closes the detail panel and focus returns to the grid
+  ok   content/keyboard: Ctrl+K opens the palette with focus in its field
+  ok   content/keyboard: the palette jumps to the chosen view and closes
+  ok   content/keyboard: focus was never lost to <body> along the whole path
+  ok   content/a11y: no element with a pointer cursor is out of the keyboard's reach
+  ok   content/a11y: every button and link has an accessible name
+  ok   content/a11y: every form input has a label
+  ok   content/a11y: headings never skip a level
+  ok   content/a11y: exactly one h1 per view
+  ok   content/a11y: landmarks and live regions (status, toasts, alerts) in every view
+  ok   content/a11y: every control reached with Tab shows a focus ring
+  ok   content/a11y: every view is usable at 900 px (no horizontal scroll)
+  ok   content/a11y: at 900 px the detail panel is an overlay inside the window
+  ok   content/a11y: Esc closes the overlay panel and focus returns to Detalle
+  ok   content/a11y: walkthrough ran without JS errors
+  ok   content/app: ran without JS errors
+
+== synthetic/ new UI (port 50762)
+  ok   synthetic/app: home drawn
+  ok   synthetic/app: project name in the top bar
+  ok   synthetic/app: shell has top bar, nav, main, search, Comandos, Releer
+  ok   synthetic/nav: entries present (Contenido only with content sets)
+  ok   synthetic/nav: counters match the catalog
+  ok   synthetic/nav: catalog dot is the worst severity of its findings
+  ok   synthetic/home: shows counts from the catalog
+  ok   synthetic/home: shows each content set with its status
+  ok   synthetic/home: findings grouped by severity with their totals
+  ok   synthetic/home: next-step card follows the rules
+  ok   synthetic/home: no JS errors
+  ok   synthetic/routes: the new UI links to the previous one (Interfaz anterior -> /classic)
+  ok   synthetic/routes: / serves the new UI, /app the same page, /classic the old one with its banner
+  ok   synthetic/app: usable at 900 px (no horizontal overflow)
+  ok   synthetic/home: clicking a finding navigates (hash changes to its route)
+  ok   synthetic/app: the nav marks the current view
+  ok   synthetic/app: reload keeps the route
+  ok   synthetic/app: Releer answers with a toast and gives the button back
+  ok   synthetic/app: Releer no JS errors
+  ok   synthetic/catalog: one link per kit
+  ok   synthetic/catalog: the counter matches the catalog
+  ok   synthetic/catalog: only a window of rows is in the DOM (< 80)
+  ok   synthetic/catalog: the filter narrows and the counter says how many
+  ok   synthetic/catalog: the filter is kept in the URL
+  ok   synthetic/catalog: selecting a row fills the panel (data, findings)
+  ok   synthetic/catalog: the selection is in the URL
+  ok   synthetic/catalog: the deep link to a piece survives a reload
+  ok   synthetic/catalog: the error chip keeps only those pieces
+  ok   synthetic/catalog: choosing a kit lists only its pieces
+  ok   synthetic/catalog: the kit panel shows its folder
+  ok   synthetic/catalog: sorting a column is kept in the URL
+  ok   synthetic/catalog: a failing bind shows a clear error toast
+  ok   synthetic/catalog: binding a slot answers with a toast and the panel shows it
+  ok   synthetic/catalog: no JS errors
+  ok   synthetic/catalog: usable at 900 px (no horizontal overflow)
+  ok   synthetic/materials: the list is not cut (counter = every material)
+  ok   synthetic/materials: a window of rows (< 80)
+  ok   synthetic/materials: the filter narrows
+  ok   synthetic/materials: selecting a row shows the material, where it is used and its findings
+  ok   synthetic/materials: the deep link survives a reload
+  ok   synthetic/materials: no JS errors
+  ok   synthetic/content: shows the set and one row per element (counter)
+  ok   synthetic/content: one chip per kind
+  ok   synthetic/content: a set without findings shows the calm state
+  ok   synthetic/content: the set-level findings are shown
+  ok   synthetic/content: the filter narrows the rows
+  ok   synthetic/content: selecting a row fills the panel
+  ok   synthetic/content: the deep link to an element survives a reload
+  ok   synthetic/content: no JS errors
+  ok   synthetic/tree: the root and its children are listed
+  ok   synthetic/tree: only expanded branches are in the DOM
+  ok   synthetic/tree: the panel shows the root
+  ok   synthetic/tree: expanding a node adds its children
+  ok   synthetic/tree: selecting a node fills the panel, the breadcrumb and the URL
+  ok   synthetic/tree: the deep link survives a reload
+  ok   synthetic/tree: Expandir todo lists every node
+  ok   synthetic/tree: Plegar todo leaves the root
+  ok   synthetic/tree: no JS errors
+  ok   synthetic/search: results are grouped by type with the total of each
+  ok   synthetic/search: each group is capped at 5
+  ok   synthetic/search: a capped group offers 'Ver todos'
+  ok   synthetic/search: ArrowDown marks an option (aria-activedescendant)
+  ok   synthetic/search: Enter opens the option
+  ok   synthetic/search: the opened piece shows in the panel
+  ok   synthetic/search: nothing found says so
+  ok   synthetic/search: Esc closes the results
+  ok   synthetic/palette: Ctrl+K opens the dialog with the views and Releer
+  ok   synthetic/palette: typing a view and Enter goes there, the dialog closes
+  ok   synthetic/palette: a piece name jumps to that piece
+  ok   synthetic/palette: Esc closes it
+  ok   synthetic/palette: the Releer action runs (toast)
+  ok   synthetic/palette: no JS errors
+  ok   synthetic/context: view renders with text, layers and the talk panel
+  ok   synthetic/context: adding a claim opens a dialog (not prompt) that Esc closes without writing
+  ok   synthetic/context: the dialog is gone after Esc
+  ok   synthetic/context: choosing a layer keeps it in the URL
+  ok   synthetic/context: no JS errors
+  ok   synthetic/spec: examples-like project without specs shows the empty state
+  ok   synthetic/spec/build: no JS errors
+  ok   synthetic/numbers: no 4+ digit number is left ungrouped in the catalog
+  ok   synthetic/catalog: header columns do not overlap (no clipped header cell)
+  ok   synthetic/3d: opened and closed 20 times, every viewer drawn and every renderer disposed
+  ok   synthetic/3d: a fresh WebGL context is still available afterwards
+  ok   synthetic/3d: the piece detail has its Ver en 3D button
+  ok   synthetic/jobs: with no jobs the view says so and offers where jobs come from
+  ok   synthetic/new views: no JS errors
+  ok   synthetic/a11y: the catalog grid has aria-rowcount and aria-sort on every column header
+  ok   synthetic/keyboard: Tab reaches the Inicio entry of the navigation
+  ok   synthetic/keyboard: Tab and Enter on Catálogo open the catalog
+  ok   synthetic/keyboard: Tab to the filter and typing narrows the list
+  ok   synthetic/keyboard: arrows and Enter select a row and open the detail panel
+  ok   synthetic/keyboard: focus stays on the grid while the panel is open
+  ok   synthetic/keyboard: Esc closes the detail panel and focus returns to the grid
+  ok   synthetic/keyboard: Ctrl+K opens the palette with focus in its field
+  ok   synthetic/keyboard: the palette jumps to the chosen view and closes
+  ok   synthetic/keyboard: focus was never lost to <body> along the whole path
+  ok   synthetic/a11y: no element with a pointer cursor is out of the keyboard's reach
+  ok   synthetic/a11y: every button and link has an accessible name
+  ok   synthetic/a11y: every form input has a label
+  ok   synthetic/a11y: headings never skip a level
+  ok   synthetic/a11y: exactly one h1 per view
+  ok   synthetic/a11y: landmarks and live regions (status, toasts, alerts) in every view
+  ok   synthetic/a11y: every control reached with Tab shows a focus ring
+  ok   synthetic/a11y: every view is usable at 900 px (no horizontal scroll)
+  ok   synthetic/a11y: at 900 px the detail panel is an overlay inside the window
+  ok   synthetic/a11y: Esc closes the overlay panel and focus returns to Detalle
+  ok   synthetic/a11y: walkthrough ran without JS errors
+  ok   synthetic/app: ran without JS errors
+
+== wizard/ (port 50765)
+  ok   wizard/app wizard: / opens the wizard on a folder without kiln.toml
+  ok   wizard/app wizard: five steps, the first one current
+  ok   wizard/app wizard: name field and the talk panel are there
+  ok   wizard/app wizard: the navigation is out of the way
+  ok   wizard/a11y: the wizard has exactly one h1 and no skipped heading level
+  ok   wizard/app wizard: Seguir without a name says what is missing and stays
+  ok   wizard/app wizard: with a name it goes to step 2 (Lo básico) with its questions
+  ok   wizard/app wizard: Atrás returns to step 1 keeping the name
+  ok   wizard/app wizard: no JS errors
+
+== longnames (port 50768)
+  ok   longnames/long names: the scratch project has a 200-character kit and piece
+  ok   longnames/long names: the scratch project reaches every field (finding on the long kit, 5,000-character manifest and material text)
+  ok   longnames/long names: no horizontal scroll on the catalog, kit and piece routes at 1440 and 900 px
+
+== measurements on the synthetic project (3 runs, median)
+  run 1 done
+  run 2 done
+  run 3 done
+  ok   synthetic/budget: first view (home, painted) < 300 (x1.25 tolerance)
+  ok   synthetic/budget: first view straight on the catalog < 300 (x1.25 tolerance)
+  ok   synthetic/budget: catalog filter keystroke < 50 (x1.25 tolerance)
+  ok   synthetic/budget: row nodes in the catalog (5,000 pieces) < 80
+  ok   synthetic/metric is real: app_home_dom_ms > 0
+  ok   synthetic/metric is real: app_home_paint_ms > 0
+  ok   synthetic/metric is real: app_home_nodes > 0
+  ok   synthetic/metric is real: app_catalog_first_ms > 0
+  ok   synthetic/metric is real: app_catalog_switch_ms > 0
+  ok   synthetic/metric is real: app_catalog_nodes > 0
+  ok   synthetic/metric is real: app_catalog_rows > 0
+  ok   synthetic/metric is real: app_catalog_filter_ms > 0
+  ok   synthetic/metric is real: app_catalog_filter_rows > 0
+  ok   synthetic/metric is real: app_catalog_filter_count > 0
+  ok   synthetic/metric is real: app_catalog_filter_count_before > 0
+  ok   synthetic/metric is real: app_search_ms > 0
+  ok   synthetic/metric is real: app_search_nodes > 0
+  ok   synthetic/metric is real: app_materials_switch_ms > 0
+  ok   synthetic/metric is real: app_materials_nodes > 0
+  ok   synthetic/metric is real: app_materials_rows > 0
+  ok   synthetic/metric is real: app_content_switch_ms > 0
+  ok   synthetic/metric is real: app_content_nodes > 0
+  ok   synthetic/metric is real: app_content_rows > 0
+  ok   synthetic/metric is real: app_tree_switch_ms > 0
+  ok   synthetic/metric is real: app_tree_nodes > 0
+  ok   synthetic/metric is real: app_tree_rows > 0
+  ok   synthetic/metric is real: app_heap_mb > 0
+  ok   synthetic/catalog was measured, not the home view: nodes differ
+
+== before / after (synthetic project: 5000 pieces, 2000 findings)
+| measure | previous UI, first recorded | previous UI, this run | new UI, this run |
+|---|---:|---:|---:|
+| first view (painted), ms | 379 | 66.3 | 63.0 |
+| switch to catalog, ms | 111 | 109 | 45.2 |
+| filter keystroke in catalog, ms | 74.4 | 76.3 | 1.7 |
+| global search keystroke, ms | 74.4 | 76.3 | 123 |
+| DOM nodes, catalog view | 8158 | 8160 | 413 |
+| DOM nodes, home view | 123 | 125 | 183 |
+| /api/catalog cold (forced fresh read, X-Kiln-Fresh), ms | 330 | 466 | 466 |
+| /api/catalog cached (304 with If-None-Match), ms | 330 | 22.0 | 20.8 |
+| JS heap after the views, MB | 3.7 | 3.7 | 4.8 |
+
+metric                           median  baseline        delta
+-------------------------------  ------  --------  -----------
+api_catalog_ms                      466       413  +52.9 (13%)
+api_catalog_warm_ms                22.0      21.2    +0.7 (3%)
+api_catalog_cached_ms              20.8      19.0    +1.8 (9%)
+api_catalog_kb                     2442      2442    +0.9 (0%)
+pieces                             5000      5000    +0.0 (0%)
+findings                           2000      2000    +0.0 (0%)
+fmp_dom_ms                         50.7      53.4   -2.7 (-5%)
+fmp_paint_ms                       66.3      74.7  -8.4 (-11%)
+fcp_ms                             40.0      44.0   -4.0 (-9%)
+heap_default_mb                     3.4       3.4    +0.0 (0%)
+dom_default                         125       125    +0.0 (0%)
+switch_context_ms                   1.5       1.5    +0.0 (0%)
+dom_context                         125       125    +0.0 (0%)
+switch_tree_ms                      7.7       6.9   +0.8 (12%)
+dom_tree                            842       842    +0.0 (0%)
+switch_content_ms                  27.4      26.5    +0.9 (3%)
+dom_content                        8342      8342    +0.0 (0%)
+switch_catalog_ms                   109       110   -1.6 (-1%)
+dom_catalog                        8160      8160    +0.0 (0%)
+keystroke_ms                       76.3      76.4   -0.1 (-0%)
+open_kit_ms                        90.4      89.7    +0.7 (1%)
+long_open_kit_ms                   91.0      91.0    +0.0 (0%)
+dom_catalog_kit_open               3747      3747    +0.0 (0%)
+keystroke_open_kit_ms              71.2      71.6   -0.4 (-1%)
+heap_after_views_mb                 3.7       3.7    +0.0 (0%)
+js_errors                           0.0       0.0         +0.0
+app_home_dom_ms                    55.8      55.8    +0.0 (0%)
+app_home_paint_ms                  63.0      67.0   -4.0 (-6%)
+app_home_nodes                      183       183    +0.0 (0%)
+app_js_errors                       0.0       0.0         +0.0
+app_catalog_first_ms               61.1      64.7   -3.6 (-6%)
+app_catalog_switch_ms              45.2      52.1  -6.9 (-13%)
+app_catalog_nodes                   413       413    +0.0 (0%)
+app_catalog_rows                   24.0      24.0    +0.0 (0%)
+app_catalog_filter_ms               1.7       1.4   +0.3 (21%)
+app_catalog_filter_rows            24.0      24.0    +0.0 (0%)
+app_catalog_filter_count           1000      1000    +0.0 (0%)
+app_catalog_filter_count_before    5000      5000    +0.0 (0%)
+app_search_ms                       123       124   -0.8 (-1%)
+app_search_nodes                   27.0      27.0    +0.0 (0%)
+app_materials_switch_ms            82.1      81.7    +0.4 (0%)
+app_materials_nodes                 338       338    +0.0 (0%)
+app_materials_rows                 25.0      25.0    +0.0 (0%)
+app_content_switch_ms              27.5      32.5  -5.0 (-15%)
+app_content_nodes                   279       279    +0.0 (0%)
+app_content_rows                   20.0      20.0    +0.0 (0%)
+app_tree_switch_ms                 20.1      15.8   +4.3 (27%)
+app_tree_nodes                      684       684    +0.0 (0%)
+app_tree_rows                      71.0      71.0    +0.0 (0%)
+app_heap_mb                         4.8       4.8    +0.0 (0%)
+app_views_js_errors                 0.0       0.0         +0.0
+
+476 checks passed, 0 failed, 18 notes
+REGRESSION check from the baseline is missing or red: examples/view Contexto: search "electricidad" narrows (4 dimmed)
+
+== generated recipe panel
+  ok   generated/rock: the spec view opens
+  ok   generated/rock: no parts table
+  ok   generated/rock: one group per op with its Spanish label
+  ok   generated/rock: radius range has min and max inputs
+  ok   generated/rock: the seed input shows 7
+  ok   generated/rock: the Aplicar button
+  ok   generated/rock: the edits are in the inputs before applying
+  ok   generated/apply: the toast «Asset generado» appears
+  ok   generated/apply: the page posted /api/generate
+  ok   generated/apply: the catalog has seed 9 and the new amplitude
+  ok   generated/apply: specs/rock.toml on disk has seed = 9 and the new amplitude
+  ok   generated/apply: the 3D view has a canvas
+  ok   generated/apply: the generated GLB is served
+  ok   generated/hoist: still shows its parts table and no recipe panel
+  ok   generated/no JS errors
+
+15 generated checks passed, 0 failed
+
+screenshots: /var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T//kiln-ui-test.DQzg2v/screenshots
+metrics:     /var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T//kiln-ui-test.DQzg2v/metrics.json   (synthetic project: /var/folders/6z/grgr4_391b769y77xh4qggkc0000gn/T//kiln-ui-test.DQzg2v/synthetic)
+FAIL: ui walkthrough failed (exit 1)
+exit 1

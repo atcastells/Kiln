@@ -367,7 +367,7 @@ function askFor(id, from) {
 
 function specLevel(sp) { const subs = ["asset:" + sp.asset.id, ...sp.parts.map(p => `part:${sp.asset.id}/${p.id}`)]; const f = cat.findings.filter(x => subs.includes(x.subject)).map(x => x.severity); return f.includes("error") ? "error" : f.includes("warn") ? "warn" : f.length ? "info" : null; }
 
-const SRC = { reuse: ["Reutilizar", "ok"], variant: ["Variante", "info"], search: ["Buscar", "warn"], retouch: ["Retocar", "info"], asset: ["Asset", "ok"] };
+const SRC = { reuse: ["Reutilizar", "ok"], variant: ["Variante", "info"], search: ["Buscar", "warn"], retouch: ["Retocar", "info"], asset: ["Asset", "ok"], model: ["Modelada", "ok"] };
 function renderSpec(sp) {
   const C = { ask: 20, asset: 260, part: 500, src: 750, mat: 1000, check: 1250 };
   const nodes = [], edges = [], id = sp.asset.id;

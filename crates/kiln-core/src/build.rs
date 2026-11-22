@@ -32,6 +32,9 @@ pub struct Plan {
     /// Mount points, exported as empty nodes named `anchor_<id>`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub anchors: Vec<PlanAnchor>,
+    /// Box-UV scale of modelled parts; set only when some item has shapes.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub uv_per_m: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,6 +78,9 @@ pub struct Item {
     pub split: Option<String>,
     /// Slot -> palette material, from the piece's bindings.
     pub slots: BTreeMap<String, Paint>,
+    /// The forms Blender builds the part from (metres, glTF axes, part frame).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub shapes: Vec<crate::model::Shape>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -206,6 +212,29 @@ fn paint(root: &Path, m: &Material) -> Paint {
     }
 }
 
+/// Refuses a spec whose shapes `kiln check` would reject, so Blender never
+/// gets shapes outside the limits (R6), even when build runs without check.
+pub fn refuse(spec: &Spec) -> Result<(), String> {
+    for p in &spec.parts {
+        let problems = match (p.source.kind == "model", p.shapes.is_empty()) {
+            (true, _) => {
+                let copies = crate::model::copies_problem(&p.shapes, p.count.unwrap_or(1));
+                crate::model::problems(&p.shapes).into_iter().chain(copies).collect()
+            }
+            (false, false) => vec!["`shapes` solo vale en una pieza con fuente `model`".into()],
+            (false, true) => continue,
+        };
+        if !problems.is_empty() {
+            return Err(format!(
+                "no se monta: la pieza «{}» tiene formas que `kiln check` rechaza: {}",
+                p.id,
+                problems.join("; ")
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub fn plan(root: &Path, config: &Config, cat: &Catalog, spec: &Spec) -> Plan {
     let dir = out_dir(root, config, &spec.asset.id);
     let file = |ext: &str| {
@@ -235,12 +264,19 @@ pub fn plan(root: &Path, config: &Config, cat: &Catalog, spec: &Spec) -> Plan {
                 .map(|f| root.join(f).to_string_lossy().into_owned()),
         };
         let child_size = child.and_then(|c| cat.builds.get(c)).and_then(|r| r.size_m);
+        let is_model = p.source.kind == "model";
         let size = p
             .size_m
+            .or(is_model
+                .then(|| {
+                    crate::model::bounds(&p.shapes).map(|(lo, hi)| [0, 1, 2].map(|i| hi[i] - lo[i]))
+                })
+                .flatten())
             .or(piece.and_then(|c| c.size_m))
             .or(child_size)
             .unwrap_or([BOX_M; 3]);
         let todo = match (&p.source.kind[..], &model) {
+            ("model", _) => None,
             ("asset", None) => Some(format!("caja: monta antes «{}»", child.unwrap_or("?"))),
             ("asset", Some(_)) => None,
             ("search", _) => Some(format!(
@@ -292,7 +328,8 @@ pub fn plan(root: &Path, config: &Config, cat: &Catalog, spec: &Spec) -> Plan {
                 model: model.clone(),
                 // A reused piece or a built asset keeps its size unless it has
                 // no model to keep.
-                fit: !matches!(&p.source.kind[..], "reuse" | "asset") || model.is_none(),
+                fit: !is_model
+                    && (!matches!(&p.source.kind[..], "reuse" | "asset") || model.is_none()),
                 size_m: if p.source.kind == "reuse" {
                     piece.and_then(|c| c.size_m).unwrap_or(size)
                 } else if p.source.kind == "asset" {
@@ -318,10 +355,15 @@ pub fn plan(root: &Path, config: &Config, cat: &Catalog, spec: &Spec) -> Plan {
                 },
                 split: split.clone(),
                 slots: slots.clone(),
+                shapes: p.shapes.clone(),
             });
         }
     }
     lay_out(&mut items);
+    let uv_per_m = items
+        .iter()
+        .any(|i| !i.shapes.is_empty())
+        .then(|| config.uv_per_m());
     Plan {
         asset: spec.asset.id.clone(),
         name: spec.asset.name.clone(),
@@ -342,6 +384,7 @@ pub fn plan(root: &Path, config: &Config, cat: &Catalog, spec: &Spec) -> Plan {
                 turn: a.turn,
             })
             .collect(),
+        uv_per_m,
     }
 }
 
@@ -470,6 +513,7 @@ mod tests {
             zones: BTreeMap::new(),
             split: None,
             slots: BTreeMap::new(),
+            shapes: Vec::new(),
         }
     }
 
@@ -583,6 +627,49 @@ materials = { "beam/wood" = "pine", "flat/x" = "ghost" }
         assert_eq!(key(&old, "flat/x").as_deref(), Some("iron"));
         let none = paints(root, &cat(), &s, &names, Some("missing"));
         assert_eq!(key(&none, "beam/wood").as_deref(), Some("oak"));
+    }
+
+    #[test]
+    fn a_model_part_carries_its_shapes_and_no_todo() {
+        let config = Config::parse("[project]\nname = \"t\"\n[assets]\nuv_per_m = 0.5\n").unwrap();
+        let spec = crate::spec::parse(
+            "[asset]\nid = \"m\"\nname = \"M\"\n[[parts]]\nid = \"p\"\nwhat = \"x\"\nmaterials = { wood = \"oak\" }\n[parts.source]\nkind = \"model\"\n[[parts.shapes]]\nzone = \"wood\"\nbox = [[0.0, 0.0, 0.0], [1.0, 0.5, 0.25]]\n",
+        )
+        .unwrap();
+        let p = plan(Path::new("/p"), &config, &cat(), &spec);
+        let it = &p.items[0];
+        assert_eq!(it.shapes.len(), 1);
+        assert!(it.model.is_none() && !it.fit && it.todo.is_none());
+        assert_eq!(it.size_m, [1.0, 0.5, 0.25]);
+        assert_eq!(it.zones["wood"].key, "oak");
+        assert_eq!(p.uv_per_m, Some(0.5));
+    }
+
+    /// R6 holds at build time too: Blender never gets shapes `kiln check` refuses.
+    #[test]
+    fn build_refuses_shapes_outside_the_limits() {
+        let part = |kind: &str, shape: &str| {
+            crate::spec::parse(&format!(
+                "[asset]\nid = \"m\"\nname = \"M\"\n[[parts]]\nid = \"p\"\nwhat = \"x\"\n[parts.source]\nkind = \"{kind}\"\nfrom = \"k/p\"\n[[parts.shapes]]\nzone = \"wood\"\n{shape}\n"
+            ))
+            .unwrap()
+        };
+        let good = "box = [[0.0, 0.0, 0.0], [1.0, 0.5, 0.25]]";
+        let two = "tube = { from = [0, 0, 0], to = [0, 1, 0], radius = 0.1, segments = 2 }";
+        assert!(refuse(&part("model", good)).is_ok());
+        for (kind, shape) in [("model", two), ("reuse", good)] {
+            let e = refuse(&part(kind, shape)).unwrap_err();
+            assert!(e.contains("«p»"), "{kind}: {e}");
+        }
+    }
+
+    #[test]
+    fn a_plan_without_model_parts_serializes_no_shapes_or_uv() {
+        let config = Config::parse("[project]\nname = \"t\"\n[assets]\nuv_per_m = 0.5\n").unwrap();
+        let spec = crate::spec::parse(SPEC).unwrap();
+        let p = plan(Path::new("/p"), &config, &cat(), &spec);
+        let text = serde_json::to_string(&p).unwrap();
+        assert!(!text.contains("shapes") && !text.contains("uv_per_m"), "{text}");
     }
 
     #[test]

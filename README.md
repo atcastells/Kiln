@@ -266,6 +266,12 @@ materials = { "post/Wood" = "oak", "load/Iron" = "rust" }
 Para cada zona manda, por este orden: `materials` de la ficha, `material`
 de la pieza (todas sus zonas), el vínculo del catálogo y el propio modelo.
 
+**Piezas modeladas.** `source = { kind = "model" }` dibuja la pieza con
+`[[parts.shapes]]` (formas `box`, `para` y `tube`, en metros, ejes de glTF, cada
+una con su `zone`); cada zona necesita material en `materials` y `size_m` sale
+de las formas. `[assets] uv_per_m` (opcional, > 0, por defecto 1.0) fija
+cuántas veces se repite la textura por metro en estas piezas.
+
 En el GLB montado cada material se llama `pieza/zona`, y por eso cambiar un
 material no obliga a montar otra vez:
 
@@ -423,11 +429,11 @@ Los proyectos que crea Kiln (`project_create`, `new_game`) y el de `--project`
 ya cuentan como de confianza. La lista está en `trusted.json`, junto al
 registro; `status` y `projects` dicen `trusted`.
 
-Son 36 herramientas. Empieza por `status`, que dice qué carpeta está abierta.
+Son 37 herramientas. Empieza por `status`, que dice qué carpeta está abierta.
 
 | Grupo | Herramientas |
 |---|---|
-| Leer | `status` resumen y siguiente paso; `tree` árbol, un nivel cada vez; `catalog` kits, piezas, materiales, fichas o la UI del juego (`what=ui`); `check` hallazgos; `content` conjuntos de contenido; `spec_get` una ficha; `review_sheets` hojas de la revisión como imágenes |
+| Leer | `status` resumen y siguiente paso; `tree` árbol, un nivel cada vez; `catalog` kits, piezas, materiales, fichas o la UI del juego (`what=ui`); `check` hallazgos; `content` conjuntos de contenido; `spec_get` una ficha; `review_sheets` hojas de la revisión como imágenes; `guide` el texto de los prompts (`asset`, `review`, `context`) para clientes que no los pasan al modelo |
 | Fichas | `spec_write` escribe una ficha si pasa la comprobación; `spec_layout` solo coloca piezas (`at`, `turn`) |
 | Contexto | `context_get` lee; `context_propose` la voz del agente; `context_edit` la voz de la persona |
 | Producción y trabajos | `build` monta con Blender; `generate` genera con Godot un asset de receta; `paint` aplica materiales; `godot_measure` mide lo que solo Godot abre y exporta las piezas `.blend`; `review` monta y saca las hojas de una vuelta de la revisión; `review_submit` manda la revisión del cliente; `verify` comprueba el GLB montado; `publish` lo lleva al juego; `tools` dice qué herramientas externas hay y su versión; `job` y `jobs` siguen los trabajos |
@@ -439,7 +445,8 @@ Son 36 herramientas. Empieza por `status`, que dice qué carpeta está abierta.
 
 Tres prompts: `kiln-asset` (de la petición a la ficha), `kiln-context`
 (ordenar o afinar el contexto) y `kiln-review` (revisar el montaje, con
-`review_sheets` y `review_submit`).
+`review_sheets` y `review_submit`). Un cliente que no pasa los prompts al
+modelo (como `claude -p`) lee el mismo texto con `guide`.
 
 ### Lo que hace la página, por MCP
 

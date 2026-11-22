@@ -83,6 +83,7 @@ fn build_one(
         .iter()
         .find(|s| s.asset.id == id)
         .ok_or(format!("no hay ficha con id «{id}»"))?;
+    build::refuse(spec)?;
     let plan = build::plan(project, &cfg, &cat, spec);
     let dir = build::out_dir(project, &cfg, id);
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;

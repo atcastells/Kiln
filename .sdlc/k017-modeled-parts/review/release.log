@@ -1,0 +1,7 @@
+   Compiling tokio v1.54.1
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+   Compiling tokio-util v0.7.20
+   Compiling rmcp v3.8.0
+   Compiling kiln-cli v0.1.0 (/Users/acastells/Kiln/crates/kiln-cli)
+    Finished `release` profile [optimized] target(s) in 21.31s
+exit 0

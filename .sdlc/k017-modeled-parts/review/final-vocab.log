@@ -1,0 +1,28 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.29s
+     Running unittests src/lib.rs (target/debug/deps/kiln_core-1b0997d9069dbce5)
+
+running 3 tests
+test model::tests::problems_table ... ok
+test model::tests::tris_and_bounds ... ok
+test model::tests::parses_the_three_forms_from_toml ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 387 filtered out; finished in 0.00s
+
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+   Compiling kiln-cli v0.1.0 (/Users/acastells/Kiln/crates/kiln-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2.59s
+     Running tests/mcp_prompts.rs (target/debug/deps/mcp_prompts-084befd2769bf442)
+
+running 7 tests
+test request_over_500_chars_is_a_protocol_error ... ok
+test asset_prompt_carries_the_generation_vocabulary ... ok
+test list_has_the_three_with_their_arguments ... ok
+test asset_prompt_is_one_message_with_header_skill_and_request ... ok
+test guide_tool_gives_the_prompt_texts ... ok
+test asset_prompt_without_request_asks_the_person_first ... ok
+test context_and_review_prompts_carry_their_header ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.54s
+

@@ -57,8 +57,8 @@ pub struct Kiln {
 const INSTRUCTIONS: &str = "Kiln prepara los assets y el contenido de un juego. \
 Empieza por `status`: dice qué proyecto está abierto. Con `projects`, `project_open` y \
 `project_create` se cambia de juego sin salir de la conversación. El trabajo de agente \
-lo haces tú siguiendo los prompts `kiln-asset` y `kiln-context`; Kiln comprueba y \
-escribe. Montar, pintar, medir con Godot, revisar y traer son trabajos largos: devuelven \
+lo haces tú siguiendo los prompts `kiln-asset` y `kiln-context` (o `guide` con `asset`, \
+`review` o `context` si no los ves); Kiln comprueba y escribe. Montar, pintar, medir con Godot, revisar y traer son trabajos largos: devuelven \
 un id que se sigue con `job`; siguen corriendo aunque se cierre la conversación, y `jobs` \
 los lista. La página de Kiln muestra el proyecto abierto y sus trabajos.";
 
@@ -88,7 +88,8 @@ impl Kiln {
                 + Self::materials_router()
                 + Self::sources_router()
                 + Self::new_game_router()
-                + Self::projects_router(),
+                + Self::projects_router()
+                + Self::guide_router(),
             prompt_router: Self::prompts_router(),
         };
         match project {

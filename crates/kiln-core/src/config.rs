@@ -443,6 +443,9 @@ pub struct AssetsSection {
     /// Folder of the asset specs Kiln writes (used from the second delivery).
     #[serde(default)]
     pub specs: Option<String>,
+    /// Box-UV scale of modelled parts, in UV units per metre (1.0 when unset).
+    #[serde(default)]
+    pub uv_per_m: Option<f64>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -564,6 +567,11 @@ impl Config {
         out
     }
 
+    /// Box-UV scale of modelled parts: `[assets] uv_per_m`, else 1.0.
+    pub fn uv_per_m(&self) -> f64 {
+        self.assets.uv_per_m.unwrap_or(1.0)
+    }
+
     pub fn load(project: &Path) -> Result<Config, String> {
         let path = project.join(FILE);
         let text = std::fs::read_to_string(&path)
@@ -584,6 +592,11 @@ impl Config {
         }
         if !(0.0..=1.0).contains(&c.generate.steep_max) {
             return Err("[generate] steep_max debe estar entre 0 y 1".into());
+        }
+        if let Some(v) = c.assets.uv_per_m
+            && (!v.is_finite() || v <= 0.0)
+        {
+            return Err("[assets] uv_per_m debe ser un número finito mayor que 0".into());
         }
         Ok(c)
     }
@@ -616,6 +629,23 @@ mod tests {
         assert_eq!(c.anchors["doorway"].opening_m, Some([1.4, 2.2]));
         assert!(c.anchors["wall_gap"].fits.is_empty());
         assert_eq!(c.publish.dir.as_deref(), Some("godot/assets"));
+    }
+
+    #[test]
+    fn uv_per_m_defaults_to_one_and_reads_back() {
+        let c = Config::parse("[project]\nname = \"x\"\n[assets]\nkits = []\n").unwrap();
+        assert_eq!(c.uv_per_m(), 1.0);
+        let c = Config::parse("[project]\nname = \"x\"\n[assets]\nuv_per_m = 0.5\n").unwrap();
+        assert_eq!(c.uv_per_m(), 0.5);
+    }
+
+    #[test]
+    fn uv_per_m_rejects_non_positive_and_non_finite() {
+        for v in ["0", "-1.5", "nan", "inf"] {
+            let e = Config::parse(&format!("[project]\nname = \"x\"\n[assets]\nuv_per_m = {v}\n"))
+                .unwrap_err();
+            assert!(e.contains("[assets] uv_per_m"), "{v}: {e}");
+        }
     }
 
     #[test]

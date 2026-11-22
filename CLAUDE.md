@@ -8,8 +8,8 @@ con Blender y Godot. Rust, sin dependencias fuera de Rust en el servidor.
 
 ```bash
 cargo build --release      # binario target/release/kiln
-cargo test --workspace     # 682 pasan, 0 fallan, 30 ignorados; ~15 s en caliente
-KILN_CANONICAL_RECIPES=<ASTRA>/godot/assets/kiln cargo test --workspace -- --ignored   # los 30: piden blender y godot en el PATH; los de geometría canónica leen las recetas de ASTRA; `integrity_fixture` pide `KILN_MESH_FIXTURE=<ASTRA>/godot/assets/kiln/historic_cavity/historic_cavity.glb`
+cargo test --workspace     # 694 pasan, 0 fallan, 31 ignorados; ~15 s en caliente
+KILN_CANONICAL_RECIPES=<ASTRA>/godot/assets/kiln cargo test --workspace -- --ignored   # los 31: piden blender y godot en el PATH (`model_build`, solo blender); los de geometría canónica leen las recetas de ASTRA; `integrity_fixture` pide `KILN_MESH_FIXTURE=<ASTRA>/godot/assets/kiln/historic_cavity/historic_cavity.glb`
 cargo clippy --workspace --all-targets -- -D warnings   # limpio, sin avisos
 scripts/ui_test.sh         # UI en Chrome sin ventana; pide node >= 22 y Chrome
 target/release/kiln serve --project examples   # el núcleo y su página en http://127.0.0.1:4330
