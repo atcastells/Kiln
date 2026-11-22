@@ -10,7 +10,7 @@ import { generatorPanel, bindGenerator } from "./generator.js";
 export const madeOf = sp => [...new Set(sp.parts.filter(p => p.source.kind === "asset" && p.source.from).map(p => p.source.from))];
 export const usedIn = (cat, id) => cat.specs.map(s => [s.asset.id, s.parts.filter(p => p.source.kind === "asset" && p.source.from === id).reduce((n, p) => n + Math.max(1, p.count || 1), 0)]).filter(([, n]) => n);
 export const specFindings = (cat, id) => cat.findings.filter(f => f.subject === `asset:${id}` || f.subject.startsWith(`part:${id}/`));
-export const SOURCE = { reuse: "Reutilizar", variant: "Variante", search: "Buscar", retouch: "Retocar", asset: "Asset" };
+export const SOURCE = { reuse: "Reutilizar", variant: "Variante", search: "Buscar", retouch: "Retocar", asset: "Asset", model: "Modelada" };
 // A part whose materials can become the catalog piece's defaults.
 export const canValidate = (p, cat) => Object.keys(p.materials ?? {}).length > 0 && ["reuse", "variant"].includes(p.source.kind) && cat.pieces.some(c => c.key === p.source.from);
 const sourceText = p => (p.source.from ? p.source.from + (p.source.variant ? ` · ${p.source.variant}` : "") : p.source.query ? `buscar «${p.source.query}»` : "—");

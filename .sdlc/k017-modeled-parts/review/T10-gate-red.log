@@ -1,0 +1,15 @@
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+error[E0425]: cannot find function `refuse` in this scope
+   --> crates/kiln-core/src/build.rs:636:17
+    |
+636 |         assert!(refuse(&part("model", good)).is_ok());
+    |                 ^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `refuse` in this scope
+   --> crates/kiln-core/src/build.rs:638:21
+    |
+638 |             let e = refuse(&part(kind, shape)).unwrap_err();
+    |                     ^^^^^^ not found in this scope
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `kiln-core` (lib test) due to 2 previous errors

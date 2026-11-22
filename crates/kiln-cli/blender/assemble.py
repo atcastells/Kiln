@@ -119,6 +119,99 @@ def box():
     return o
 
 
+def tube_rims(t):
+    """The two rims of a tube, in glTF space: the rule of `kiln_core::model::tube_rims`.
+
+    Plain Python floats (f64), same operations in the same order as the Rust
+    side: mathutils.Vector is float32 and breaks near-ties of the reference
+    axis differently, which turns the rim and changes the bounds.
+    """
+
+    def cross(a, b):
+        return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]
+
+    def unit(a):
+        n = math.sqrt(a[0] * a[0] + a[1] * a[1] + a[2] * a[2])
+        return [a[0] / n, a[1] / n, a[2] / n]
+
+    d = unit([t["to"][i] - t["from"][i] for i in range(3)])
+    k = min(range(3), key=lambda i: abs(d[i]))
+    a = [1.0 if k == i else 0.0 for i in range(3)]
+    e1 = unit(cross(d, a))
+    e2 = cross(d, e1)
+    n = t["segments"]
+
+    def rim(c, r):
+        out = []
+        for i in range(n):
+            th = math.tau * i / n
+            s, co = math.sin(th), math.cos(th)
+            out.append([c[j] + r * (co * e1[j] + s * e2[j]) for j in range(3)])
+        return out
+
+    r0 = t["radius"]
+    return [rim(t["from"], r0), rim(t["to"], t.get("radius_to") or r0)]
+
+
+def shape_faces(bm, shape, slot):
+    """Adds one shape to the bmesh, in Blender axes, all its faces on `slot`."""
+    faces = []
+    if "tube" in shape:
+        r0, r1 = ([bm.verts.new(to_blender(p)) for p in rim] for rim in tube_rims(shape["tube"]))
+        n = len(r0)
+        for i in range(n):
+            j = (i + 1) % n
+            faces.append(bm.faces.new((r0[i], r0[j], r1[j], r1[i])))
+        faces.append(bm.faces.new(r0))
+        faces.append(bm.faces.new(r1))
+    else:
+        if "box" in shape:
+            lo, hi = shape["box"]
+            o = [min(lo[i], hi[i]) for i in range(3)]
+            u, v, w = ([hi[i] - lo[i] if i == k else 0.0 for i in range(3)] for k in range(3))
+            u, v, w = ([abs(c) for c in e] for e in (u, v, w))
+        else:
+            p = shape["para"]
+            o, u, v, w = p["origin"], p["u"], p["v"], p["w"]
+        o, u, v, w = Vector(o), Vector(u), Vector(v), Vector(w)
+        c = [bm.verts.new(to_blender(o + a * u + b * v + g * w)) for a in (0, 1) for b in (0, 1) for g in (0, 1)]
+        # corner index is 4a + 2b + g
+        for q in ((0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1), (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3)):
+            faces.append(bm.faces.new([c[i] for i in q]))
+    for f in faces:
+        f.material_index = slot
+
+
+def modelled(item, uv_per_m):
+    """The object of a `model` part: its shapes in one mesh, one material slot per zone."""
+    import bmesh
+
+    zones = []
+    for s in item["shapes"]:
+        if s["zone"] not in zones:
+            zones.append(s["zone"])
+    bm = bmesh.new()
+    for s in item["shapes"]:
+        shape_faces(bm, s, zones.index(s["zone"]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    uv = bm.loops.layers.uv.new("UVMap")
+    for f in bm.faces:
+        n = f.normal
+        axis = max(range(3), key=lambda i: abs(n[i]))
+        i, j = [k for k in range(3) if k != axis]
+        for lp in f.loops:
+            lp[uv].uv = (lp.vert.co[i] * uv_per_m, lp.vert.co[j] * uv_per_m)
+    me = bpy.data.meshes.new(item["name"])
+    bm.to_mesh(me)
+    bm.free()
+    for z in zones:
+        m = bpy.data.materials.new(z)
+        # the zone travels in a property: Blender may cut or suffix the name
+        m["kiln_zone"] = z
+        me.materials.append(m)
+    return bpy.data.objects.new(item["name"], me)
+
+
 def base_to_origin(o):
     """Moves the mesh so the centre of its base is at the origin; returns its size (Blender axes)."""
     vs = [v.co for v in o.data.vertices]
@@ -183,10 +276,13 @@ def build_rig(item, o):
     return o
 
 
-def build(item, cache):
+def build(item, cache, uv_per_m=1.0):
     model = item.get("model")
     o = None
-    if model and os.path.exists(model):
+    if item.get("shapes"):
+        o = modelled(item, uv_per_m)
+        dims = base_to_origin(o)
+    elif model and os.path.exists(model):
         if model in RIGS:
             raise SystemExit(
                 "assemble.py: una pieza con esqueleto se coloca una sola vez: " + item["part"]
@@ -215,7 +311,7 @@ def build(item, cache):
     o.name = item["name"]
     w, h, d = item["size_m"]
     target = Vector((w, d, h))  # glTF (w, h, d) is Blender (x=w, y=d, z=h)
-    if item["fit"] or model is None:
+    if item["fit"] or (model is None and not item.get("shapes")):
         o.scale = Vector(
             tuple(t / s if s > 1e-6 else 1.0 for t, s in zip(target, dims))
         )
@@ -259,7 +355,7 @@ def main():
     bpy.ops.wm.read_factory_settings(use_empty=True)
     cache, built = {}, []
     for item in plan["items"]:
-        built.append((item, build(item, cache)))
+        built.append((item, build(item, cache, plan.get("uv_per_m") or 1.0)))
     for a in plan.get("anchors", []):
         anchor(a)
     for src, _ in cache.values():

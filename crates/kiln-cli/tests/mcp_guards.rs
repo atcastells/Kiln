@@ -10,7 +10,7 @@ use std::io::{BufRead, Write};
 use std::path::Path;
 
 /// (name, readOnly, destructive, idempotent, openWorld); absent hint = false.
-const SURFACE: [(&str, bool, bool, bool, bool); 36] = [
+const SURFACE: [(&str, bool, bool, bool, bool); 37] = [
     ("bind", false, true, true, false),
     ("build", false, true, false, false),
     ("catalog", true, false, false, false),
@@ -22,6 +22,7 @@ const SURFACE: [(&str, bool, bool, bool, bool); 36] = [
     ("context_propose", false, false, false, false),
     ("generate", false, true, false, false),
     ("godot_measure", false, false, false, false),
+    ("guide", true, false, false, false),
     ("import", false, true, false, true),
     ("job", true, false, false, false),
     ("jobs", true, false, false, false),

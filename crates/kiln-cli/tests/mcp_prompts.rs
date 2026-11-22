@@ -54,9 +54,26 @@ fn asset_prompt_carries_the_generation_vocabulary() {
     let r = m.request("prompts/get", serde_json::json!({"name": "kiln-asset", "arguments": {"request": "una roca"}}));
     let t = r["messages"][0]["content"]["text"].as_str().unwrap();
     assert!(t.contains("Vocabulario de generación"), "{t}");
+    assert!(t.contains("Vocabulario de modelado"), "{t}");
     for op in ["sphere", "stretch", "noise", "facet"] {
         assert!(t.contains(&format!("- {op} (")), "{op}: {t}");
     }
+}
+
+/// A client that does not hand prompts to the model reads the same text with `guide`.
+#[test]
+fn guide_tool_gives_the_prompt_texts() {
+    let p = temp_project("");
+    let mut m = Mcp::start(p.path());
+    let prompt = m.request("prompts/get", serde_json::json!({"name": "kiln-asset", "arguments": {"request": "x"}}));
+    let prompt = prompt["messages"][0]["content"]["text"].as_str().unwrap().to_string();
+    let asset = m.call("guide", serde_json::json!({"topic": "asset"}));
+    let asset: String = serde_json::from_str(&asset.text).unwrap();
+    assert!(asset.contains("Vocabulario de modelado") && prompt.starts_with(&asset), "{asset}");
+    let review = m.call("guide", serde_json::json!({"topic": "review"}));
+    let review: String = serde_json::from_str(&review.text).unwrap();
+    assert!(review.contains("review_submit"), "{review}");
+    assert!(m.call("guide", serde_json::json!({"topic": "otra"})).is_error);
 }
 
 #[test]

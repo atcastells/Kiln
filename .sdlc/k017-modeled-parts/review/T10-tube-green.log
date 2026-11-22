@@ -1,0 +1,10 @@
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+   Compiling kiln-cli v0.1.0 (/Users/acastells/Kiln/crates/kiln-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.57s
+     Running tests/model_build.rs (target/debug/deps/model_build-c142f197b75f9674)
+
+running 1 test
+test a_model_part_is_built_from_its_shapes ... ok
+
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.53s
+

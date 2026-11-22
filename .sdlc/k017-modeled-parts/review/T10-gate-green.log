@@ -1,0 +1,21 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 6.78s
+     Running unittests src/lib.rs (target/debug/deps/kiln_core-1b0997d9069dbce5)
+
+running 12 tests
+test canonical::build::tests::canonical_quantize_halves_away_from_zero ... ok
+test canonical::build::tests::canonical_build_rejects_unquantizable_position ... ok
+test canonical::build::tests::canonical_count_rejects_wrong_segments ... ok
+test canonical::build::tests::canonical_build_rejects_bad_indices ... ok
+test build::tests::loose_parts_go_in_a_row_behind_the_placed_ones ... ok
+test canonical::build::tests::canonical_sphere_8_gives_34_and_64 ... ok
+test build::tests::build_refuses_shapes_outside_the_limits ... ok
+test build::tests::a_model_part_carries_its_shapes_and_no_todo ... ok
+test build::tests::paints_follow_the_order_variant_zone_part_binding_model ... ok
+test build::tests::a_plan_without_model_parts_serializes_no_shapes_or_uv ... ok
+test canonical::build::tests::canonical_sphere_64_gives_2050_and_4096 ... ok
+test build::tests::an_asset_part_uses_the_built_child_and_goes_stale_after_it ... ok
+
+test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 378 filtered out; finished in 0.05s
+

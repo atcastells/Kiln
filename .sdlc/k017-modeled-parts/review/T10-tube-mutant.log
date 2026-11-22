@@ -1,0 +1,23 @@
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+   Compiling kiln-cli v0.1.0 (/Users/acastells/Kiln/crates/kiln-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3.68s
+     Running tests/model_build.rs (target/debug/deps/model_build-c142f197b75f9674)
+
+running 1 test
+test a_model_part_is_built_from_its_shapes ... FAILED
+
+failures:
+
+---- a_model_part_is_built_from_its_shapes stdout ----
+
+thread 'a_model_part_is_built_from_its_shapes' (67747329) panicked at crates/kiln-cli/tests/model_build.rs:59:9:
+axis 2: 1.3463518619537354 vs 1.33365801277585
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    a_model_part_is_built_from_its_shapes
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 1.45s
+
+error: test failed, to rerun pass `-p kiln-cli --test model_build`

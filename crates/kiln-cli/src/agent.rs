@@ -427,10 +427,11 @@ fn run_chat(
 
 fn ask_prompt(asked: &str, config: &str, context: &str, cat_path: &Path, specs: &Path) -> String {
     format!(
-        "Petición de la persona: «{asked}»\n\n{config}\n{context}\nCatálogo del proyecto: {}\nEscribe la ficha en la carpeta {} (fichero <id>.toml), siguiendo las instrucciones de la skill kiln-asset que tienes en tu prompt de sistema. No toques ningún otro fichero salvo para añadir preguntas al contexto.\n\nVocabulario de generación:\n{}",
+        "Petición de la persona: «{asked}»\n\n{config}\n{context}\nCatálogo del proyecto: {}\nEscribe la ficha en la carpeta {} (fichero <id>.toml), siguiendo las instrucciones de la skill kiln-asset que tienes en tu prompt de sistema. No toques ningún otro fichero salvo para añadir preguntas al contexto.\n\nVocabulario de generación:\n{}\n\nVocabulario de modelado:\n{}",
         cat_path.display(),
         specs.display(),
-        generator_vocabulary()
+        generator_vocabulary(),
+        kiln_core::model::VOCABULARY
     )
 }
 
@@ -719,6 +720,7 @@ mod tests {
     fn vocabulary_in_the_ask_prompt() {
         let p = ask_prompt("una roca", "cfg", "ctx", Path::new("cat.json"), Path::new("specs"));
         assert!(p.contains("Vocabulario de generación"), "{p}");
+        assert!(p.contains("Vocabulario de modelado"), "{p}");
         assert!(p.contains("sphere"), "{p}");
     }
 

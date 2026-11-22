@@ -117,11 +117,15 @@ pub struct Part {
     /// How each copy is turned, degrees about X, Y and Z.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub turn: Vec<[f64; 3]>,
+    /// The forms of a `model` part (`[[parts.shapes]]`), in metres; empty for
+    /// any other kind.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub shapes: Vec<crate::model::Shape>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Source {
-    /// reuse | variant | search | retouch | asset
+    /// reuse | variant | search | retouch | asset | model
     pub kind: String,
     /// The catalog key of the piece it reuses or varies (`kit/piece`), or,
     /// for `asset`, the id of the spec it is made of.
@@ -163,7 +167,7 @@ pub enum Normals {
     Inward,
 }
 
-pub const KINDS: [&str; 5] = ["reuse", "variant", "search", "retouch", "asset"];
+pub const KINDS: [&str; 6] = ["reuse", "variant", "search", "retouch", "asset", "model"];
 
 pub fn parse(text: &str) -> Result<Spec, String> {
     toml::from_str(text).map_err(|e| e.to_string())
@@ -452,6 +456,55 @@ pub fn check(s: &Spec, rules: &crate::config::Rules, cat: &mut Catalog) {
             ),
             _ => {}
         }
+        let is_model = p.source.kind == "model";
+        if is_model && p.shapes.is_empty() {
+            push(
+                Severity::Error,
+                subject.clone(),
+                "model_shape",
+                "una pieza `model` pide `[[parts.shapes]]` con al menos una forma".into(),
+            );
+        } else if !is_model && !p.shapes.is_empty() {
+            push(
+                Severity::Error,
+                subject.clone(),
+                "model_shape",
+                "`shapes` solo vale en una pieza con fuente `model`".into(),
+            );
+        }
+        if is_model && !p.shapes.is_empty() {
+            let copies = crate::model::copies_problem(&p.shapes, p.count.unwrap_or(1));
+            for msg in crate::model::problems(&p.shapes).into_iter().chain(copies) {
+                push(Severity::Error, subject.clone(), "model_shape", msg);
+            }
+            let mut zones: Vec<&str> = p.shapes.iter().map(|sh| sh.zone.as_str()).collect();
+            zones.sort_unstable();
+            zones.dedup();
+            for z in zones {
+                if p.material.is_none() && !p.materials.contains_key(z) {
+                    push(
+                        Severity::Error,
+                        subject.clone(),
+                        "model_zone",
+                        format!("la zona «{z}» no tiene material: ni en `materials` ni en `material`"),
+                    );
+                }
+            }
+            if let (Some(sz), Some((lo, hi))) = (p.size_m, crate::model::bounds(&p.shapes))
+                && (0..3).any(|i| (sz[i] - (hi[i] - lo[i])).abs() > 0.001)
+            {
+                push(
+                    Severity::Error,
+                    subject.clone(),
+                    "model_size",
+                    format!(
+                        "`size_m` {:.3} x {:.3} x {:.3} m no casa con las formas ({:.3} x {:.3} x {:.3} m)",
+                        sz[0], sz[1], sz[2], hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]
+                    ),
+                );
+            }
+            parts_tris += crate::model::tris(&p.shapes) * p.count.unwrap_or(1) as u64;
+        }
         match &p.material {
             Some(m) if !cat.materials.iter().any(|x| &x.key == m) => push(
                 Severity::Warn,
@@ -618,7 +671,7 @@ pub fn check(s: &Spec, rules: &crate::config::Rules, cat: &mut Catalog) {
             Severity::Warn,
             id.clone(),
             "budget",
-            format!("las piezas reutilizadas ya suman {parts_tris} triángulos, por encima de {b}"),
+            format!("las piezas reutilizadas y modeladas ya suman {parts_tris} triángulos, por encima de {b}"),
         );
     }
     if let Some(g) = &s.generator {
@@ -712,6 +765,74 @@ materials = { "beam/wood" = "pine", "ghost/wood" = "oak" }
         assert!(has("variant_part"));
         assert!(!has("material_unset"));
         assert!(!has("variant_duplicate"));
+    }
+
+    fn model_codes(asset_extra: &str, part_extra: &str, kind: &str, shapes: &[&str]) -> Vec<(String, String)> {
+        let mut text = format!(
+            "[asset]\nid = \"a\"\nname = \"A\"\n{asset_extra}\n[[parts]]\nid = \"p\"\nwhat = \"pieza\"\n{part_extra}\n[parts.source]\nkind = \"{kind}\"\n"
+        );
+        for sh in shapes {
+            text.push_str(&format!("[[parts.shapes]]\n{sh}\n"));
+        }
+        let mat = |k: &str| crate::catalog::Material {
+            key: k.into(),
+            name: k.into(),
+            source: "table".into(),
+            file: String::new(),
+            detail: Default::default(),
+            color: None,
+            albedo: None,
+        };
+        let mut cat = Catalog {
+            project: String::new(),
+            root: String::new(),
+            kits: vec![],
+            pieces: vec![],
+            materials: vec![mat("oak"), mat("iron")],
+            specs: vec![],
+            tree: None,
+            builds: Default::default(),
+            content: vec![],
+            findings: vec![],
+        };
+        check(&parse(&text).unwrap(), &Default::default(), &mut cat);
+        cat.findings.into_iter().map(|f| (f.code, f.message)).collect()
+    }
+
+    const BOX: &str = "zone = \"wood\"\nbox = [[0.0, 0.0, 0.0], [1.0, 0.5, 0.25]]";
+    const PAINT: &str = "materials = { wood = \"oak\" }";
+
+    #[test]
+    fn model_part_checks_clean() {
+        let codes = model_codes("", &format!("size_m = [1.0, 0.5, 0.25]\n{PAINT}"), "model", &[BOX]);
+        assert!(
+            !codes.iter().any(|(c, _)| c.starts_with("model_") || c == "material_unset" || c == "from_missing"),
+            "{codes:?}"
+        );
+    }
+
+    #[test]
+    fn model_part_errors() {
+        let flat = "zone = \"wood\"\nbox = [[0.0, 0.0, 0.0], [0.0, 1.0, 1.0]]";
+        let other = "zone = \"cloth\"\nbox = [[0.0, 0.0, 0.0], [1.0, 0.5, 0.25]]";
+        let cases: [(&str, &str, &str, &[&str], &str); 5] = [
+            ("empty shapes", PAINT, "model", &[], "model_shape"),
+            ("shapes on reuse", PAINT, "reuse", &[BOX], "model_shape"),
+            ("broken shape", PAINT, "model", &[flat], "model_shape"),
+            ("zone without material", PAINT, "model", &[BOX, other], "model_zone"),
+            ("size mismatch", "size_m = [1.0, 0.5, 0.3]\nmaterials = { wood = \"oak\" }", "model", &[BOX], "model_size"),
+        ];
+        for (name, extra, kind, shapes, code) in cases {
+            let codes = model_codes("", extra, kind, shapes);
+            assert!(codes.iter().any(|(c, _)| c == code), "{name}: {codes:?}");
+        }
+    }
+
+    #[test]
+    fn model_shapes_count_toward_budget() {
+        let shapes = [BOX; 3];
+        let codes = model_codes("budget_tris = 30", &format!("count = 2\n{PAINT}"), "model", &shapes);
+        assert!(codes.iter().any(|(c, _)| c == "budget"), "{codes:?}");
     }
 
     fn rig_spec(animations: &str, count: u32) -> String {

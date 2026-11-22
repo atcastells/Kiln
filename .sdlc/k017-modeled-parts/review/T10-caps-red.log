@@ -1,0 +1,22 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+error[E0425]: cannot find function `copies_problem` in this scope
+   --> crates/kiln-core/src/model.rs:358:17
+    |
+358 |         assert!(copies_problem(&boxes, 65).is_none());
+    |                 ^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `copies_problem` in this scope
+   --> crates/kiln-core/src/model.rs:359:17
+    |
+359 |         assert!(copies_problem(&boxes, 66).is_some());
+    |                 ^^^^^^^^^^^^^^ not found in this scope
+
+error[E0425]: cannot find function `copies_problem` in this scope
+   --> crates/kiln-core/src/model.rs:360:17
+    |
+360 |         assert!(copies_problem(&boxes, u32::MAX).is_some());
+    |                 ^^^^^^^^^^^^^^ not found in this scope
+
+For more information about this error, try `rustc --explain E0425`.
+error: could not compile `kiln-core` (lib test) due to 3 previous errors

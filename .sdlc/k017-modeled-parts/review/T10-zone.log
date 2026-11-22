@@ -1,0 +1,12 @@
+    Blocking waiting for file lock on artifact directory
+   Compiling kiln-core v0.1.0 (/Users/acastells/Kiln/crates/kiln-core)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 5.67s
+     Running unittests src/lib.rs (target/debug/deps/kiln_core-1b0997d9069dbce5)
+
+running 3 tests
+test model::tests::tris_and_bounds ... ok
+test model::tests::problems_table ... ok
+test model::tests::parses_the_three_forms_from_toml ... ok
+
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 387 filtered out; finished in 0.00s
+

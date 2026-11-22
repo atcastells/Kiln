@@ -1,0 +1,39 @@
+   Compiling kiln-cli v0.1.0 (/Users/acastells/Kiln/crates/kiln-cli)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 0.43s
+     Running tests/coverage.rs (target/debug/deps/coverage-ee54f9620eaa27f2)
+
+running 8 tests
+test extractor_finds_a_route_answered_before_the_match ... ok
+test extractor_finds_literal_and_prefix_arms ... ok
+test every_cli_command_is_covered ... ok
+test table_has_no_stale_rows ... ok
+test every_api_route_is_covered ... ok
+test a_new_route_without_tool_is_reported ... ok
+test named_tools_and_prompts_exist ... ok
+test command_tools_exist ... ok
+
+test result: ok. 8 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.38s
+
+     Running tests/mcp_guards.rs (target/debug/deps/mcp_guards-4f0d6d29fa97b8f9)
+
+running 4 tests
+test tool_list_and_annotations_are_pinned ... ok
+test bad_ids_and_paths_are_refused_without_touching_the_disk ... ok
+test keys_never_leak ... ok
+test one_megabyte_inputs_are_refused_and_nothing_changes ... ok
+
+test result: ok. 4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.24s
+
+     Running tests/mcp_prompts.rs (target/debug/deps/mcp_prompts-084befd2769bf442)
+
+running 7 tests
+test request_over_500_chars_is_a_protocol_error ... ok
+test context_and_review_prompts_carry_their_header ... ok
+test list_has_the_three_with_their_arguments ... ok
+test asset_prompt_is_one_message_with_header_skill_and_request ... ok
+test asset_prompt_carries_the_generation_vocabulary ... ok
+test asset_prompt_without_request_asks_the_person_first ... ok
+test guide_tool_gives_the_prompt_texts ... ok
+
+test result: ok. 7 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s
+

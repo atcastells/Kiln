@@ -72,6 +72,9 @@ Abre el catálogo y, para cada pieza, elige una fuente (`source.kind`):
   `materials`; si quieres otros colores, elige una de sus variantes con
   `variant`. Úsalo para las partes grandes que ya existen o que merecen su
   propia ficha (un motor, una grúa), en vez de repetir sus piezas.
+- `model`: ninguna pieza del catálogo sirve y la parte es un objeto rígido
+  hecho de cajas, bloques inclinados y tubos; la dibujas tú con el
+  vocabulario de modelado.
 
 Prefiere siempre reutilizar. Usa claves del catálogo tal como están, sin
 inventarlas. Cada pieza que no sea `reuse` lleva `material` con una clave de
@@ -145,6 +148,53 @@ Sin la tabla no se comprueba nada de esto.
 components = 1        # por defecto 1
 genus = 0             # género total; por defecto 0
 normals = "outward"   # "outward" (sólido) | "inward" (cavidad)
+```
+
+## Una pieza modelada
+
+Usa `source = { kind = "model" }` solo cuando el catálogo no tiene nada que
+sirva (ni `reuse`, ni `variant`, ni algo que buscar fuera) y la parte es un
+objeto rígido de aristas rectas o tubos: una mesa, un armario, una tubería. Si
+hay una pieza parecida, reutilízala; lo orgánico o muy detallado se busca
+fuera.
+
+Las formas van en `[[parts.shapes]]`, con el vocabulario de modelado que te da
+Kiln. Ejes: metros, glTF, Y arriba, el frente de la pieza hacia +Z, y las
+coordenadas en el marco propio de la pieza. Kiln baja el centro de la base al
+origen, así que `at` coloca la pieza como cualquier otra.
+
+- Cada zona (`zone`) necesita un material de la paleta en `materials`
+  (`materials = { Top = "clave" }`), o la pieza uno para todas en
+  `material`; sin él, `kiln check` da error.
+- `size_m` es opcional: Kiln lo deduce de las formas. Si lo pones, debe casar
+  con ellas a ±1 mm.
+- Cada forma cuesta triángulos: `box` y `para` 12, `tube` `4·segments − 4`.
+  Se suman al `budget_tris` del asset.
+
+Para un acabado low-poly de kit: pocas formas con sentido (tablero, patas,
+paneles, tiradores); proporciones en metros reales; desfases pequeños para que
+dos caras no coincidan en el mismo plano (z-fighting); los detalles, como cajas
+finas algo salidas de la superficie; y tubos de 6 a 8 segmentos para tuberías
+y postes.
+
+```toml
+[[parts]]
+id = "bench"
+what = "encimera sobre armario y patas"
+source = { kind = "model" }
+materials = { Top = "worn_paint", Leg = "dark_steel" }
+
+[[parts.shapes]]
+zone = "Top"
+box = [[-0.60, 0.86, -0.42], [0.60, 0.92, 0.42]]        # dos esquinas opuestas
+
+[[parts.shapes]]
+zone = "Leg"
+para = { origin = [0.52, 0, 0.34], u = [0.06, 0, 0], v = [0, 0.86, 0], w = [0, 0, 0.06] }
+
+[[parts.shapes]]
+zone = "Leg"
+tube = { from = [0, 0, 0], to = [0, 0.8, 0], radius = 0.03, segments = 6 }   # radius_to opcional: cono
 ```
 
 ## Un asset generado

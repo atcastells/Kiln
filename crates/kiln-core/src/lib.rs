@@ -19,6 +19,7 @@ pub mod godot;
 pub mod integrity;
 pub mod license;
 pub mod mesh;
+pub mod model;
 pub mod new_game;
 pub mod review;
 pub mod sources;

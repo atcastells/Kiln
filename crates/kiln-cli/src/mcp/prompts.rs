@@ -1,10 +1,10 @@
 //! Prompts: the skills of Kiln, told to use the tools instead of writing files.
 //! A bad argument is a protocol error (invalid params), not a message.
 
-use super::Kiln;
+use super::{Kiln, Reply, fail, ok};
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{PromptMessage, Role};
-use rmcp::{ErrorData, prompt, prompt_router, schemars};
+use rmcp::{ErrorData, prompt, prompt_router, schemars, tool, tool_router};
 
 const ASSET_SKILL: &str = include_str!("../../../../skills/asset/SKILL.md");
 const CONTEXT_SKILL: &str = include_str!("../../../../skills/context/SKILL.md");
@@ -59,8 +59,45 @@ struct ContextArgs {
 #[derive(serde::Deserialize, schemars::JsonSchema)]
 struct ReviewArgs {}
 
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+struct GuideArgs {
+    /// Qué guía: `asset` (desgranar un asset en su ficha, con los vocabularios de generación y de modelado), `review` (revisar un montaje) o `context` (ordenar el contexto).
+    topic: String,
+}
+
 fn user(text: String) -> Vec<PromptMessage> {
     vec![PromptMessage::new_text(Role::User, text)]
+}
+
+/// The `kiln-asset` text without the request: header, skill and vocabularies.
+fn asset_text() -> String {
+    format!(
+        "{ASSET_HEADER}\n\n{ASSET_SKILL}\n\nVocabulario de generación:\n{}\n\nVocabulario de modelado:\n{}\n\n",
+        crate::agent::generator_vocabulary(),
+        kiln_core::model::VOCABULARY
+    )
+}
+
+fn review_text() -> String {
+    format!("{REVIEW_HEADER}\n\n{REVIEW_SKILL}")
+}
+
+fn context_text() -> String {
+    format!("{CONTEXT_HEADER}\n\n{CONTEXT_SKILL}")
+}
+
+#[tool_router(router = guide_router, vis = "pub(super)")]
+impl Kiln {
+    /// El texto de los prompts `kiln-asset`, `kiln-review` y `kiln-context` como herramienta, para los clientes que no pasan los prompts al modelo. Léelo antes de escribir una ficha (`asset`: formato, fuentes y vocabularios) o de revisar un montaje (`review`).
+    #[tool(annotations(read_only_hint = true))]
+    async fn guide(&self, Parameters(a): Parameters<GuideArgs>) -> Reply {
+        match a.topic.as_str() {
+            "asset" => ok(asset_text()),
+            "review" => ok(review_text()),
+            "context" => ok(context_text()),
+            _ => fail("topic debe ser asset, review o context"),
+        }
+    }
 }
 
 #[prompt_router(router = "prompts_router", vis = "pub(super)")]
@@ -73,10 +110,7 @@ impl Kiln {
     async fn kiln_asset(&self, Parameters(a): Parameters<AssetArgs>) -> Result<Vec<PromptMessage>, ErrorData> {
         let request = a.request.as_deref().map(str::trim).unwrap_or_default();
         crate::ops::check_len("la petición", request, 500).map_err(|e| ErrorData::invalid_params(e, None))?;
-        let mut text = format!(
-            "{ASSET_HEADER}\n\n{ASSET_SKILL}\n\nVocabulario de generación:\n{}\n\n",
-            crate::agent::generator_vocabulary()
-        );
+        let mut text = asset_text();
         if request.is_empty() {
             text.push_str("Pregunta a la persona qué asset quiere y espera su respuesta antes de empezar.");
         } else {
@@ -94,7 +128,7 @@ impl Kiln {
         if !["sort", "refine", "talk"].contains(&a.mode.as_str()) {
             return Err(ErrorData::invalid_params("mode debe ser sort, refine o talk", None));
         }
-        let mut text = format!("{CONTEXT_HEADER}\n\n{CONTEXT_SKILL}\n\nModo: {}\n", a.mode);
+        let mut text = format!("{}\n\nModo: {}\n", context_text(), a.mode);
         if let Some(l) = &a.layer {
             crate::ops::check_id("la capa", l).map_err(|e| ErrorData::invalid_params(e, None))?;
             text.push_str(&format!("Capa: {l}\n"));
@@ -108,6 +142,6 @@ impl Kiln {
         description = "Revisa tú el montaje de un asset: Kiln saca las hojas con `review` y tú mandas la revisión con `review_submit`."
     )]
     async fn kiln_review(&self, Parameters(_): Parameters<ReviewArgs>) -> Vec<PromptMessage> {
-        user(format!("{REVIEW_HEADER}\n\n{REVIEW_SKILL}"))
+        user(review_text())
     }
 }
