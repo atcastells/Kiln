@@ -79,7 +79,7 @@ kbd { font: 500 11px var(--mono); padding: 1px 6px; border: 1px solid var(--line
 .meter.ok i { background: var(--ok); }
 
 /* ---- 4. Armazon: barra superior, navegacion, trabajo, detalle ----------- */
-.app { display: grid; grid-template-rows: var(--topbar) minmax(0, 1fr); height: 100vh; height: 100dvh; }
+.app { display: grid; grid-template-rows: var(--topbar) auto minmax(0, 1fr); height: 100vh; height: 100dvh; }
 .topbar { display: flex; align-items: center; gap: var(--s3); padding: 0 var(--s4); background: var(--panel); border-bottom: 1px solid var(--line); position: relative; z-index: 40; }
 .brand { display: flex; align-items: center; gap: var(--s2); width: calc(var(--nav) - var(--s4)); flex: none; }
 .brand strong { font-size: 18px; letter-spacing: -.01em; }
@@ -397,3 +397,5 @@ nav.side .hint .classic { display: inline-block; margin-top: var(--s2); white-sp
 .vrow > * { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pagehead > div { min-width: 0; overflow-wrap: anywhere; }
 .page { min-width: 0; }
+.trust-notice { padding: var(--s2) var(--s4); background: var(--panel); color: var(--fg); border-bottom: 1px solid var(--line); border-left: 4px solid var(--bad); font-size: 13px; }
+.trust-notice code { font-family: var(--mono, monospace); background: var(--bg); padding: 1px 4px; border-radius: 4px; }

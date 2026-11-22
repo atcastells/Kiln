@@ -118,12 +118,38 @@ pub fn bind(port: u16) -> Result<TcpListener, String> {
 }
 
 /// The page shows `project` from now on: the project, or the start wizard
-/// when the folder has no `kiln.toml`.
-pub fn open_page(shared: &Shared, project: &Path, config: Option<PathBuf>) -> Result<(), String> {
+/// when the folder has no `kiln.toml`. `vouched`: the person named it
+/// (`kiln serve --project`), so the page may run programs in it.
+pub fn open_page(shared: &Shared, project: &Path, config: Option<PathBuf>, vouched: bool) -> Result<(), String> {
     let new = config.is_none() && !project.join(kiln_core::config::FILE).exists();
     let ctx = if new { None } else { Some(Arc::new(make_ctx(project, config)?)) };
-    shared.show(project, ctx);
+    shared.show(project, ctx, vouched);
     Ok(())
+}
+
+/// The POSTs of the page that run Blender, Godot or Claude: refused while
+/// the project it shows is not trusted (see `Page::trusted`).
+const RUNS: &[&str] = &[
+    "/api/build",
+    "/api/paint",
+    "/api/generate",
+    "/api/review",
+    "/api/godot",
+    "/api/import",
+    "/api/ask",
+    "/api/chat",
+    "/api/context/sort",
+    "/api/context/refine",
+];
+
+fn untrusted(page: &Page) -> Vec<u8> {
+    let dir = page.dir.as_deref().map(|d| d.display().to_string()).unwrap_or_default();
+    let e = format!(
+        "Kiln no lanza Blender, Godot ni Claude en {dir} hasta que confíes en esta carpeta: su kiln.toml \
+         decide qué programas se ejecutan y su proyecto de Godot corre sus propios plugins. Revísala y, si \
+         te fías, ejecuta en tu terminal `kiln trust --project {dir}`."
+    );
+    serde_json::to_vec(&serde_json::json!({ "error": e })).unwrap_or_default()
 }
 
 /// Serves the page of whatever project `shared` shows at each request.
@@ -177,9 +203,14 @@ fn stale(req: &Request, page: &Page) -> bool {
 }
 
 /// What the page polls to follow the core: the folder it shows and its
-/// `rev`, which changes when an MCP session opens another project.
+/// `rev`, which changes when an MCP session opens another project, and
+/// whether it may run programs there.
 fn session(page: &Page) -> serde_json::Value {
-    serde_json::json!({ "rev": page.rev, "project": page.dir.as_ref().map(|d| d.display().to_string()) })
+    serde_json::json!({
+        "rev": page.rev,
+        "project": page.dir.as_ref().map(|d| d.display().to_string()),
+        "trusted": page.trusted(),
+    })
 }
 
 const NO_PROJECT: &[u8] = "{\"error\":\"Kiln no tiene ningún proyecto abierto: ábrelo desde Claude Code (project_open) o con kiln serve --project CARPETA\"}".as_bytes();
@@ -245,17 +276,20 @@ fn handle_new(stream: TcpStream, req: Request, project: &Path, shared: &Shared, 
             None => ("404 Not Found", "application/json", br#"{"error":"no existe ese trabajo"}"#.to_vec()),
         },
         ("POST", _) if !from_page(&req) => ("403 Forbidden", "application/json", br#"{"error":"solo desde la pagina de Kiln"}"#.to_vec()),
+        ("POST", p) if RUNS.contains(&p) && !page.trusted() => ("403 Forbidden", "application/json", untrusted(page)),
         ("POST", "/api/chat") => match turn_of(&req.body) {
             Ok(t) => ("200 OK", "application/json", json(serde_json::json!({ "job": agent::chat(jobs, project.to_path_buf(), None, t) }))),
             Err(e) => ("400 Bad Request", "application/json", json(serde_json::json!({ "error": e }))),
         },
         ("POST", "/api/new") => {
+            // A folder that held nothing is Kiln's own; one with a Godot project keeps its plugins.
+            let fresh = crate::projects::fresh(project);
             let made = serde_json::from_slice::<kiln_core::new_game::NewGame>(&req.body)
                 .map_err(|e| e.to_string())
                 .and_then(|g| ops::new_game::create(project, g));
             match made {
                 Ok((files, ctx)) => {
-                    shared.show(project, Some(Arc::new(ctx)));
+                    shared.show(project, Some(Arc::new(ctx)), page.vouched || fresh);
                     ("200 OK", "application/json", json(serde_json::json!({ "ok": true, "files": files })))
                 }
                 Err(e) => ("400 Bad Request", "application/json", json(serde_json::json!({ "error": e }))),
@@ -374,6 +408,7 @@ fn handle(stream: TcpStream, req: Request, ctx: &Arc<Ctx>, jobs: &Jobs, page: &P
             "application/json",
             br#"{"error":"solo desde la pagina de Kiln"}"#.to_vec(),
         ),
+        ("POST", p) if RUNS.contains(&p) && !page.trusted() => ("403 Forbidden", "application/json", untrusted(page)),
         ("POST", "/api/ask") => {
             let text = field("text");
             let layout = field("layout");

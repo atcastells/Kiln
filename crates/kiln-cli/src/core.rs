@@ -42,6 +42,18 @@ pub struct Page {
     /// `None` while the folder has no `kiln.toml` (the start wizard).
     pub ctx: Option<Arc<Ctx>>,
     pub rev: u64,
+    /// The person vouched for `dir` in this core (`--project`, or Kiln made
+    /// it in an empty folder); otherwise the registry's trust list decides.
+    pub vouched: bool,
+}
+
+impl Page {
+    /// Whether the page may run Blender, Godot and Claude in its folder.
+    /// The trust list is read each time, so `kiln trust` counts at once.
+    pub fn trusted(&self) -> bool {
+        self.vouched
+            || self.dir.as_deref().zip(registry::home()).is_some_and(|(d, h)| registry::is_trusted(&h, d))
+    }
 }
 
 /// The state every door shares.
@@ -72,12 +84,16 @@ impl Shared {
         }
     }
 
-    /// The page shows `dir` from now on.
-    pub fn show(&self, dir: &Path, ctx: Option<Arc<Ctx>>) {
+    /// The page shows `dir` from now on. A folder shown again keeps the
+    /// person's vouch: a session that did not vouch cannot take it away.
+    pub fn show(&self, dir: &Path, ctx: Option<Arc<Ctx>>, vouched: bool) {
         let mut p = self.page.write().unwrap();
         if p.dir.as_deref() != Some(dir) {
             p.rev += 1;
             p.dir = Some(dir.to_path_buf());
+            p.vouched = vouched;
+        } else {
+            p.vouched |= vouched;
         }
         p.ctx = ctx;
     }
@@ -105,7 +121,14 @@ pub enum Hello {
     /// An MCP session follows: what `kiln mcp` was started with.
     Mcp { project: Option<PathBuf>, config: Option<PathBuf>, cwd: Option<PathBuf> },
     /// `kiln serve --project` while a core runs: show that project.
-    Open { project: PathBuf, config: Option<PathBuf> },
+    /// `vouched`: the person named the folder (`--project` or `--config`),
+    /// not just ran `kiln serve` in it.
+    Open {
+        project: PathBuf,
+        config: Option<PathBuf>,
+        #[serde(default)]
+        vouched: bool,
+    },
     /// `kiln stop`.
     Stop { force: bool },
 }
@@ -139,6 +162,9 @@ pub struct Opts {
     /// Started by `kiln mcp`: leaves when idle and runs on without the page
     /// if its port is taken.
     pub auto: bool,
+    /// The person named `project` (`--project` or `--config`): the page may
+    /// run programs in it.
+    pub vouched: bool,
 }
 
 fn idle_limit() -> Duration {
@@ -157,7 +183,7 @@ pub fn run(o: Opts) -> Result<(), String> {
     }
     let shared = Shared::default();
     if let Some(p) = &o.project {
-        crate::serve::open_page(&shared, p, o.config.clone())?;
+        crate::serve::open_page(&shared, p, o.config.clone(), o.vouched)?;
     }
     let listener = crate::serve::bind(o.port)?;
     crate::serve::listen(listener, shared, o.ui_dir);
@@ -166,19 +192,19 @@ pub fn run(o: Opts) -> Result<(), String> {
 
 /// `kiln serve` while a core already runs: that core shows the project.
 /// `Ok(None)`: no core is running.
-pub fn open_in_running(project: &Path, config: Option<&Path>) -> Result<Option<String>, String> {
+pub fn open_in_running(project: &Path, config: Option<&Path>, vouched: bool) -> Result<Option<String>, String> {
     #[cfg(unix)]
     if let Some(home) = registry::home()
         && let Ok(s) = std::os::unix::net::UnixStream::connect(home.join(SOCKET))
     {
-        let hello = Hello::Open { project: project.to_path_buf(), config: config.map(Path::to_path_buf) };
+        let hello = Hello::Open { project: project.to_path_buf(), config: config.map(Path::to_path_buf), vouched };
         let a = unix::ask(&s, &hello)?;
         return match a.error {
             Some(e) => Err(e),
             None => Ok(Some(a.url.unwrap_or_else(|| "(el núcleo no sirve la página)".into()))),
         };
     }
-    let _ = (project, config);
+    let _ = (project, config, vouched);
     Ok(None)
 }
 
@@ -242,7 +268,7 @@ mod unix {
         }
         let shared = Shared::new(Jobs::persistent(home.join(JOBS)));
         if let Some(p) = &o.project {
-            crate::serve::open_page(&shared, p, o.config.clone())?;
+            crate::serve::open_page(&shared, p, o.config.clone(), o.vouched)?;
         }
         let port = match crate::serve::bind(o.port) {
             Ok(l) => {
@@ -370,9 +396,9 @@ mod unix {
                 shared.activity.sessions.fetch_sub(1, Ordering::SeqCst);
                 shared.touch();
             }
-            Hello::Open { project, config } => {
+            Hello::Open { project, config, vouched } => {
                 let sh = shared.clone();
-                let r = tokio::task::spawn_blocking(move || crate::serve::open_page(&sh, &project, config))
+                let r = tokio::task::spawn_blocking(move || crate::serve::open_page(&sh, &project, config, vouched))
                     .await
                     .map_err(|e| e.to_string())
                     .and_then(|r| r);
@@ -503,12 +529,14 @@ mod tests {
     #[test]
     fn the_page_rev_changes_only_with_the_folder() {
         let s = Shared::default();
-        s.show(Path::new("/a"), None);
+        s.show(Path::new("/a"), None, true);
         let r1 = s.page.read().unwrap().rev;
-        s.show(Path::new("/a"), None);
+        s.show(Path::new("/a"), None, false);
         assert_eq!(s.page.read().unwrap().rev, r1);
-        s.show(Path::new("/b"), None);
+        assert!(s.page.read().unwrap().vouched, "showing the folder again keeps the vouch");
+        s.show(Path::new("/b"), None, false);
         assert_eq!(s.page.read().unwrap().rev, r1 + 1);
+        assert!(!s.page.read().unwrap().vouched, "another folder does not inherit it");
     }
 
     #[test]

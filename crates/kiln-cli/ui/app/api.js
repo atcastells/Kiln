@@ -17,7 +17,7 @@ async function failure(res) {
   let detail = "";
   try { detail = (await res.json())?.error ?? ""; } catch { /* no JSON body */ }
   if (res.status >= 500) return new ApiError(res.status, `Kiln tuvo un error interno${detail ? `: ${detail}` : "."}`);
-  if ((res.status === 400 || res.status === 409) && detail) return new ApiError(res.status, detail);
+  if ((res.status === 400 || res.status === 403 || res.status === 409) && detail) return new ApiError(res.status, detail);
   return new ApiError(res.status, FALLBACK[res.status] ?? detail ?? `La petición falló (${res.status}).`);
 }
 

@@ -64,6 +64,9 @@ test("errors are ApiError with the status and a Spanish message", async () => {
   await assert.rejects(api.getJSON("/nope"), e => e.status === 404 && /No existe/.test(e.message));
   await assert.rejects(api.getJSON("/boom"), e => e.status === 500 && /error/i.test(e.message));
   await assert.rejects(api.getJSON("/new"), e => e.status === 409);
+  // a 403 that says why (an untrusted project) reaches the button as it is
+  const untrusted = createApi({ fetch: recorder(res(403, { error: "ejecuta `kiln trust --project /p`" })).fetch });
+  await assert.rejects(untrusted.post("/api/build", {}), e => e.status === 403 && /kiln trust --project \/p/.test(e.message));
 });
 
 test("a network failure is an ApiError with status 0", async () => {

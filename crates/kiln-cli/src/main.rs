@@ -203,8 +203,10 @@ fn main() -> ExitCode {
             }
             "serve" => {
                 let project = (!args.core).then(|| args.project.clone());
+                // Only a folder the person named is vouched for, as with `kiln mcp`.
+                let vouched = args.project_given || args.config.is_some();
                 if let Some(p) = &project
-                    && let Some(url) = core::open_in_running(p, args.config.as_deref())?
+                    && let Some(url) = core::open_in_running(p, args.config.as_deref(), vouched)?
                 {
                     eprintln!("Kiln ya está en marcha: {url} muestra ahora {}", p.display());
                     return Ok(ExitCode::SUCCESS);
@@ -215,6 +217,7 @@ fn main() -> ExitCode {
                     port: args.port,
                     ui_dir: args.ui_dir.clone(),
                     auto: args.core,
+                    vouched,
                 })
                 .map(|_| ExitCode::SUCCESS)
             }
