@@ -44,6 +44,24 @@ Important below was reproduced with a red test or a code trace before fixing.
   websites, not processes run by the same user.
 - `/api/search` (curl to fixed hosts) is not gated, the same as MCP `search`.
 
+## Verifier
+
+Amber with no Important findings. It ran the real binary with a temp
+`KILN_HOME`:
+- Untrusted project: all ten routes give 403 with `kiln trust`, no job runs and
+  the fake Godot never runs. Edits still work. After `kiln trust`, the page is
+  trusted without reopening and `generate` launches.
+- `kiln serve --project` stays trusted and launches.
+- The new-game wizard: an empty folder made through MCP is trusted. A folder
+  with only `project.godot` stays untrusted, even after `/api/new`.
+- A headless screenshot shows the notice, and no notice once trusted.
+
+Nits:
+- A `kiln serve --project X` vouch is lost after the page visits another folder
+  and comes back. That follows the spec, and the notice says how to fix it.
+- The "y recarga la página" in the notice is not needed, because the poll
+  removes the notice on its own.
+
 ## Verification
 
 - `tests/core.rs` baseline on the base before T1: 4/4. The T1 red run failed
