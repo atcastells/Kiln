@@ -48,6 +48,8 @@ pub struct Kiln {
     /// Where the registry of projects lives (`None`: not kept).
     pub home: Option<PathBuf>,
     pub jobs: Jobs,
+    /// The core this session lives in: the page follows its project.
+    pub shared: Option<crate::core::Shared>,
     tool_router: ToolRouter<Kiln>,
     prompt_router: PromptRouter<Kiln>,
 }
@@ -57,20 +59,28 @@ Empieza por `status`: dice qué proyecto está abierto. Con `projects`, `project
 `project_create` se cambia de juego sin salir de la conversación. El trabajo de agente \
 lo haces tú siguiendo los prompts `kiln-asset` y `kiln-context`; Kiln comprueba y \
 escribe. Montar, pintar, medir con Godot, revisar y traer son trabajos largos: devuelven \
-un id que se sigue con `job`.";
+un id que se sigue con `job`; siguen corriendo aunque se cierre la conversación, y `jobs` \
+los lista. La página de Kiln muestra el proyecto abierto y sus trabajos.";
 
 const NO_PROJECT: &str = "no hay ningún proyecto abierto: usa `projects` para ver los recientes, \
 `project_open` con la ruta de uno, o `project_create` para empezar uno nuevo";
 
 impl Kiln {
-    /// With `project`, that folder is open as before; without it, the working
-    /// folder if it holds a project, else the newest registered one. The
-    /// client's roots may replace that choice once it is connected.
-    pub fn new(project: Option<PathBuf>, config: Option<PathBuf>) -> Result<Self, String> {
+    /// With `project`, that folder is open as before; without it, the
+    /// client's working folder (`here`) if it holds a project, else the newest
+    /// registered one. The client's roots may replace that choice once it is
+    /// connected. In the core, `shared` brings the jobs every door sees.
+    pub fn new(
+        project: Option<PathBuf>,
+        config: Option<PathBuf>,
+        here: Vec<PathBuf>,
+        shared: Option<crate::core::Shared>,
+    ) -> Result<Self, String> {
         let kiln = Kiln {
             active: Default::default(),
             home: registry::home(),
-            jobs: Default::default(),
+            jobs: shared.as_ref().map(|s| s.jobs.clone()).unwrap_or_default(),
+            shared,
             tool_router: Self::read_router()
                 + Self::production_router()
                 + Self::specs_router()
@@ -82,15 +92,11 @@ impl Kiln {
             prompt_router: Self::prompts_router(),
         };
         match project {
-            Some(p) => {
-                kiln.open(&p, config, true)?;
-                kiln.active.write().unwrap().vouched = true;
-            }
+            Some(p) => kiln.open(&p, config, true, true)?,
             None => {
-                let here: Vec<PathBuf> = std::env::current_dir().into_iter().collect();
                 let recent = kiln.home.as_deref().map(registry::list).unwrap_or_default();
                 if let Some(p) = registry::pick(&here, &recent)
-                    && let Err(e) = kiln.open(&p, None, false)
+                    && let Err(e) = kiln.open(&p, None, false, false)
                 {
                     eprintln!("no se pudo abrir {}: {e}", p.display());
                 }
@@ -100,11 +106,13 @@ impl Kiln {
     }
 
     /// Makes `dir` the open project and notes it in the registry. A folder
-    /// without `kiln.toml` stays open with no project yet.
-    pub fn open(&self, dir: &Path, config: Option<PathBuf>, chosen: bool) -> Result<(), String> {
+    /// without `kiln.toml` stays open with no project yet. `vouched`: the
+    /// person named it (`--project`).
+    pub fn open(&self, dir: &Path, config: Option<PathBuf>, chosen: bool, vouched: bool) -> Result<(), String> {
         let has_toml = config.is_some() || registry::kind(dir).kiln;
         let ctx = if has_toml { Some(Arc::new(crate::ops::ctx(dir, config)?)) } else { None };
-        *self.active.write().unwrap() = Active { dir: Some(dir.to_path_buf()), ctx, chosen, vouched: false };
+        self.show(dir, ctx.clone(), vouched);
+        *self.active.write().unwrap() = Active { dir: Some(dir.to_path_buf()), ctx, chosen, vouched };
         self.remember(dir);
         Ok(())
     }
@@ -113,8 +121,10 @@ impl Kiln {
     /// folder was `fresh` (missing or empty before): a folder that already
     /// held a Godot project keeps its own plugins and needs `kiln trust`.
     pub fn made(&self, dir: &Path, ctx: Ctx, fresh: bool) {
+        let ctx = Arc::new(ctx);
+        self.show(dir, Some(ctx.clone()), fresh);
         *self.active.write().unwrap() =
-            Active { dir: Some(dir.to_path_buf()), ctx: Some(Arc::new(ctx)), chosen: true, vouched: fresh };
+            Active { dir: Some(dir.to_path_buf()), ctx: Some(ctx), chosen: true, vouched: fresh };
         if fresh
             && let Some(home) = &self.home
             && let Err(e) = registry::trust(home, dir)
@@ -149,6 +159,13 @@ impl Kiln {
             ctx.project.display(),
             ctx.project.display()
         ))
+    }
+
+    /// In the core, the page shows what this session just opened.
+    fn show(&self, dir: &Path, ctx: Option<Arc<Ctx>>, vouched: bool) {
+        if let Some(s) = &self.shared {
+            s.show(dir, ctx, vouched);
+        }
     }
 
     /// Notes `dir` as the newest project; a failure only goes to stderr.
@@ -212,7 +229,7 @@ impl Kiln {
         if self.active.read().unwrap().chosen {
             return;
         }
-        match self.open(&p, None, false) {
+        match self.open(&p, None, false, false) {
             Ok(()) => eprintln!("proyecto de las roots del cliente: {}", p.display()),
             Err(e) => eprintln!("no se pudo abrir {}: {e}", p.display()),
         }
@@ -288,8 +305,14 @@ impl ServerHandler for Kiln {
     }
 }
 
+/// `kiln mcp`: through the core when there is one (or one can start), so
+/// jobs outlive this process and the page sees them; else in this process.
 pub fn run(project: Option<PathBuf>, config: Option<PathBuf>) -> Result<(), String> {
-    let kiln = Kiln::new(project, config)?;
+    if crate::core::bridge(project.clone(), config.clone())? {
+        return Ok(());
+    }
+    let here: Vec<PathBuf> = std::env::current_dir().into_iter().collect();
+    let kiln = Kiln::new(project, config, here, None)?;
     match &kiln.active.read().unwrap().dir {
         Some(d) => eprintln!("Kiln MCP por stdio, proyecto {}", d.display()),
         None => eprintln!("Kiln MCP por stdio, sin proyecto abierto"),

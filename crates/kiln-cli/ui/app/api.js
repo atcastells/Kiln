@@ -17,12 +17,13 @@ async function failure(res) {
   let detail = "";
   try { detail = (await res.json())?.error ?? ""; } catch { /* no JSON body */ }
   if (res.status >= 500) return new ApiError(res.status, `Kiln tuvo un error interno${detail ? `: ${detail}` : "."}`);
-  if (res.status === 400 && detail) return new ApiError(400, detail);
+  if ((res.status === 400 || res.status === 403 || res.status === 409) && detail) return new ApiError(res.status, detail);
   return new ApiError(res.status, FALLBACK[res.status] ?? detail ?? `La petición falló (${res.status}).`);
 }
 
 export function createApi({ fetch: f = (...a) => globalThis.fetch(...a), base = "" } = {}) {
   const cache = new Map();    // path -> { etag, value }
+  let rev = null;             // the core's project the page loaded (see shell.js)
   const inflight = new Map(); // path -> Promise
 
   async function send(url, init) {
@@ -42,6 +43,9 @@ export function createApi({ fetch: f = (...a) => globalThis.fetch(...a), base = 
   }
 
   return {
+    // The `rev` of the project this page loaded: writes carry it, so the core
+    // refuses them once it shows another project.
+    setRev(r) { rev = r; },
     // Forget the cached copy (and its ETag) of a path: the next read is a full one.
     forget(path) { cache.delete(path); },
     // `fresh`: ask the server to read from disk, not from its cache ("Releer").
@@ -57,7 +61,7 @@ export function createApi({ fetch: f = (...a) => globalThis.fetch(...a), base = 
     async post(path, body) {
       const res = await send(path, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "X-Kiln": "1" },
+        headers: { "Content-Type": "application/json", "X-Kiln": "1", ...(rev === null ? {} : { "X-Kiln-Rev": String(rev) }) },
         body: JSON.stringify(body ?? {}),
       });
       if (!res.ok) throw await failure(res);
@@ -72,4 +76,5 @@ const shared = createApi();
 export const getJSON = shared.getJSON;
 export const post = shared.post;
 export const forget = shared.forget;
+export const setRev = shared.setRev;
 export const generate = shared.generate.bind(shared);

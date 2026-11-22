@@ -85,7 +85,7 @@ impl Kiln {
         }
         let kiln = self.clone();
         let d = dir.clone();
-        if let Err(e) = blocking(move || kiln.open(&d, None, true)).await? {
+        if let Err(e) = blocking(move || kiln.open(&d, None, true, false)).await? {
             return fail(e);
         }
         let trusted = self.trusted();

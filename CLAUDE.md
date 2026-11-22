@@ -8,12 +8,16 @@ con Blender y Godot. Rust, sin dependencias fuera de Rust en el servidor.
 
 ```bash
 cargo build --release      # binario target/release/kiln
-cargo test --workspace     # 667 pasan, 0 fallan, 30 ignorados; ~14 s en caliente
+cargo test --workspace     # 682 pasan, 0 fallan, 30 ignorados; ~15 s en caliente
 KILN_CANONICAL_RECIPES=<ASTRA>/godot/assets/kiln cargo test --workspace -- --ignored   # los 30: piden blender y godot en el PATH; los de geometría canónica leen las recetas de ASTRA; `integrity_fixture` pide `KILN_MESH_FIXTURE=<ASTRA>/godot/assets/kiln/historic_cavity/historic_cavity.glb`
 cargo clippy --workspace --all-targets -- -D warnings   # limpio, sin avisos
 scripts/ui_test.sh         # UI en Chrome sin ventana; pide node >= 22 y Chrome
-target/release/kiln serve --project examples   # http://127.0.0.1:4330
+target/release/kiln serve --project examples   # el núcleo y su página en http://127.0.0.1:4330
+target/release/kiln stop   # cierra el núcleo (lo arranca solo `kiln mcp`)
 ```
+
+Los tests que lanzan `kiln mcp` o `kiln serve` les dan su propio `KILN_HOME`
+temporal: nunca el núcleo ni el registro de la persona.
 
 ## Estructura
 
@@ -21,7 +25,8 @@ Todo es actual; no hay partes heredadas.
 
 - `crates/kiln-core`: biblioteca (catálogo, comprobaciones, GLB, Godot,
   contenido, reglas de UI).
-- `crates/kiln-cli`: binario `kiln` (servidor, MCP en `crates/kiln-cli/src/mcp`, agente,
+- `crates/kiln-cli`: binario `kiln` (núcleo en `core.rs`, trabajos en
+  `jobs.rs`, página en `serve.rs`, MCP en `crates/kiln-cli/src/mcp`, agente,
   verificación) y la página web en `crates/kiln-cli/ui`.
 - `skills/`: skills que Kiln pasa a `claude -p` (asset, context, review).
 - `examples/`: Puerto Niebla, juego inventado que sirve de fixture.
@@ -37,6 +42,8 @@ Todo es actual; no hay partes heredadas.
 ## Seguridad
 
 - El servidor solo escucha en `127.0.0.1`; solo la propia página lanza al agente.
+- El núcleo habla con `kiln mcp` por un socket Unix en `KILN_HOME`, con
+  permisos 0600: solo el usuario lo abre.
 - Kiln quita `ANTHROPIC_API_KEY` y `ANTHROPIC_AUTH_TOKEN` al lanzar `claude`.
 - NUNCA commitear `.env*`, certificados ni keystores.
 

@@ -12,14 +12,8 @@ const MAX_IMAGE: u64 = 5 * 1024 * 1024;
 const SITES: [&str; 3] = ["polyhaven", "polypizza", "sketchfab"];
 
 impl Kiln {
-    /// Marks the job with the open project, so `jobs` tells projects apart.
+    /// The id of a job just started; the job knows its project.
     fn started(&self, id: u64) -> Reply {
-        let dir = self.active.read().unwrap().dir.clone();
-        if let Some(d) = dir
-            && let Some(j) = self.jobs.lock().unwrap().iter_mut().find(|j| j.id == id)
-        {
-            j.project = Some(d.display().to_string());
-        }
         ok(json!({ "job": id, "next": "llama a `job` con este id" }))
     }
 }
@@ -56,6 +50,26 @@ struct GenerateArgs {
     /// La ficha entera del asset en TOML, con su `[generator]`. Si se da, se guarda antes de generar; si no es válida, se rechaza y no se lanza nada.
     #[serde(default)]
     recipe: Option<String>,
+}
+
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+struct ReviewArgs {
+    /// Id del asset.
+    asset: String,
+    /// `true`: monta y saca las hojas de la vuelta siguiente, después de mandar la revisión de la anterior con `review_submit`. Por defecto empieza una revisión nueva.
+    #[serde(default)]
+    next_round: bool,
+    /// Quién revisa: `client` (tú, por defecto: Kiln solo monta y saca las hojas) o `kiln` (el revisor propio de Kiln, otro Claude aparte que gasta uso de la suscripción y hace todas las vueltas solo).
+    #[serde(default)]
+    reviewer: Option<String>,
+}
+
+#[derive(serde::Deserialize, schemars::JsonSchema)]
+struct SubmitArgs {
+    /// Id del asset.
+    asset: String,
+    /// La revisión de la última vuelta en TOML, como la describe el prompt `kiln-review`: `seen`, `verdict` (pass o revise), `scores` y `[[findings]]` con `part`, `criterion`, `severity`, `problem`, `evidence` y `fix`.
+    review: String,
 }
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
@@ -201,8 +215,10 @@ impl Kiln {
             Err(e) => return fail(e),
         };
         let jobs = self.jobs.clone();
-        let id = blocking(move || ops::production::godot_measure(&jobs, ctx)).await?;
-        self.started(id)
+        match blocking(move || ops::production::godot_measure(&jobs, ctx)).await? {
+            Ok(id) => self.started(id),
+            Err(e) => fail(e),
+        }
     }
 
     /// Godot abre las escenas de los conjuntos de contenido de `kiln.toml` y escribe el manifiesto con sus ids (la orden `kiln content-manifest`). Con `set`, solo ese conjunto. Devuelve un trabajo; sigue su avance llamando a `job` hasta que su estado deje de ser `running`.
@@ -224,21 +240,48 @@ impl Kiln {
         }
     }
 
-    /// Revisa el montaje con el revisor propio de Kiln, aparte: Claude Opus por la sesión de `claude` (gasta uso de la suscripción), de modo que quien colocó las piezas nunca juzga su propio trabajo. Hace hasta `[agents] review_rounds` vueltas. Tarda minutos: devuelve un trabajo; sigue su avance llamando a `job` hasta que su estado deje de ser `running`. Después, mira las hojas con `review_sheets`.
+    /// Revisa el montaje de un asset. Por defecto el revisor eres tú (decisión D1): Kiln monta el asset y saca con Blender las hojas de una vuelta (giro, alzados, piezas, silueta) y sus medidas; cuando el trabajo termine, míralas con `review_sheets`, júzgalas con el prompt `kiln-review` y manda la revisión con `review_submit`. Para la vuelta siguiente, `next_round` = true. Con `reviewer` = `kiln` lo hace todo el revisor propio de Kiln (otro Claude aparte, que gasta uso de la suscripción). Devuelve un trabajo; sigue su avance con `job`.
     #[tool(annotations(read_only_hint = false, destructive_hint = true))]
-    async fn review(&self, Parameters(a): Parameters<AssetArgs>) -> Reply {
+    async fn review(&self, Parameters(a): Parameters<ReviewArgs>) -> Reply {
         if let Err(e) = ops::check_id("el asset", &a.asset) {
             return fail(e);
+        }
+        let own = match a.reviewer.as_deref().unwrap_or("client") {
+            "client" => false,
+            "kiln" => true,
+            _ => return fail("reviewer debe ser client o kiln"),
+        };
+        if own && a.next_round {
+            return fail("el revisor de Kiln hace todas las vueltas solo: no uses next_round con reviewer = kiln");
         }
         let ctx = match self.run_ctx() {
             Ok(c) => c,
             Err(e) => return fail(e),
         };
         let jobs = self.jobs.clone();
-        match blocking(move || ops::production::review(&jobs, ctx, &a.asset)).await? {
+        let started = blocking(move || {
+            if own {
+                ops::production::review(&jobs, ctx, &a.asset)
+            } else {
+                ops::production::review_round(&jobs, ctx, &a.asset, a.next_round)
+            }
+        })
+        .await?;
+        match started {
             Ok(id) => self.started(id),
             Err(e) => fail(e),
         }
+    }
+
+    /// Manda tu revisión de la última vuelta (en TOML, como dice el prompt `kiln-review`). Kiln la comprueba, la guarda para la página y, si no aprueba, aplica a la ficha las correcciones que pueda (`at`, `turn`, `size_m`, `count`, `material`). Dice qué aplicó, qué queda para la persona y qué hacer después.
+    #[tool(annotations(read_only_hint = false, destructive_hint = true))]
+    async fn review_submit(&self, Parameters(a): Parameters<SubmitArgs>) -> Reply {
+        let ctx = match self.ctx() {
+            Ok(c) => c,
+            Err(e) => return fail(e),
+        };
+        let jobs = self.jobs.clone();
+        reply(blocking(move || ops::production::review_submit(&jobs, &ctx, &a.asset, &a.review)).await?)
     }
 
     /// Trae un modelo de una fuente externa (polyhaven, polypizza o sketchfab) para una pieza del asset: descarga y reescribe LICENSE y CREDITS. Tarda minutos: devuelve un trabajo; sigue su avance llamando a `job` hasta que su estado deje de ser `running`.
@@ -277,7 +320,7 @@ impl Kiln {
         reply(blocking(move || ops::production::job_wait(&jobs, a.id, since, wait)).await?)
     }
 
-    /// Lista los trabajos de esta sesión con su estado y la carpeta del proyecto (`project`) en que se lanzó cada uno.
+    /// Lista los trabajos de Kiln, los de esta sesión y los lanzados desde otras o desde la página (siguen corriendo aunque se cierre la conversación), con su estado y la carpeta del proyecto (`project`) de cada uno. Los más recientes, hasta 30, y todos los que siguen en marcha.
     #[tool(annotations(read_only_hint = true))]
     async fn jobs(&self) -> Reply {
         let jobs = self.jobs.clone();

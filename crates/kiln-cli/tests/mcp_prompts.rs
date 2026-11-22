@@ -86,9 +86,12 @@ fn context_and_review_prompts_carry_their_header() {
 /// `Mcp::request` panics on protocol errors, so this talks raw JSON-RPC to its own process.
 fn raw_get(dir: &std::path::Path, args: serde_json::Value) -> serde_json::Value {
     use std::io::{BufRead, Write};
+    let home = common::empty_dir();
     let mut child = std::process::Command::new(env!("CARGO_BIN_EXE_kiln"))
         .args(["mcp", "--project"])
         .arg(dir)
+        .env("KILN_HOME", home.path())
+        .env("KILN_CORE", "off")
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())

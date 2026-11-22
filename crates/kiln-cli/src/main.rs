@@ -5,7 +5,8 @@
 //!   kiln tools  --project DIR [--config FILE]                external tools found, with their versions
 //!   kiln mcp    [--project DIR] [--config FILE]              MCP over stdio, for Claude Code; without --project it serves any project
 //!   kiln trust  --project DIR                                let `kiln mcp` run Blender, Godot and Claude in that project
-//!   kiln serve  --project DIR [--config FILE] [--port 4330] [--ui-dir DIR]  the graph at http://127.0.0.1:PORT (--ui-dir: read the new UI from disk)
+//!   kiln serve  [--project DIR] [--config FILE] [--port 4330] [--ui-dir DIR]  the core and its page at http://127.0.0.1:PORT (--ui-dir: read the new UI from disk); with a core running, it shows DIR there
+//!   kiln stop   [--force]                                    the core saves its jobs and leaves (--force: even with jobs running)
 //!   kiln build  --project DIR [--config FILE] --asset ID     assemble an asset in Blender
 //!   kiln generate --project DIR [--config FILE] --asset ID [--seed N]   generate a recipe asset in Godot, no Blender
 //!   kiln paint  --project DIR [--config FILE] --asset ID [--variant ID]   wear its materials again, no assembling
@@ -17,8 +18,10 @@
 
 mod agent;
 mod content;
+mod core;
 mod fetch;
 mod generate;
+mod jobs;
 mod mcp;
 mod ops;
 mod projects;
@@ -46,6 +49,9 @@ struct Args {
     seed: Option<u32>,
     /// Whether `--project` was given (only `mcp` works without it).
     project_given: bool,
+    /// `serve --core`: started by `kiln mcp`, leaves when nobody uses it.
+    core: bool,
+    force: bool,
 }
 
 fn parse() -> Result<Args, String> {
@@ -63,8 +69,14 @@ fn parse() -> Result<Args, String> {
         ui_dir: None,
         seed: None,
         project_given: false,
+        core: false,
+        force: false,
     };
     while let Some(flag) = it.next() {
+        if flag == "--core" || flag == "--force" {
+            *(if flag == "--core" { &mut a.core } else { &mut a.force }) = true;
+            continue;
+        }
         let mut val = || it.next().ok_or(format!("falta el valor de {flag}"));
         match flag.as_str() {
             "--project" => {
@@ -87,7 +99,7 @@ fn parse() -> Result<Args, String> {
     Ok(a)
 }
 
-const USAGE: &str = "uso: kiln <index|check|tools|mcp|trust|serve|build|generate|paint|verify|publish|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--ui-dir DIR] [--asset ID] [--variant ID] [--set NAME] [--seed N]";
+const USAGE: &str = "uso: kiln <index|check|tools|mcp|trust|serve|stop|build|generate|paint|verify|publish|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--ui-dir DIR] [--asset ID] [--variant ID] [--set NAME] [--seed N] [--force]";
 
 pub fn load(
     project: &std::path::Path,
@@ -189,8 +201,34 @@ fn main() -> ExitCode {
                 let project = (args.project_given || args.config.is_some()).then(|| args.project.clone());
                 mcp::run(project, args.config.clone()).map(|_| ExitCode::SUCCESS)
             }
-            "serve" => serve::run(args.project.clone(), args.config.clone(), args.port, args.ui_dir.clone())
-                .map(|_| ExitCode::SUCCESS),
+            "serve" => {
+                let project = (!args.core).then(|| args.project.clone());
+                // Only a folder the person named is vouched for, as with `kiln mcp`.
+                let vouched = args.project_given || args.config.is_some();
+                if let Some(p) = &project
+                    && let Some(url) = core::open_in_running(p, args.config.as_deref(), vouched)?
+                {
+                    eprintln!("Kiln ya está en marcha: {url} muestra ahora {}", p.display());
+                    return Ok(ExitCode::SUCCESS);
+                }
+                core::run(core::Opts {
+                    project,
+                    config: args.config.clone(),
+                    port: args.port,
+                    ui_dir: args.ui_dir.clone(),
+                    auto: args.core,
+                    vouched,
+                })
+                .map(|_| ExitCode::SUCCESS)
+            }
+            "stop" => {
+                if core::stop(args.force)? {
+                    eprintln!("el núcleo de Kiln se ha cerrado");
+                } else {
+                    eprintln!("no hay ningún núcleo de Kiln en marcha");
+                }
+                Ok(ExitCode::SUCCESS)
+            }
             "build" => {
                 let id = args.asset.as_deref().ok_or("falta --asset ID")?;
                 let glb =

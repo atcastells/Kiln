@@ -46,3 +46,11 @@ export async function busy(control, reason, work) {
     control.removeAttribute("aria-busy");
   }
 }
+
+// Fixed notice shown while the project is not trusted; an older server sends
+// no `trusted` field, which counts as trusted, and with no project open there
+// is nothing to trust yet.
+export function trustNotice(session) {
+  if (session?.trusted !== false || !session.project) return "";
+  return html`<div class="trust-notice" role="status">Proyecto sin confianza: Kiln no lanzará Blender, Godot ni Claude aquí. Revisa la carpeta y, si te fías, ejecuta en tu terminal <code>kiln trust --project ${session.project}</code> y recarga la página.</div>`.toString();
+}
