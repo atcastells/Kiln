@@ -356,7 +356,7 @@ source = { kind = \"model\" }\nmaterials = { Base = \"piedra\", Hierro = \"hierr
 [[parts.shapes]]\nzone = \"Hierro\"\ntube = { from = [0, 0.18, 0], to = [0, 2.3, 0], radius = 0.05, segments = 12 }\n\n\
 [[parts.shapes]]\nzone = \"Hierro\"\nbox = [[-0.17, 2.3, -0.17], [0.17, 2.36, 0.17]]\n\n\
 [[parts.shapes]]\nzone = \"Luz\"\nbox = [[-0.13, 2.36, -0.13], [0.13, 2.7, 0.13]]\n\n\
-[[parts.shapes]]\nzone = \"Hierro\"\ntube = { from = [0, 2.7, 0], to = [0, 2.92, 0], radius = 0.24, radius_to = 0.03, segments = 4 }\n";
+[[parts.shapes]]\nzone = \"Hierro\"\ntube = { from = [0, 2.7, 0], to = [0, 2.92, 0], radius = 0.24, radius_to = 0.03, segments = 8 }\n";
 
 /// The answers of the example to the basic questions of a new game.
 pub fn example_game(name: &str) -> kiln_core::new_game::NewGame {

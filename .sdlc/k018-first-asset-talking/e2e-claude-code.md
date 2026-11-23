@@ -30,3 +30,27 @@ Hallazgos que cambiaron el código:
 
 Falta en un Mac con Blender y Godot reales, y en la app de escritorio y la
 extensión de VS Code (ver `review.md`).
+
+# E2E: el recorrido en el Mac con Blender y Godot reales, 2026-11-23
+
+macOS, rama en un worktree aparte, `KILN_HOME` temporal, Claude Code 2.1.330
+sin interfaz (`claude -p` con `--resume`), solo herramientas de Kiln.
+
+- `kiln setup`, sin rutas: Blender 5.2.3 y Godot 4.7.1 (Homebrew), Claude
+  2.1.330 (`~/.local/bin`).
+- Turno 1, `/mcp__kiln__kiln-start` (15 s): `setup`, `status`; ofrece el
+  ejemplo o su juego.
+- Turno 2, ejemplo (21 s): `example_create`, `spec_get`, `build` (92
+  triángulos en Blender), `preview`. El agente ve en la planta que el
+  tejadillo de 4 lados está girado 45° respecto al cristal.
+- Turno 3, «verifícalo y publícalo» (20 s): `config_get`, `verify` (Kiln,
+  glTF Validator y Godot pasan), `publish` a `publicado/farol` (versión 1).
+- Turno 4, un banco de madera (40 s): `guide` asset, `catalog`, `spec_write`
+  sin hallazgos, `build` (132 triángulos), `preview`: 1,6 x 0,86 x 0,44 m,
+  listones en madera clara y laterales oscuros.
+
+Unos 96 s de agente de punta a punta, del comando al farol publicado y un
+segundo asset montado.
+
+Cambiado tras esta prueba: el tejadillo del farol de ejemplo pasa a 8 lados,
+para que no se vea girado respecto al cristal.
