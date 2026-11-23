@@ -50,6 +50,7 @@ const COMMANDS: &[(&str, Cover)] = &[
     ("index", Tool(&["catalog", "status"])),
     ("check", Tool(&["check"])),
     ("tools", Tool(&["tools"])),
+    ("setup", Tool(&["setup"])),
     ("mcp", Excluded("the MCP server itself")),
     ("trust", Excluded("the person's own decision: the agent must not be able to grant it")),
     ("serve", Excluded("the page; its routes are covered by TABLE")),

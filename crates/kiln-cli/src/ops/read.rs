@@ -6,7 +6,7 @@ use kiln_core::{Catalog, Severity};
 use serde_json::{Value, json};
 use std::sync::Mutex;
 
-fn load(ctx: &Ctx) -> Result<Catalog, String> {
+pub(crate) fn load(ctx: &Ctx) -> Result<Catalog, String> {
     crate::load(&ctx.project, ctx.config.as_deref())
 }
 
@@ -63,13 +63,13 @@ pub fn status(ctx: &Ctx) -> Result<Value, String> {
         .specs
         .iter()
         .find(|s| s.parts.iter().any(|p| p.source.kind == "search"));
-    let unbuilt = cat.specs.iter().find(|s| !cat.builds.contains_key(&s.asset.id));
+    let journey = super::start::journey(ctx, &cat, &cfg);
     let next = if findings["error"].as_u64().unwrap_or(0) > 0 {
         "Corrige primero los errores de «check».".to_string()
     } else if let Some(s) = search {
         format!("La ficha «{}» tiene piezas por buscar: resuélvelas.", s.asset.id)
-    } else if let Some(s) = unbuilt {
-        format!("Construye la ficha «{}», que aún no tiene modelo.", s.asset.id)
+    } else if let Some(n) = super::start::next(&cfg, &journey) {
+        n
     } else if !missing.is_empty() {
         format!("Completa el contexto: {}.", missing[0])
     } else {
@@ -85,6 +85,7 @@ pub fn status(ctx: &Ctx) -> Result<Value, String> {
         "findings": findings,
         "context": { "claims": c.claims.len(), "open_questions": c.questions.iter().filter(|q| q.status == "open").count(), "missing": missing },
         "next": next,
+        "assets": journey,
         "tools": kiln_core::tools::present(&cfg),
     });
     if let Some(t) = ui_target(ctx, &cfg, &c, &cat) {

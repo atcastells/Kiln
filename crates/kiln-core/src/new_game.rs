@@ -98,8 +98,15 @@ pub fn scaffold(dir: &Path, game: &NewGame) -> Result<Vec<String>, String> {
         .ok()
         .filter(|t| *t > 0)
         .unwrap_or(20_000);
+    // Where a verified asset goes: into the Godot project when the folder
+    // is one, else a folder of its own that the person can copy from.
+    let publish = if dir.join("project.godot").is_file() {
+        "\n[tools]\ngodot_project = \".\"\n\n[publish]\ndir = \"assets/kiln\"\n"
+    } else {
+        "\n[publish]\ndir = \"publicado\"\n"
+    };
     let toml_text = format!(
-        "[project]\nname = {}\nkind = \"game\"\nengine = \"godot\"\n\n[assets]\nkits = [\"assets/kits\"]\nspecs = \"kiln/specs\"\n\n[materials]\ntables = [\"kiln/materials.toml\"]\n\n[rules]\nlicenses = {licenses}\nmax_tris = {tris}\n\n[context]\nfile = \"kiln/context.toml\"\n",
+        "[project]\nname = {}\nkind = \"game\"\nengine = \"godot\"\n\n[assets]\nkits = [\"assets/kits\"]\nspecs = \"kiln/specs\"\n\n[materials]\ntables = [\"kiln/materials.toml\"]\n\n[rules]\nlicenses = {licenses}\nmax_tris = {tris}\n\n[context]\nfile = \"kiln/context.toml\"\n{publish}",
         toml::Value::String(name.into())
     );
     let mut ctx = Context::default();

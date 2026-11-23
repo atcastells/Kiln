@@ -8,7 +8,7 @@ con Blender y Godot. Rust, sin dependencias fuera de Rust en el servidor.
 
 ```bash
 cargo build --release      # binario target/release/kiln
-cargo test --workspace     # 694 pasan, 0 fallan, 31 ignorados; ~15 s en caliente
+cargo test --workspace     # 709 pasan, 0 fallan, 31 ignorados; ~15 s en caliente
 KILN_CANONICAL_RECIPES=<ASTRA>/godot/assets/kiln cargo test --workspace -- --ignored   # los 31: piden blender y godot en el PATH (`model_build`, solo blender); los de geometría canónica leen las recetas de ASTRA; `integrity_fixture` pide `KILN_MESH_FIXTURE=<ASTRA>/godot/assets/kiln/historic_cavity/historic_cavity.glb`
 cargo clippy --workspace --all-targets -- -D warnings   # limpio, sin avisos
 scripts/ui_test.sh         # UI en Chrome sin ventana; pide node >= 22 y Chrome
@@ -28,7 +28,7 @@ Todo es actual; no hay partes heredadas.
 - `crates/kiln-cli`: binario `kiln` (núcleo en `core.rs`, trabajos en
   `jobs.rs`, página en `serve.rs`, MCP en `crates/kiln-cli/src/mcp`, agente,
   verificación) y la página web en `crates/kiln-cli/ui`.
-- `skills/`: skills que Kiln pasa a `claude -p` (asset, context, review).
+- `skills/`: skills que Kiln pasa a `claude -p` (asset, context, review) y el recorrido `kiln-start` (start).
 - `examples/`: Puerto Niebla, juego inventado que sirve de fixture.
 - `.sdlc/`: una carpeta por entrega (`k0NN-*`, `eN-*`).
 

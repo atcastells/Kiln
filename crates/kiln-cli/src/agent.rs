@@ -612,7 +612,7 @@ pub fn claude() -> Command {
         c.args(["/C", "claude"]);
         c
     } else {
-        Command::new("claude")
+        Command::new(kiln_core::tools::resolve("claude", "claude"))
     };
     c.env_remove("ANTHROPIC_API_KEY").env_remove("ANTHROPIC_AUTH_TOKEN");
     c
