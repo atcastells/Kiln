@@ -160,7 +160,7 @@ pub fn probe(name: &str, program: &str, min: Option<&str>) -> Tool {
 
 /// The tools Kiln knows of: name, configured program and oldest version tested.
 fn known(config: &crate::Config) -> Vec<(&'static str, String, Option<&'static str>)> {
-    let claude = std::env::var("KILN_CLAUDE").unwrap_or_else(|_| "claude".into());
+    let claude = std::env::var("KILN_CLAUDE").unwrap_or_else(|_| resolve("claude", "claude"));
     vec![
         ("blender", config.tools.blender.clone(), Some("5.0")),
         ("godot", config.tools.godot.clone(), Some("4.7")),
@@ -197,6 +197,148 @@ pub fn present(config: &crate::Config) -> Vec<Tool> {
             }
         })
         .collect()
+}
+
+// --- Programs outside the PATH ------------------------------------------
+//
+// A beginner installs Blender or Godot as an app and never puts it on the
+// PATH. `kiln setup` looks in the usual places and saves what it finds in a
+// file of the user (not of a project): a `kiln.toml` that leaves the plain
+// name (`blender`, `godot`) gets the saved program when the name is not on
+// the PATH. A program named in `kiln.toml` is never replaced.
+
+/// The programs `setup` looks for, and where to get each one.
+pub const SETUP: [(&str, &str); 3] = [
+    ("blender", "https://www.blender.org/download/"),
+    ("godot", "https://godotengine.org/download/"),
+    ("claude", "https://code.claude.com/docs/en/setup"),
+];
+
+static SAVED_FILE: std::sync::RwLock<Option<std::path::PathBuf>> = std::sync::RwLock::new(None);
+
+/// The file with the programs saved by `setup` (`$KILN_HOME/tools.json`).
+/// Read on every use, so a save from another process counts at once.
+pub fn set_saved_file(path: Option<std::path::PathBuf>) {
+    *SAVED_FILE.write().unwrap_or_else(|e| e.into_inner()) = path;
+}
+
+/// The file set with `set_saved_file`, if any.
+pub fn saved_file() -> Option<std::path::PathBuf> {
+    SAVED_FILE.read().unwrap_or_else(|e| e.into_inner()).clone()
+}
+
+/// The programs saved by `setup`, by name. A missing or broken file is empty.
+pub fn saved() -> std::collections::BTreeMap<String, String> {
+    saved_file().map(|f| saved_in(&f)).unwrap_or_default()
+}
+
+/// The programs saved in `file`.
+pub fn saved_in(file: &std::path::Path) -> std::collections::BTreeMap<String, String> {
+    std::fs::read(file)
+        .ok()
+        .and_then(|b| serde_json::from_slice(&b).ok())
+        .unwrap_or_default()
+}
+
+/// Writes `program` for `name` in `file`.
+pub fn save_in(file: &std::path::Path, name: &str, program: &std::path::Path) -> Result<(), String> {
+    let mut all = saved_in(file);
+    all.insert(name.to_string(), program.to_string_lossy().into_owned());
+    if let Some(d) = file.parent() {
+        std::fs::create_dir_all(d).map_err(|e| format!("{}: {e}", d.display()))?;
+    }
+    let json = serde_json::to_vec_pretty(&all).map_err(|e| e.to_string())?;
+    let tmp = file.with_extension(format!("json.{}", std::process::id()));
+    std::fs::write(&tmp, json).map_err(|e| format!("{}: {e}", tmp.display()))?;
+    std::fs::rename(&tmp, file).map_err(|e| format!("{}: {e}", file.display()))
+}
+
+/// The program to run for `name`: `configured` when it names its own
+/// program or the plain name is on the PATH; else the one saved by `setup`.
+pub fn resolve(name: &str, configured: &str) -> String {
+    if configured != name || locate(configured).is_some() {
+        return configured.to_string();
+    }
+    match saved().remove(name) {
+        Some(p) if locate(&p).is_some() => p,
+        _ => configured.to_string(),
+    }
+}
+
+/// Where `name` is usually installed when it is not on the PATH: app
+/// bundles, Steam, Homebrew and the user's own folders. `root` is `/` (a
+/// test passes a temporary folder) and `home` the user's folder.
+pub fn candidates(name: &str, root: &std::path::Path, home: Option<&std::path::Path>) -> Vec<std::path::PathBuf> {
+    use std::path::{Path, PathBuf};
+    let at = |p: &str| root.join(p.trim_start_matches('/'));
+    let mut dirs: Vec<PathBuf> = vec![at("/Applications")];
+    if let Some(h) = home {
+        dirs.push(h.join("Applications"));
+    }
+    // Every `<prefix>*.app` in the folders of apps, newest name last.
+    let apps = |prefix: &str, exe: &str| -> Vec<PathBuf> {
+        let mut found = Vec::new();
+        for d in &dirs {
+            let Ok(rd) = std::fs::read_dir(d) else { continue };
+            let mut names: Vec<String> = rd
+                .filter_map(|e| e.ok())
+                .map(|e| e.file_name().to_string_lossy().into_owned())
+                .filter(|n| n.starts_with(prefix) && n.ends_with(".app"))
+                .collect();
+            names.sort();
+            found.extend(names.into_iter().rev().map(|n| d.join(n).join("Contents/MacOS").join(exe)));
+        }
+        found
+    };
+    let steam: Vec<PathBuf> = home
+        .map(|h| {
+            vec![
+                h.join("Library/Application Support/Steam/steamapps/common"),
+                h.join(".steam/steam/steamapps/common"),
+                h.join(".local/share/Steam/steamapps/common"),
+            ]
+        })
+        .unwrap_or_default();
+    let in_home = |rel: &str| home.map(|h| h.join(rel));
+    let mut out: Vec<PathBuf> = Vec::new();
+    match name {
+        "blender" => {
+            out.extend(apps("Blender", "Blender"));
+            for s in &steam {
+                out.push(s.join("Blender/Blender.app/Contents/MacOS/Blender"));
+                out.push(s.join("Blender/blender"));
+            }
+            for p in ["/opt/homebrew/bin/blender", "/usr/local/bin/blender", "/snap/bin/blender", "/usr/bin/blender"] {
+                out.push(at(p));
+            }
+            out.extend(in_home(".local/bin/blender"));
+            out.push(at("/var/lib/flatpak/exports/bin/org.blender.Blender"));
+        }
+        "godot" => {
+            out.extend(apps("Godot", "Godot"));
+            for s in &steam {
+                out.push(s.join("Godot Engine/Godot.app/Contents/MacOS/Godot"));
+                out.push(s.join("Godot Engine/godot"));
+            }
+            for p in ["/opt/homebrew/bin/godot", "/usr/local/bin/godot", "/snap/bin/godot", "/usr/bin/godot"] {
+                out.push(at(p));
+            }
+            out.extend(in_home(".local/bin/godot"));
+            out.push(at("/var/lib/flatpak/exports/bin/org.godotengine.Godot"));
+        }
+        "claude" => {
+            out.extend(in_home(".claude/local/claude"));
+            out.extend(in_home(".local/bin/claude"));
+            out.extend(in_home(".npm-global/bin/claude"));
+            for p in ["/opt/homebrew/bin/claude", "/usr/local/bin/claude"] {
+                out.push(at(p));
+            }
+        }
+        _ => {}
+    }
+    let mut seen = std::collections::BTreeSet::new();
+    out.retain(|p: &PathBuf| seen.insert(p.clone()) && locate(&p.to_string_lossy()).is_some() && !Path::new(p).is_dir());
+    out
 }
 
 #[cfg(test)]
@@ -300,5 +442,60 @@ mod tests {
         assert!(!mark.exists(), "present must not run the tool");
         assert!(locate("sh").is_some() && locate("kiln-no-such-tool").is_none());
         std::fs::remove_dir_all(&dir).unwrap();
+    }
+}
+
+#[cfg(all(test, unix))]
+mod setup_tests {
+    use super::*;
+    use std::os::unix::fs::PermissionsExt;
+
+    fn exe(p: &std::path::Path) {
+        std::fs::create_dir_all(p.parent().unwrap()).unwrap();
+        std::fs::write(p, "#!/bin/sh\necho 'Blender 5.0.1'\n").unwrap();
+        std::fs::set_permissions(p, std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    #[test]
+    fn finds_apps_steam_and_homebrew_outside_the_path() {
+        let root = std::env::temp_dir().join(format!("kiln-cand-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let home = root.join("Users/ana");
+        let app = root.join("Applications/Blender.app/Contents/MacOS/Blender");
+        let steam = home.join("Library/Application Support/Steam/steamapps/common/Blender/Blender.app/Contents/MacOS/Blender");
+        let godot = root.join("Applications/Godot_mono.app/Contents/MacOS/Godot");
+        let brew = root.join("opt/homebrew/bin/godot");
+        let claude = home.join(".claude/local/claude");
+        for p in [&app, &steam, &godot, &brew, &claude] {
+            exe(p);
+        }
+        // A file that cannot run is not a candidate.
+        std::fs::create_dir_all(root.join("usr/local/bin")).unwrap();
+        std::fs::write(root.join("usr/local/bin/blender"), "x").unwrap();
+
+        assert_eq!(candidates("blender", &root, Some(&home)), vec![app, steam]);
+        assert_eq!(candidates("godot", &root, Some(&home)), vec![godot, brew]);
+        assert_eq!(candidates("claude", &root, Some(&home)), vec![claude]);
+        assert!(candidates("curl", &root, Some(&home)).is_empty());
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    #[test]
+    fn a_saved_program_fills_in_only_the_plain_name_off_the_path() {
+        let root = std::env::temp_dir().join(format!("kiln-saved-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&root);
+        let prog = root.join("Blender.app/Contents/MacOS/Blender");
+        exe(&prog);
+        set_saved_file(Some(root.join("home/tools.json")));
+        assert!(saved().is_empty(), "no file yet");
+        save_in(&root.join("home/tools.json"), "kiln-test-tool", &prog).unwrap();
+        let p = prog.to_string_lossy().into_owned();
+        assert_eq!(saved()["kiln-test-tool"], p);
+        assert_eq!(resolve("kiln-test-tool", "kiln-test-tool"), p, "plain name, not on the PATH");
+        assert_eq!(resolve("kiln-test-tool", "/x/own"), "/x/own", "a program of kiln.toml stays");
+        std::fs::remove_file(&prog).unwrap();
+        assert_eq!(resolve("kiln-test-tool", "kiln-test-tool"), "kiln-test-tool", "a saved program that is gone is not used");
+        set_saved_file(None);
+        std::fs::remove_dir_all(&root).unwrap();
     }
 }

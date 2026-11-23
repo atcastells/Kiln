@@ -1,4 +1,4 @@
-//! Prompts over MCP: the three skills, their arguments and the request limit.
+//! Prompts over MCP: the four skills, their arguments and the request limit.
 //! A request over 500 characters is a protocol error (invalid params).
 mod common;
 
@@ -13,12 +13,12 @@ fn args_of(prompts: &[serde_json::Value], name: &str) -> Vec<String> {
 }
 
 #[test]
-fn list_has_the_three_with_their_arguments() {
+fn list_has_the_four_with_their_arguments() {
     let p = temp_project("");
     let mut m = Mcp::start(p.path());
     let r = m.request("prompts/list", serde_json::json!({}));
     let ps = r["prompts"].as_array().unwrap();
-    assert_eq!(ps.len(), 3, "{r}");
+    assert_eq!(ps.len(), 4, "{r}");
     // Claude Code splits a slash command on spaces and hands the words out in
     // order: `request` is the one and optional argument (approved by the developer).
     let asset = args_of(ps, "kiln-asset");
@@ -28,6 +28,26 @@ fn list_has_the_three_with_their_arguments() {
     let ctx = args_of(ps, "kiln-context");
     assert!(ctx.contains(&"mode".into()) && ctx.contains(&"layer".into()), "{ctx:?}");
     assert!(args_of(ps, "kiln-review").is_empty());
+    // A slash command with no arguments: `/mcp__kiln__kiln-start` runs as it is.
+    assert!(args_of(ps, "kiln-start").is_empty());
+}
+
+#[test]
+fn start_prompt_walks_from_tools_to_publishing() {
+    let p = temp_project("");
+    let mut m = Mcp::start(p.path());
+    let r = m.request("prompts/get", serde_json::json!({"name": "kiln-start"}));
+    let msgs = r["messages"].as_array().unwrap();
+    assert_eq!(msgs.len(), 1, "{r}");
+    let t = msgs[0]["content"]["text"].as_str().unwrap();
+    assert!(!t.starts_with("---"), "no front matter: {t}");
+    let order = ["`setup`", "`example_create`", "`spec_write`", "`build`", "`preview`", "`verify`", "`publish`"];
+    let at: Vec<usize> = order.iter().map(|w| t.find(w).unwrap_or_else(|| panic!("{w}: {t}"))).collect();
+    assert!(at.windows(2).all(|w| w[0] < w[1]), "the steps are in order: {at:?}");
+    assert!(t.contains("No uses nunca `reviewer = \"kiln\"`"), "D1: {t}");
+    // The same text for clients that do not pass prompts on.
+    let g = m.call("guide", serde_json::json!({"topic": "start"}));
+    assert!(!g.is_error && g.text.contains("example_create"), "{}", g.text);
 }
 
 #[test]

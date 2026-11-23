@@ -586,7 +586,10 @@ impl Config {
     }
 
     pub fn parse(text: &str) -> Result<Config, String> {
-        let c: Config = toml::from_str(text).map_err(|e| e.to_string())?;
+        let mut c: Config = toml::from_str(text).map_err(|e| e.to_string())?;
+        // Blender and Godot installed as apps: the programs saved by `kiln setup`.
+        c.tools.blender = crate::tools::resolve("blender", &c.tools.blender);
+        c.tools.godot = crate::tools::resolve("godot", &c.tools.godot);
         if !(1..=64).contains(&c.generate.verify_seeds) {
             return Err("[generate] verify_seeds debe estar entre 1 y 64".into());
         }

@@ -1378,8 +1378,58 @@ El núcleo hereda el entorno del primer `kiln mcp` que lo arrancó (`PATH`,
 tras `kiln stop`. La orden `kiln build` y las demás de la terminal siguen
 trabajando por su cuenta, fuera del núcleo.
 
+## Entrega 18: el primer asset conversando (K018)
+
+Alguien que no conoce Kiln lo registra una vez en Claude Code y, desde ahí,
+llega a su primer asset publicado solo hablando:
+
+```bash
+claude mcp add --scope user kiln -- /ruta/a/kiln mcp
+```
+
+En Claude Code, `/mcp__kiln__kiln-start` empieza el recorrido (en la terminal,
+la app de escritorio y la extensión de VS Code es el mismo comando). El
+agente comprueba las herramientas, abre el juego de la persona o crea uno de
+ejemplo, monta, enseña, verifica y publica. El prompt vive en
+`skills/start/SKILL.md`; `guide` con `start` da el mismo texto a los clientes
+que no pasan prompts.
+
+- **`setup`** (y `kiln setup` en la terminal) busca Blender, Godot y Claude
+  Code aunque no estén en el PATH: apps de `/Applications` y
+  `~/Applications`, Steam, Homebrew, Snap, Flatpak y `~/.local/bin`. Guarda lo
+  que encuentra en `tools.json`, en la carpeta de Kiln, para todos los
+  proyectos: un `kiln.toml` que deja el nombre a secas (`blender`, `godot`)
+  usa el programa guardado cuando ese nombre no está en el PATH; uno que nombra
+  su propio programa no cambia. Si falta algo, da el enlace de descarga.
+  Desde el MCP solo se puede elegir entre lo que Kiln encontró; una ruta
+  cualquiera la guarda la persona con `kiln setup --blender RUTA` (igual con
+  `--godot` y `--claude`).
+- **`example_create`** crea en una carpeta nueva o vacía un juego de ejemplo
+  ya abierto y de confianza: las respuestas básicas, una paleta de siete
+  colores y la ficha de un farol hecho solo de formas, que se monta con
+  Blender sin descargar nada.
+- **`config_get` / `config_set`** leen y cambian lo esencial de `kiln.toml`
+  (nombre, licencias, triángulos, `publish.dir`, `tools.godot_project`,
+  tiempo máximo) sin tocar el resto del fichero ni sus comentarios. Las
+  carpetas deben quedar dentro del proyecto. Los programas no se cambian por
+  aquí.
+- **`palette_add`** añade un color liso a la paleta del juego.
+- **`preview`** dibuja el asset montado (o generado) desde el frente, el
+  perfil, la planta y tres cuartos, en una sola imagen que la conversación
+  enseña, con sus medidas y triángulos. La dibuja Kiln en Rust, al momento y
+  sin Blender ni Godot, y la guarda junto al modelo (`preview.png`), porque la
+  terminal no enseña imágenes.
+- **`open_viewer`** abre la página del núcleo en el visor 3D del asset.
+- **`status`** dice en qué punto está cada asset (`assets`: montado,
+  verificado, publicado) y el siguiente paso, del primer asset a publicarlo.
+- Un juego nuevo ya trae `[publish] dir`: `assets/kiln` dentro de su proyecto
+  de Godot, o `publicado` si la carpeta no lo es.
+
+La revisión ya no lanza un segundo Claude por su cuenta (D1, desde la entrega
+17): el recorrido pide al agente del cliente que revise con `kiln-review`.
+
 ## Lo que viene
 
-- El primer asset de punta a punta y la app de escritorio (Tauri).
+- La instalación como plugin de Claude Code y la app de escritorio (Tauri).
 - Assets hechos de assets, lo que falta: la vista 3D con el padre en gris, el árbol que sigue por las piezas-asset, el agente que pide un nivel cada vez y los anclajes.
 - El grafo pasará a Rete.js cuando los nodos se puedan editar.

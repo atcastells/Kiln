@@ -21,6 +21,8 @@ pub mod license;
 pub mod mesh;
 pub mod model;
 pub mod new_game;
+pub mod png;
+pub mod preview;
 pub mod review;
 pub mod sources;
 pub mod spec;

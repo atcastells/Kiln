@@ -106,12 +106,12 @@ fn read_within(bytes: &[u8], max_total: usize) -> Result<WithSkipped, String> {
     Ok((meshes, skipped))
 }
 
-fn u32_at(b: &[u8], at: usize) -> Option<u32> {
+pub(crate) fn u32_at(b: &[u8], at: usize) -> Option<u32> {
     let end = at.checked_add(4)?;
     Some(u32::from_le_bytes(b.get(at..end)?.try_into().ok()?))
 }
 
-fn bin_chunk(bytes: &[u8]) -> Result<&[u8], String> {
+pub(crate) fn bin_chunk(bytes: &[u8]) -> Result<&[u8], String> {
     let broken = || "GLB roto: bloques truncados".to_string();
     let mut at = (u32_at(bytes, 12).ok_or_else(broken)? as usize)
         .checked_add(20)
@@ -217,7 +217,7 @@ fn locate<'a>(
     })
 }
 
-fn primitive(doc: &Value, bin: &[u8], prim: &Value) -> Result<Mesh, String> {
+pub(crate) fn primitive(doc: &Value, bin: &[u8], prim: &Value) -> Result<Mesh, String> {
     let pos = locate(doc, bin, &prim["attributes"]["POSITION"], "VEC3", &[5126], MAX_VERTICES)?;
     let mut positions = Vec::with_capacity(pos.count);
     for i in 0..pos.count {

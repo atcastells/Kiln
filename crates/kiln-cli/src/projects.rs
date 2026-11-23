@@ -31,6 +31,11 @@ pub fn home() -> Option<PathBuf> {
     }
 }
 
+/// Where `kiln setup` keeps the programs it found: `$KILN_HOME/tools.json`.
+pub fn tools_file() -> Option<PathBuf> {
+    home().map(|h| h.join("tools.json"))
+}
+
 /// The entries in `dir`, newest first. A missing or broken file is empty.
 pub fn list(dir: &Path) -> Vec<Entry> {
     let mut v: Vec<Entry> = std::fs::read(dir.join(FILE))

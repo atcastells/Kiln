@@ -14,6 +14,7 @@ mod prompts;
 mod read;
 mod sources;
 mod specs;
+mod start;
 
 use crate::agent::{Ctx, Jobs};
 use crate::projects as registry;
@@ -55,7 +56,8 @@ pub struct Kiln {
 }
 
 const INSTRUCTIONS: &str = "Kiln prepara los assets y el contenido de un juego. \
-Empieza por `status`: dice qué proyecto está abierto. Con `projects`, `project_open` y \
+Si la persona es nueva en Kiln o no hay proyecto abierto, sigue el prompt `kiln-start` (o `guide` con `start`): \
+lleva de cero al primer asset publicado. Si no, empieza por `status`: dice qué proyecto está abierto y el siguiente paso. Con `projects`, `project_open` y \
 `project_create` se cambia de juego sin salir de la conversación. El trabajo de agente \
 lo haces tú siguiendo los prompts `kiln-asset` y `kiln-context` (o `guide` con `asset`, \
 `review` o `context` si no los ves); Kiln comprueba y escribe. Montar, pintar, medir con Godot, revisar y traer son trabajos largos: devuelven \
@@ -89,6 +91,7 @@ impl Kiln {
                 + Self::sources_router()
                 + Self::new_game_router()
                 + Self::projects_router()
+                + Self::start_router()
                 + Self::guide_router(),
             prompt_router: Self::prompts_router(),
         };

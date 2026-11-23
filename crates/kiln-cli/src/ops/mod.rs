@@ -8,6 +8,8 @@ pub mod production;
 pub mod publish;
 pub mod publish_recipe;
 pub mod read;
+pub mod setup;
+pub mod start;
 pub mod sources;
 pub mod specs;
 

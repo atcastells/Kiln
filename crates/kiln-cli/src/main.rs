@@ -4,6 +4,7 @@
 //!   kiln check  --project DIR [--config FILE]                findings; exit 1 on errors
 //!   kiln tools  --project DIR [--config FILE]                external tools found, with their versions
 //!   kiln mcp    [--project DIR] [--config FILE]              MCP over stdio, for Claude Code; without --project it serves any project
+//!   kiln setup  [--blender PATH] [--godot PATH] [--claude PATH]   find Blender, Godot and Claude Code outside the PATH and save them for every project
 //!   kiln trust  --project DIR                                let `kiln mcp` run Blender, Godot and Claude in that project
 //!   kiln serve  [--project DIR] [--config FILE] [--port 4330] [--ui-dir DIR]  the core and its page at http://127.0.0.1:PORT (--ui-dir: read the new UI from disk); with a core running, it shows DIR there
 //!   kiln stop   [--force]                                    the core saves its jobs and leaves (--force: even with jobs running)
@@ -52,6 +53,8 @@ struct Args {
     /// `serve --core`: started by `kiln mcp`, leaves when nobody uses it.
     core: bool,
     force: bool,
+    /// `setup --blender PATH` and the like: programs the person names.
+    programs: Vec<(String, PathBuf)>,
 }
 
 fn parse() -> Result<Args, String> {
@@ -71,6 +74,7 @@ fn parse() -> Result<Args, String> {
         project_given: false,
         core: false,
         force: false,
+        programs: Vec::new(),
     };
     while let Some(flag) = it.next() {
         if flag == "--core" || flag == "--force" {
@@ -89,6 +93,10 @@ fn parse() -> Result<Args, String> {
             "--variant" => a.variant = Some(val()?),
             "--set" => a.set = Some(val()?),
             "--ui-dir" => a.ui_dir = Some(PathBuf::from(val()?)),
+            "--blender" | "--godot" | "--claude" => {
+                let p = PathBuf::from(val()?);
+                a.programs.push((flag.trim_start_matches('-').to_string(), p));
+            }
             "--port" => a.port = val()?.parse().map_err(|_| "--port debe ser un número")?,
             "--seed" => a.seed = Some(val()?.parse().map_err(|_| "--seed debe ser un número entero sin signo (u32)")?),
             other => return Err(format!("opción desconocida {other}\n{USAGE}")),
@@ -99,7 +107,7 @@ fn parse() -> Result<Args, String> {
     Ok(a)
 }
 
-const USAGE: &str = "uso: kiln <index|check|tools|mcp|trust|serve|stop|build|generate|paint|verify|publish|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--ui-dir DIR] [--asset ID] [--variant ID] [--set NAME] [--seed N] [--force]";
+const USAGE: &str = "uso: kiln <index|check|tools|setup|mcp|trust|serve|stop|build|generate|paint|verify|publish|review|godot|content-manifest> --project DIR [--config FILE] [--out FILE] [--port N] [--ui-dir DIR] [--asset ID] [--variant ID] [--set NAME] [--seed N] [--force] [--blender PATH] [--godot PATH] [--claude PATH]";
 
 pub fn load(
     project: &std::path::Path,
@@ -112,6 +120,7 @@ pub fn load(
 }
 
 fn main() -> ExitCode {
+    kiln_core::tools::set_saved_file(projects::tools_file());
     let args = match parse() {
         Ok(a) => a,
         Err(e) => {
@@ -182,6 +191,29 @@ fn main() -> ExitCode {
                     let line = format!("{:<w$}  {:<10}  {:<13}  {}", t.name, version, state, t.note.as_deref().unwrap_or(""));
                     println!("{}", line.trim_end());
                 }
+                Ok(ExitCode::SUCCESS)
+            }
+            "setup" => {
+                let file = projects::tools_file().ok_or("no se sabe dónde guardar las herramientas: define KILN_HOME")?;
+                for (name, p) in &args.programs {
+                    ops::setup::set(&file, name, p)?;
+                    eprintln!("{name}: {}", p.display());
+                }
+                let home = std::env::var_os("HOME").map(PathBuf::from);
+                let v = ops::setup::setup(Some(&file), &Default::default(), std::path::Path::new("/"), home.as_deref())?;
+                for t in v["tools"].as_array().into_iter().flatten() {
+                    let name = t["name"].as_str().unwrap_or_default();
+                    let line = match t["path"].as_str() {
+                        Some(p) => format!(
+                            "{name:<8} {:<10} {p}{}",
+                            t["version"].as_str().unwrap_or("-"),
+                            t["note"].as_str().map(|n| format!("  ({n})")).unwrap_or_default()
+                        ),
+                        None => format!("{name:<8} ausente    {}", t["download"].as_str().unwrap_or_default()),
+                    };
+                    println!("{line}");
+                }
+                eprintln!("{}", v["next"].as_str().unwrap_or_default());
                 Ok(ExitCode::SUCCESS)
             }
             "trust" => {

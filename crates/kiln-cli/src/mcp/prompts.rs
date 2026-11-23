@@ -9,6 +9,7 @@ use rmcp::{ErrorData, prompt, prompt_router, schemars, tool, tool_router};
 const ASSET_SKILL: &str = include_str!("../../../../skills/asset/SKILL.md");
 const CONTEXT_SKILL: &str = include_str!("../../../../skills/context/SKILL.md");
 const REVIEW_SKILL: &str = include_str!("../../../../skills/review/SKILL.md");
+const START_SKILL: &str = include_str!("../../../../skills/start/SKILL.md");
 
 const ASSET_HEADER: &str = "Eres el agente de la skill `kiln-asset` de Kiln. El texto de la skill \
 habla de ficheros y rutas: aquí no leas ni escribas ficheros, usa las herramientas de Kiln.\n\
@@ -60,8 +61,11 @@ struct ContextArgs {
 struct ReviewArgs {}
 
 #[derive(serde::Deserialize, schemars::JsonSchema)]
+struct StartArgs {}
+
+#[derive(serde::Deserialize, schemars::JsonSchema)]
 struct GuideArgs {
-    /// Qué guía: `asset` (desgranar un asset en su ficha, con los vocabularios de generación y de modelado), `review` (revisar un montaje) o `context` (ordenar el contexto).
+    /// Qué guía: `start` (de cero al primer asset publicado, para quien empieza), `asset` (desgranar un asset en su ficha, con los vocabularios de generación y de modelado), `review` (revisar un montaje) o `context` (ordenar el contexto).
     topic: String,
 }
 
@@ -82,26 +86,42 @@ fn review_text() -> String {
     format!("{REVIEW_HEADER}\n\n{REVIEW_SKILL}")
 }
 
+/// The guide without its front matter, which is for skill loaders.
+fn start_text() -> String {
+    let body = START_SKILL.strip_prefix("---").and_then(|r| r.split_once("\n---\n")).map_or(START_SKILL, |(_, b)| b);
+    body.trim_start().to_string()
+}
+
 fn context_text() -> String {
     format!("{CONTEXT_HEADER}\n\n{CONTEXT_SKILL}")
 }
 
 #[tool_router(router = guide_router, vis = "pub(super)")]
 impl Kiln {
-    /// El texto de los prompts `kiln-asset`, `kiln-review` y `kiln-context` como herramienta, para los clientes que no pasan los prompts al modelo. Léelo antes de escribir una ficha (`asset`: formato, fuentes y vocabularios) o de revisar un montaje (`review`).
+    /// El texto de los prompts `kiln-start`, `kiln-asset`, `kiln-review` y `kiln-context` como herramienta, para los clientes que no pasan los prompts al modelo. Léelo al empezar con alguien nuevo (`start`), antes de escribir una ficha (`asset`: formato, fuentes y vocabularios) o de revisar un montaje (`review`).
     #[tool(annotations(read_only_hint = true))]
     async fn guide(&self, Parameters(a): Parameters<GuideArgs>) -> Reply {
         match a.topic.as_str() {
             "asset" => ok(asset_text()),
             "review" => ok(review_text()),
             "context" => ok(context_text()),
-            _ => fail("topic debe ser asset, review o context"),
+            "start" => ok(start_text()),
+            _ => fail("topic debe ser start, asset, review o context"),
         }
     }
 }
 
 #[prompt_router(router = "prompts_router", vis = "pub(super)")]
 impl Kiln {
+    /// De cero al primer asset publicado, para quien empieza.
+    #[prompt(
+        name = "kiln-start",
+        description = "Empieza con Kiln: comprueba las herramientas, abre o crea tu juego (o uno de ejemplo) y lleva tu primer asset hasta el juego, solo conversando."
+    )]
+    async fn kiln_start(&self, Parameters(_): Parameters<StartArgs>) -> Vec<PromptMessage> {
+        user(format!("{}\n\nEmpieza ahora por el paso 1.", start_text()))
+    }
+
     /// Desglosar la petición de un asset en su ficha.
     #[prompt(
         name = "kiln-asset",

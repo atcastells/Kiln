@@ -10,16 +10,19 @@ use std::io::{BufRead, Write};
 use std::path::Path;
 
 /// (name, readOnly, destructive, idempotent, openWorld); absent hint = false.
-const SURFACE: [(&str, bool, bool, bool, bool); 37] = [
+const SURFACE: [(&str, bool, bool, bool, bool); 44] = [
     ("bind", false, true, true, false),
     ("build", false, true, false, false),
     ("catalog", true, false, false, false),
     ("check", true, false, false, false),
+    ("config_get", true, false, false, false),
+    ("config_set", false, false, true, false),
     ("content", true, false, false, false),
     ("content_manifest", false, false, false, false),
     ("context_edit", false, true, false, false),
     ("context_get", true, false, false, false),
     ("context_propose", false, false, false, false),
+    ("example_create", false, false, false, false),
     ("generate", false, true, false, false),
     ("godot_measure", false, false, false, false),
     ("guide", true, false, false, false),
@@ -30,7 +33,10 @@ const SURFACE: [(&str, bool, bool, bool, bool); 37] = [
     ("material_validate", false, true, true, false),
     ("new_game", false, false, false, false),
     ("new_game_options", true, false, false, false),
+    ("open_viewer", true, false, false, false),
     ("paint", false, true, false, false),
+    ("palette_add", false, false, false, false),
+    ("preview", false, false, true, false),
     ("project_create", false, false, false, false),
     ("project_open", false, false, false, false),
     ("projects", true, false, false, false),
@@ -40,6 +46,7 @@ const SURFACE: [(&str, bool, bool, bool, bool); 37] = [
     ("review_submit", false, true, false, false),
     ("search", true, false, false, true),
     ("settle", false, false, false, false),
+    ("setup", false, false, true, false),
     ("spec_get", true, false, false, false),
     ("spec_layout", false, true, true, false),
     ("spec_write", false, true, true, false),
@@ -76,7 +83,7 @@ fn tool_list_and_annotations_are_pinned() {
     let r = m.request("prompts/list", json!({}));
     let mut names: Vec<&str> = r["prompts"].as_array().unwrap().iter().map(|p| p["name"].as_str().unwrap()).collect();
     names.sort();
-    assert_eq!(names, ["kiln-asset", "kiln-context", "kiln-review"]);
+    assert_eq!(names, ["kiln-asset", "kiln-context", "kiln-review", "kiln-start"]);
 }
 
 fn snapshot(root: &Path) -> BTreeMap<String, Vec<u8>> {
